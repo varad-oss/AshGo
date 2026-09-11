@@ -35,6 +35,7 @@ import java.io.ByteArrayOutputStream
 fun TravelerChatScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     var showSelfiePrompt by remember { mutableStateOf(true) }
 
     // Camera launcher
@@ -76,6 +77,13 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         })
     }
 
+    
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,6 +117,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
 
         // Messages List
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()

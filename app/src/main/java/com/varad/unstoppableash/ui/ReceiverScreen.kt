@@ -52,6 +52,7 @@ fun ReceiverScreen(initialMode: String = "split") {
     var viewMode by remember { mutableStateOf(initialMode) }
     var messageText by remember { mutableStateOf("") }
     val messages = remember { mutableStateListOf<ChatMessage>() }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     
     // Pune coordinates default
     var travelerLocation by remember { mutableStateOf(Pair(18.5204, 73.8567)) }
@@ -116,6 +117,13 @@ fun ReceiverScreen(initialMode: String = "split") {
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+
+    
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
     }
 
     Column(
@@ -225,6 +233,7 @@ fun ReceiverScreen(initialMode: String = "split") {
 
                 // Messages List
                 LazyColumn(
+            state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
