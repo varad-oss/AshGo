@@ -5,6 +5,7 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +35,7 @@ import java.io.ByteArrayOutputStream
 fun TravelerChatScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+    var showSelfiePrompt by remember { mutableStateOf(true) }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -118,18 +121,42 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             }
         }
 
-        // Cute Selfie Button
-        Button(
-            onClick = { cameraLauncher.launch(null) },
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PremiumSOS),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Icon(Icons.Rounded.CameraAlt, contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Tap to send a cute selfie!", fontWeight = FontWeight.Bold)
+        // Cute Selfie Prompt
+        if (showSelfiePrompt) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = PremiumAccent.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, PremiumAccent.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { cameraLauncher.launch(null) },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(PremiumAccent, CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.CameraAlt, contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Tap to send a cute selfie!",
+                        fontWeight = FontWeight.SemiBold,
+                        color = PremiumAccent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { cameraLauncher.launch(null) }
+                    )
+                    IconButton(onClick = { showSelfiePrompt = false }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Close", tint = PremiumAccent)
+                    }
+                }
+            }
         }
 
         // Input Area
