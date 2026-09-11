@@ -36,8 +36,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    var showSelfiePrompt by remember { mutableStateOf(true) }
-
+    
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -130,44 +129,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             }
         }
 
-        // Cute Selfie Prompt
-        if (showSelfiePrompt) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = PremiumAccent.copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, PremiumAccent.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { cameraLauncher.launch(null) },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(PremiumAccent, CircleShape)
-                    ) {
-                        Icon(Icons.Rounded.CameraAlt, contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Tap to send a cute selfie!",
-                        fontWeight = FontWeight.SemiBold,
-                        color = PremiumAccent,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { cameraLauncher.launch(null) }
-                    )
-                    IconButton(onClick = { showSelfiePrompt = false }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close", tint = PremiumAccent)
-                    }
-                }
-            }
-        }
-
+        
         // Input Area
         Row(
             modifier = Modifier
@@ -175,6 +137,15 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                 .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = { cameraLauncher.launch(null) },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(PremiumSurface, CircleShape)
+            ) {
+                Icon(Icons.Rounded.CameraAlt, contentDescription = "Instant Selfie", tint = PremiumAccent)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             OutlinedTextField(
                 value = messageText,
                 onValueChange = { messageText = it },
