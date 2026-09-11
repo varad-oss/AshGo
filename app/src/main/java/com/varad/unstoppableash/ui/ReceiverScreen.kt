@@ -105,16 +105,15 @@ fun ReceiverScreen(initialMode: String = "split") {
 
 
         // Listen to Buzz
-        val loadTime = System.currentTimeMillis()
-        var lastProcessed = 0L
+        var isInitialLoad = true
         database.child("buzz").child("receiver").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                if (isInitialLoad) {
+                    isInitialLoad = false
+                    return
+                }
                 if (snapshot.exists()) {
-                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                    if (timestamp > loadTime && timestamp != lastProcessed) {
-                        lastProcessed = timestamp
-                        com.varad.unstoppableash.SoundUtil.playShockSound(context)
-                    }
+                    com.varad.unstoppableash.SoundUtil.playShockSound(context)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -237,17 +236,7 @@ fun ReceiverScreen(initialMode: String = "split") {
                     .weight(1f)
                     .background(PremiumBackground)
             ) {
-                if (viewMode == "chat") {
-                    Button(
-                        onClick = { viewMode = "split" },
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(top = 16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PremiumAccent)
-                    ) {
-                        Text("View Live Map", fontWeight = FontWeight.Bold)
-                    }
-                }
+                
 
                 // Messages List
                 LazyColumn(
@@ -271,6 +260,14 @@ fun ReceiverScreen(initialMode: String = "split") {
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = { FirebaseDatabase.getInstance().reference.child("buzz").child("traveler").setValue(System.currentTimeMillis()) },
+                        modifier = Modifier.size(48.dp).background(PremiumSurface, CircleShape)
+                    ) {
+                        Icon(androidx.compose.material.icons.Icons.Rounded.Bolt, contentDescription = "Buzz Traveler", tint = androidx.compose.ui.graphics.Color.Yellow)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     OutlinedTextField(
                         value = messageText,
                         onValueChange = { messageText = it },

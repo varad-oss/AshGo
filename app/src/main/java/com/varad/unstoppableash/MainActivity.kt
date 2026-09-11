@@ -168,16 +168,15 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
 
     LaunchedEffect(Unit) {
         val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
-        val loadTime = System.currentTimeMillis()
-        var lastProcessed = 0L
+        var isInitialLoad = true
         database.child("buzz").child("traveler").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (isInitialLoad) {
+                    isInitialLoad = false
+                    return
+                }
                 if (snapshot.exists()) {
-                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                    if (timestamp > loadTime && timestamp != lastProcessed) {
-                        lastProcessed = timestamp
-                        com.varad.unstoppableash.SoundUtil.playShockSound(context)
-                    }
+                    com.varad.unstoppableash.SoundUtil.playShockSound(context)
                 }
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
