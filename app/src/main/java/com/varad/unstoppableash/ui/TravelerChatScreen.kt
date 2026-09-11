@@ -1,4 +1,7 @@
 package com.varad.unstoppableash.ui
+import androidx.compose.ui.res.painterResource
+import com.varad.unstoppableash.R
+
 
 import android.graphics.Bitmap
 import android.util.Base64
@@ -34,6 +37,7 @@ import java.io.ByteArrayOutputStream
 @Composable
 fun TravelerChatScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
+    var showSelfiePrompt by remember { mutableStateOf(true) }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     
@@ -130,6 +134,45 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         }
 
         
+
+        // Cute Selfie Prompt
+        if (showSelfiePrompt) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = PremiumAccent.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, PremiumAccent.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { cameraLauncher.launch(null) },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(PremiumAccent, CircleShape)
+                    ) {
+                        Icon(painterResource(id = R.drawable.ic_snapchat), contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Tap to send a cute snap!",
+                        fontWeight = FontWeight.SemiBold,
+                        color = PremiumAccent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { cameraLauncher.launch(null) }
+                    )
+                    IconButton(onClick = { showSelfiePrompt = false }) {
+                        Icon(androidx.compose.material.icons.Icons.Rounded.Close, contentDescription = "Close", tint = PremiumAccent)
+                    }
+                }
+            }
+        }
+
         // Input Area
         Row(
             modifier = Modifier
@@ -143,7 +186,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                     .size(48.dp)
                     .background(PremiumSurface, CircleShape)
             ) {
-                Icon(Icons.Rounded.CameraAlt, contentDescription = "Instant Selfie", tint = PremiumAccent)
+                Icon(painterResource(id = R.drawable.ic_snapchat), contentDescription = "Snapchat", tint = Color.White, modifier = Modifier.size(24.dp))
             }
             Spacer(modifier = Modifier.width(8.dp))
             OutlinedTextField(
