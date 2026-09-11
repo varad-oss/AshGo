@@ -1,4 +1,6 @@
 package com.varad.unstoppableash.ui
+import androidx.compose.ui.graphics.asImageBitmap
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -92,7 +94,8 @@ fun ReceiverScreen(initialMode: String = "split") {
                     val text = child.child("text").getValue(String::class.java) ?: ""
                     val isTraveler = child.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                     val time = child.child("timestamp").getValue(Long::class.java) ?: 0L
-                    messages.add(ChatMessage(text, isTraveler, time))
+                    val imageBase64 = child.child("imageBase64").getValue(String::class.java)
+                    messages.add(ChatMessage(text, isTraveler, time, imageBase64))
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -288,6 +291,17 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
     val isMe = if (isTravelerContext) message.isFromTraveler else !message.isFromTraveler
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     
+    // Decode bitmap outside try-catch of composable
+    var decodedBitmap: android.graphics.Bitmap? = null
+    if (!message.imageBase64.isNullOrBlank()) {
+        try {
+            val imageBytes = android.util.Base64.decode(message.imageBase64, android.util.Base64.DEFAULT)
+            decodedBitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
@@ -303,12 +317,26 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
                 color = if (isMe) PremiumAccent else PremiumSurface,
                 modifier = Modifier.widthIn(max = 280.dp)
             ) {
-                Text(
-                    text = message.text,
-                    modifier = Modifier.padding(12.dp),
-                    color = Color.White,
-                    fontSize = 15.sp
-                )
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (decodedBitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = decodedBitmap.asImageBitmap(),
+                            contentDescription = "Selfie",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp)
+                                .padding(bottom = if (message.text.isNotBlank()) 8.dp else 0.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+                    }
+                    if (message.text.isNotBlank()) {
+                        Text(
+                            text = message.text,
+                            color = Color.White,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
             }
             Text(
                 text = timeFormat.format(Date(message.timestamp)),
