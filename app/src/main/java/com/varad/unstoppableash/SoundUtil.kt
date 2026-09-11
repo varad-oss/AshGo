@@ -24,7 +24,7 @@ object SoundUtil {
             // Stop after 3 seconds
             Handler(Looper.getMainLooper()).postDelayed({
                 if (ringtone.isPlaying) ringtone.stop()
-            }, 3000)
+            }, 1000)
         } catch (e: Exception) {
             e.printStackTrace()
         }
