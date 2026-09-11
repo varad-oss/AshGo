@@ -121,11 +121,14 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
 
     LaunchedEffect(Unit) {
         val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+        val loadTime = System.currentTimeMillis()
+        var lastProcessed = 0L
         database.child("buzz").child("traveler").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 if (snapshot.exists()) {
                     val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                    if (System.currentTimeMillis() - timestamp < 10000) {
+                    if (timestamp > loadTime && timestamp != lastProcessed) {
+                        lastProcessed = timestamp
                         com.varad.unstoppableash.SoundUtil.playShockSound(context)
                     }
                 }

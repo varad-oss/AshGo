@@ -105,11 +105,14 @@ fun ReceiverScreen(initialMode: String = "split") {
 
 
         // Listen to Buzz
+        val loadTime = System.currentTimeMillis()
+        var lastProcessed = 0L
         database.child("buzz").child("receiver").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                    if (System.currentTimeMillis() - timestamp < 10000) {
+                    if (timestamp > loadTime && timestamp != lastProcessed) {
+                        lastProcessed = timestamp
                         com.varad.unstoppableash.SoundUtil.playShockSound(context)
                     }
                 }
