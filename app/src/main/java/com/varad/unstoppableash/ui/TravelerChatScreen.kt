@@ -1,5 +1,9 @@
 package com.varad.unstoppableash.ui
 
+import android.graphics.Bitmap
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,12 +26,34 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.varad.unstoppableash.ui.theme.*
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TravelerChatScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val imageBytes = baos.toByteArray()
+            val base64String = Base64.encodeToString(imageBytes, Base64.DEFAULT)
+            
+            val database = FirebaseDatabase.getInstance().reference
+            val msgData = mapOf(
+                "text" to "Here's a cute selfie! 📸",
+                "isFromTraveler" to true,
+                "timestamp" to System.currentTimeMillis(),
+                "imageBase64" to base64String
+            )
+            database.child("chat").push().setValue(msgData)
+        }
+    }
 
     LaunchedEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
@@ -37,7 +64,8 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                     val text = child.child("text").getValue(String::class.java) ?: ""
                     val isFromTraveler = child.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                     val timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L
-                    newMessages.add(ChatMessage(text, isFromTraveler, timestamp))
+                    val imageBase64 = child.child("imageBase64").getValue(String::class.java)
+                    newMessages.add(ChatMessage(text, isFromTraveler, timestamp, imageBase64))
                 }
                 messages = newMessages
             }
@@ -90,11 +118,25 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             }
         }
 
+        // Cute Selfie Button
+        Button(
+            onClick = { cameraLauncher.launch(null) },
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PremiumSOS),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Icon(Icons.Rounded.CameraAlt, contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Tap to send a cute selfie!", fontWeight = FontWeight.Bold)
+        }
+
         // Input Area
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(

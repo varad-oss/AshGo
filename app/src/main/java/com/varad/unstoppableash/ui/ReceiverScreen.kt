@@ -37,7 +37,12 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
-data class ChatMessage(val text: String, val isFromTraveler: Boolean, val timestamp: Long)
+data class ChatMessage(
+    val text: String, 
+    val isFromTraveler: Boolean, 
+    val timestamp: Long,
+    val imageBase64: String? = null
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
