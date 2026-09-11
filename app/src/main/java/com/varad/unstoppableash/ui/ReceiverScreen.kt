@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -97,6 +98,20 @@ fun ReceiverScreen(initialMode: String = "split") {
                     val time = child.child("timestamp").getValue(Long::class.java) ?: 0L
                     val imageBase64 = child.child("imageBase64").getValue(String::class.java)
                     messages.add(ChatMessage(text, isTraveler, time, imageBase64))
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+
+        // Listen to Buzz
+        database.child("buzz").child("receiver").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                    if (System.currentTimeMillis() - timestamp < 10000) {
+                        com.varad.unstoppableash.SoundUtil.playShockSound(context)
+                    }
                 }
             }
             override fun onCancelled(error: DatabaseError) {}

@@ -1,4 +1,6 @@
 package com.varad.unstoppableash.ui
+import androidx.compose.material.icons.rounded.Bolt
+
 import androidx.compose.ui.res.painterResource
 import com.varad.unstoppableash.R
 
@@ -187,6 +189,17 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                     .background(PremiumSurface, CircleShape)
             ) {
                 Icon(painterResource(id = R.drawable.ic_snapchat), contentDescription = "Snapchat", tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = { 
+                    com.google.firebase.database.FirebaseDatabase.getInstance().reference.child("buzz").child("receiver").setValue(System.currentTimeMillis()) 
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(PremiumSurface, CircleShape)
+            ) {
+                Icon(androidx.compose.material.icons.Icons.Rounded.Bolt, contentDescription = "Buzz Receiver", tint = androidx.compose.ui.graphics.Color.Yellow)
             }
             Spacer(modifier = Modifier.width(8.dp))
             OutlinedTextField(

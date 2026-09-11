@@ -118,6 +118,22 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     var busNumber by remember { mutableStateOf("") }
     var isTracking by remember { mutableStateOf(false) }
 
+
+    LaunchedEffect(Unit) {
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+        database.child("buzz").child("traveler").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                    if (System.currentTimeMillis() - timestamp < 10000) {
+                        com.varad.unstoppableash.SoundUtil.playShockSound(context)
+                    }
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        })
+    }
+
     // Subtle breathing animation for the SOS button
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(
