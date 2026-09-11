@@ -62,7 +62,14 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("traveler_dashboard") {
-                            DashboardScreen(onNavigateToMap = { navController.navigate("receiver_home") })
+                            DashboardScreen(
+                                onNavigateToChat = { navController.navigate("traveler_chat") }
+                            )
+                        }
+                        composable("traveler_chat") {
+                            com.varad.unstoppableash.ui.TravelerChatScreen(
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable("receiver_home") {
                             ReceiverDashboard(
@@ -106,7 +113,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(onNavigateToMap: () -> Unit = {}) {
+fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var busNumber by remember { mutableStateOf("") }
     var isTracking by remember { mutableStateOf(false) }
@@ -247,6 +254,18 @@ fun DashboardScreen(onNavigateToMap: () -> Unit = {}) {
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        OutlinedButton(
+            onClick = onNavigateToChat,
+            modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 24.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+        ) {
+            Text("Open Guardian Chat", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Minimalist Premium SOS Button
         Button(

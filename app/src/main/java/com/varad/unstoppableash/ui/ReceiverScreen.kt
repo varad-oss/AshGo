@@ -278,8 +278,9 @@ fun ReceiverScreen(initialMode: String = "split") {
 }
 
 @Composable
-fun ChatBubble(message: ChatMessage) {
-    val isMe = !message.isFromTraveler
+fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
+    // If traveler context, 'me' is traveler. If receiver context, 'me' is receiver.
+    val isMe = if (isTravelerContext) message.isFromTraveler else !message.isFromTraveler
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     
     Row(
