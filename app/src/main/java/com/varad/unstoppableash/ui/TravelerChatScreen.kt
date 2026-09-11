@@ -159,7 +159,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "tap here to make varad happy by sending a cute selfie",
+                        text = "Make Varad happy with a cute selfie!",
                         fontWeight = FontWeight.SemiBold,
                         color = PremiumAccent,
                         modifier = Modifier
