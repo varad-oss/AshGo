@@ -30,17 +30,26 @@ fun HelpScreen(onBack: () -> Unit) {
         },
         containerColor = PremiumBackground
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(24.dp), 
-            contentAlignment = Alignment.Center
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Need help sweetie? Toh meko call karo na buddhu.",
+                text = "Need help sweetie?",
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = 28.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Toh meko call karo na buddhu.",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
         }

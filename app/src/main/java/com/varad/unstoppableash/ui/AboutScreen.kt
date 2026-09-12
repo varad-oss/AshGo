@@ -51,13 +51,11 @@ fun AboutScreen(onBack: () -> Unit) {
                 }
             }
             
-            Spacer(modifier = Modifier.weight(1f))
-            
             Text(
                 text = annotatedText,
                 color = Color.White,
                 fontSize = 20.sp,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 lineHeight = 28.sp
             )
             
@@ -68,7 +66,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = TextSecondary,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
         }
     }
