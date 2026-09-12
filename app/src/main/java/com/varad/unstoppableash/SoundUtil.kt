@@ -29,4 +29,14 @@ object SoundUtil {
             e.printStackTrace()
         }
     }
+
+    fun playSuccessSound(context: Context) {
+        try {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(context, uri)
+            ringtone.play()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }

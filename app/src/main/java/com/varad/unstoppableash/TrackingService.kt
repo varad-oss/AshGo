@@ -4,13 +4,17 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class TrackingService : Service() {
 
@@ -21,11 +25,16 @@ class TrackingService : Service() {
     private lateinit var locationCallback: LocationCallback
     private val database = FirebaseDatabase.getInstance().reference
 
+    private var destinationLocation: Location? = null
+    private var hasAlertedArrival = false
+    private var destinationListener: ValueEventListener? = null
+
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
         setupLocationUpdates()
+        listenForDestination()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -40,6 +49,31 @@ class TrackingService : Service() {
         startForeground(NOTIFICATION_ID, createNotification())
         requestLocationUpdates()
         return START_STICKY
+    }
+
+    private fun listenForDestination() {
+        destinationListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val lat = snapshot.child("latitude").getValue(Double::class.java)
+                val lng = snapshot.child("longitude").getValue(Double::class.java)
+                if (lat != null && lng != null) {
+                    val newDest = Location("").apply {
+                        latitude = lat
+                        longitude = lng
+                    }
+                    // Reset alert flag if destination changed significantly (e.g. > 50m)
+                    if (destinationLocation == null || destinationLocation!!.distanceTo(newDest) > 50f) {
+                        hasAlertedArrival = false
+                    }
+                    destinationLocation = newDest
+                    Log.i("TrackingService", "New destination received: $lat, $lng")
+                } else {
+                    destinationLocation = null
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("tracking").child("destination").addValueEventListener(destinationListener!!)
     }
 
     private fun createNotificationChannel() {
@@ -88,6 +122,16 @@ class TrackingService : Service() {
                         .addOnFailureListener { e ->
                             Log.e("TrackingService", "Failed to update location", e)
                         }
+
+                    // Check Geofence
+                    destinationLocation?.let { dest ->
+                        val distanceInMeters = location.distanceTo(dest)
+                        if (distanceInMeters < 100f && !hasAlertedArrival) {
+                            Log.i("TrackingService", "Arrived! Distance: $distanceInMeters")
+                            hasAlertedArrival = true
+                            database.child("tracking").child("arrived").setValue(System.currentTimeMillis())
+                        }
+                    }
                 }
             }
         }
@@ -120,6 +164,9 @@ class TrackingService : Service() {
         super.onDestroy()
         if (::fusedLocationClient.isInitialized && ::locationCallback.isInitialized) {
             fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+        destinationListener?.let {
+            database.child("tracking").child("destination").removeEventListener(it)
         }
     }
 

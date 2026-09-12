@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.ui
 
+import android.widget.Toast
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +26,8 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.MapEventsOverlay
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 
@@ -56,9 +59,10 @@ fun ReceiverScreen(initialMode: String = "split") {
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     
-    // Pune coordinates default
     var travelerLocation by remember { mutableStateOf(Pair(18.5204, 73.8567)) }
+    var destinationLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var isSosActive by remember { mutableStateOf(false) }
+    var hasArrived by remember { mutableStateOf(false) }
     var vehicleInfo by remember { mutableStateOf("") }
     
     val context = LocalContext.current
@@ -69,7 +73,6 @@ fun ReceiverScreen(initialMode: String = "split") {
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
         
-        // Listen to Vehicle Info
         val vehicleListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 vehicleInfo = snapshot.getValue(String::class.java) ?: ""
@@ -79,7 +82,6 @@ fun ReceiverScreen(initialMode: String = "split") {
         val vehicleRef = database.child("tracking").child("vehicle_info")
         vehicleRef.addValueEventListener(vehicleListener)
 
-        // Listen to Location
         val locationListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val lat = snapshot.child("latitude").getValue(Double::class.java)
@@ -93,7 +95,41 @@ fun ReceiverScreen(initialMode: String = "split") {
         val locationRef = database.child("tracking").child("current_trip")
         locationRef.addValueEventListener(locationListener)
 
-        // Listen to Chat
+        val destListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val lat = snapshot.child("latitude").getValue(Double::class.java)
+                val lng = snapshot.child("longitude").getValue(Double::class.java)
+                if (lat != null && lng != null) {
+                    destinationLocation = Pair(lat, lng)
+                } else {
+                    destinationLocation = null
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val destRef = database.child("tracking").child("destination")
+        destRef.addValueEventListener(destListener)
+
+        var isInitialArrivedLoad = true
+        val arrivedListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (isInitialArrivedLoad) {
+                    isInitialArrivedLoad = false
+                    return
+                }
+                if (snapshot.exists()) {
+                    hasArrived = true
+                    com.varad.unstoppableash.SoundUtil.playSuccessSound(context)
+                    Toast.makeText(context, "Ash has arrived safely!", Toast.LENGTH_LONG).show()
+                } else {
+                    hasArrived = false
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val arrivedRef = database.child("tracking").child("arrived")
+        arrivedRef.addValueEventListener(arrivedListener)
+
         val chatListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 messages.clear()
@@ -111,7 +147,6 @@ fun ReceiverScreen(initialMode: String = "split") {
         val chatRef = database.child("chat").limitToLast(50)
         chatRef.addValueEventListener(chatListener)
 
-        // Listen to Buzz
         var isInitialLoad = true
         val buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -128,7 +163,6 @@ fun ReceiverScreen(initialMode: String = "split") {
         val buzzRef = database.child("buzz").child("receiver")
         buzzRef.addValueEventListener(buzzListener)
 
-        // Listen to Alerts
         val alertListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (child in snapshot.children) {
@@ -152,6 +186,8 @@ fun ReceiverScreen(initialMode: String = "split") {
             chatRef.removeEventListener(chatListener)
             buzzRef.removeEventListener(buzzListener)
             alertRef.removeEventListener(alertListener)
+            destRef.removeEventListener(destListener)
+            arrivedRef.removeEventListener(arrivedListener)
         }
     }
 
@@ -166,7 +202,7 @@ fun ReceiverScreen(initialMode: String = "split") {
             .fillMaxSize()
             .background(PremiumBackground)
     ) {
-        // Map Section (Top Half / Full)
+        // Map Section
         if (viewMode == "map" || viewMode == "split") {
             Box(
                 modifier = Modifier
@@ -188,22 +224,52 @@ fun ReceiverScreen(initialMode: String = "split") {
                         mapView.controller.animateTo(geoPoint)
                         
                         mapView.overlays.clear()
-                        val marker = Marker(mapView)
-                        marker.position = geoPoint
-                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        marker.title = "Ash's Live Location"
-                        mapView.overlays.add(marker)
+                        
+                        // Handle Map Long Press for Geofence
+                        val mapEventsReceiver = object : MapEventsReceiver {
+                            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
+                            override fun longPressHelper(p: GeoPoint?): Boolean {
+                                if (p != null) {
+                                    val db = FirebaseDatabase.getInstance().reference
+                                    db.child("tracking").child("destination").setValue(
+                                        mapOf("latitude" to p.latitude, "longitude" to p.longitude)
+                                    )
+                                    db.child("tracking").child("arrived").removeValue()
+                                    Toast.makeText(context, "Safe Zone Set!", Toast.LENGTH_SHORT).show()
+                                }
+                                return true
+                            }
+                        }
+                        mapView.overlays.add(MapEventsOverlay(mapEventsReceiver))
+
+                        // Ash Marker
+                        val ashMarker = Marker(mapView)
+                        ashMarker.position = geoPoint
+                        ashMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        ashMarker.title = "Ash's Live Location"
+                        mapView.overlays.add(ashMarker)
+
+                        // Destination Marker
+                        destinationLocation?.let { dest ->
+                            val destGeoPoint = GeoPoint(dest.first, dest.second)
+                            val destMarker = Marker(mapView)
+                            destMarker.position = destGeoPoint
+                            destMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            destMarker.title = "Safe Zone"
+                            // Can set icon color if wanted, but default is fine
+                            mapView.overlays.add(destMarker)
+                        }
+
                         mapView.invalidate()
                     }
                 )
                 
-                // Map Overlay Header
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(16.dp),
                     shape = RoundedCornerShape(24.dp),
-                    color = if (isSosActive) Color.Red else PremiumBackground.copy(alpha = 0.8f),
+                    color = if (isSosActive) Color.Red else if (hasArrived) Color(0xFF4CAF50) else PremiumBackground.copy(alpha = 0.8f),
                     shadowElevation = 8.dp
                 ) {
                     Column(
@@ -213,6 +279,8 @@ fun ReceiverScreen(initialMode: String = "split") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (isSosActive) {
                                 Text("🚨 EMERGENCY SOS TRIGGERED 🚨", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                            } else if (hasArrived) {
+                                Text("✅ ASH HAS REACHED SAFELY ✅", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                             } else {
                                 Box(modifier = Modifier.size(12.dp).background(Color.Green, CircleShape))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -245,7 +313,7 @@ fun ReceiverScreen(initialMode: String = "split") {
             }
         }
 
-        // Chat Section (Bottom Half / Full)
+        // Chat Section
         if (viewMode == "chat" || viewMode == "split") {
             Column(
                 modifier = Modifier
@@ -253,7 +321,6 @@ fun ReceiverScreen(initialMode: String = "split") {
                     .weight(1f)
                     .background(PremiumBackground)
             ) {
-                // Messages List
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -268,7 +335,6 @@ fun ReceiverScreen(initialMode: String = "split") {
                     }
                 }
 
-                // Input Area
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -305,7 +371,7 @@ fun ReceiverScreen(initialMode: String = "split") {
                                 val database = FirebaseDatabase.getInstance().reference
                                 val msgData = mapOf(
                                     "text" to messageText,
-                                    "isFromTraveler" to false, // Receiver is sending
+                                    "isFromTraveler" to false,
                                     "timestamp" to System.currentTimeMillis()
                                 )
                                 database.child("chat").push().setValue(msgData)
@@ -326,11 +392,9 @@ fun ReceiverScreen(initialMode: String = "split") {
 
 @Composable
 fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
-    // If traveler context, 'me' is traveler. If receiver context, 'me' is receiver.
     val isMe = if (isTravelerContext) message.isFromTraveler else !message.isFromTraveler
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     
-    // Decode bitmap outside try-catch of composable for backward compatibility with base64
     var decodedBitmap: android.graphics.Bitmap? = null
     if (!message.imageBase64.isNullOrBlank() && message.imageUrl == null) {
         try {
