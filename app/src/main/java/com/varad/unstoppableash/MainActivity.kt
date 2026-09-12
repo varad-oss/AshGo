@@ -468,16 +468,6 @@ fun RoleSelectionScreen(onTravelerSelected: () -> Unit, onReceiverSelected: () -
         ) {
             Text("I am the Receiver", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        val context = androidx.compose.ui.platform.LocalContext.current
-        Button(
-            onClick = { com.varad.unstoppableash.SoundUtil.playShockSound(context) },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-        ) {
-            Text("Test Sound Locally")
-        }
     }
 }
 
