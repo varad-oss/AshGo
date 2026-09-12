@@ -32,7 +32,7 @@ object AutoUpdater {
         }
     }
 
-    fun downloadAndInstallApk(context: Context, url: String) {
+    fun downloadAndInstallApk(context: Context, url: String, token: String? = null) {
         val resolvedUrl = resolveDownloadUrl(url)
         Toast.makeText(context, "Downloading update...", Toast.LENGTH_LONG).show()
 
@@ -51,6 +51,10 @@ object AutoUpdater {
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
             .setMimeType("application/vnd.android.package-archive")
+
+        if (!token.isNullOrBlank()) {
+            request.addRequestHeader("Authorization", "token $token")
+        }
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val downloadId = downloadManager.enqueue(request)

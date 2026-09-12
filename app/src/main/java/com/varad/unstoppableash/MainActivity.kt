@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     var showUpdateDialog by remember { mutableStateOf(false) }
                     var apkUrl by remember { mutableStateOf("") }
+                    var githubToken by remember { mutableStateOf("") }
                     val context = androidx.compose.ui.platform.LocalContext.current
 
                     LaunchedEffect(Unit) {
@@ -96,6 +97,7 @@ class MainActivity : ComponentActivity() {
                             override fun onDataChange(snapshot: DataSnapshot) {
                                 val latestVersion = snapshot.child("latest_version_code").getValue(Int::class.java) ?: 1
                                 val url = snapshot.child("apk_url").getValue(String::class.java) ?: ""
+                                val token = snapshot.child("github_token").getValue(String::class.java)
                                 
                                 try {
                                     val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -103,6 +105,7 @@ class MainActivity : ComponentActivity() {
                                     
                                     if (latestVersion > currentVersion && url.isNotBlank()) {
                                         apkUrl = url
+                                        githubToken = token ?: ""
                                         showUpdateDialog = true
                                     }
                                 } catch (e: Exception) {}
@@ -195,7 +198,7 @@ class MainActivity : ComponentActivity() {
                                     Button(
                                         onClick = {
                                             showUpdateDialog = false
-                                            AutoUpdater.downloadAndInstallApk(context, apkUrl)
+                                            AutoUpdater.downloadAndInstallApk(context, apkUrl, githubToken)
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = PremiumAccent)
                                     ) {
