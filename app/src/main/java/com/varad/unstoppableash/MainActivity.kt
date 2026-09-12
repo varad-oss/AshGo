@@ -187,9 +187,9 @@ class MainActivity : ComponentActivity() {
 
                         if (showUpdateDialog) {
                             AlertDialog(
-                                onDismissRequest = { /* Force update */ },
-                                title = { Text("Update Available! 🚀", color = Color.White) },
-                                text = { Text("A new surprise feature has been added! Tap below to update instantly.", color = Color.White) },
+                                onDismissRequest = { },
+                                title = { Text("Update Available 🚀", color = Color.White) },
+                                text = { Text("A new version of Ash Go is ready with the latest features!\n\nTap \"Update Now\" — it will download in the background and ask you to install with one tap.", color = Color.White) },
                                 confirmButton = {
                                     Button(
                                         onClick = {
@@ -198,7 +198,12 @@ class MainActivity : ComponentActivity() {
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = PremiumAccent)
                                     ) {
-                                        Text("Update Now")
+                                        Text("Update Now ✨")
+                                    }
+                                },
+                                dismissButton = {
+                                    androidx.compose.material3.TextButton(onClick = { showUpdateDialog = false }) {
+                                        Text("Later", color = TextSecondary)
                                     }
                                 },
                                 containerColor = PremiumSurface
