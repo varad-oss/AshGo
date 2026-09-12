@@ -113,11 +113,30 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         val navController = rememberNavController()
-                        NavHost(navController = navController, startDestination = "role_selection") {
+                        
+                        val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+                        val savedRole = sharedPrefs.getString("user_role", null)
+                        val startDest = when (savedRole) {
+                            "traveler" -> "traveler_dashboard"
+                            "receiver" -> "receiver_home"
+                            else -> "role_selection"
+                        }
+                        
+                        NavHost(navController = navController, startDestination = startDest) {
                             composable("role_selection") {
                                 RoleSelectionScreen(
-                                    onTravelerSelected = { navController.navigate("traveler_dashboard") },
-                                    onReceiverSelected = { navController.navigate("receiver_home") }
+                                    onTravelerSelected = { 
+                                        sharedPrefs.edit().putString("user_role", "traveler").apply()
+                                        navController.navigate("traveler_dashboard") {
+                                            popUpTo("role_selection") { inclusive = true }
+                                        }
+                                    },
+                                    onReceiverSelected = { 
+                                        sharedPrefs.edit().putString("user_role", "receiver").apply()
+                                        navController.navigate("receiver_home") {
+                                            popUpTo("role_selection") { inclusive = true }
+                                        }
+                                    }
                                 )
                             }
                             composable("traveler_dashboard") {
@@ -570,7 +589,7 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
             modifier = Modifier.size(64.dp).padding(bottom = 16.dp)
         )
         Text(
-            text = "Guardian Dashboard",
+            text = "Varad's Dashboard",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
