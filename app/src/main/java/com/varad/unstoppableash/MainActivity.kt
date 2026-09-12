@@ -213,7 +213,7 @@ class MainActivity : ComponentActivity() {
 fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
-    var busNumber by remember { mutableStateOf("") }
+    var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
     var isTracking by remember { mutableStateOf(sharedPrefs.getBoolean("is_tracking", false)) }
 
     DisposableEffect(Unit) {
@@ -289,6 +289,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             value = busNumber,
             onValueChange = { 
                 busNumber = it 
+                sharedPrefs.edit().putString("vehicle_registration", it).apply()
                 val database = FirebaseDatabase.getInstance().reference
                 database.child("tracking").child("vehicle_info").setValue(it)
             },
