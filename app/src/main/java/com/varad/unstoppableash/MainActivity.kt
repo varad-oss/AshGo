@@ -156,8 +156,7 @@ class MainActivity : ComponentActivity() {
                             }
                         ) {
 
-                        
-                        NavHost(navController = navController, startDestination = startDest) {
+                        NavHost(navController = navController, startDestination = "role_selection") {
                             composable("role_selection") {
                                 RoleSelectionScreen(
                                     onTravelerSelected = { 
@@ -221,7 +220,7 @@ class MainActivity : ComponentActivity() {
                         if (showUpdateDialog) {
                             AlertDialog(
                                 onDismissRequest = { },
-                                title = { Text("Hey Diva 💅", color = Color.White) },
+                                title = { Text("Hey Diva", color = Color.White) },
                                 text = { Text("Your favourite developer has been busy making the app a little more special for you 🫶\n\nUpdate it to discover what your Mr. Handsome aka Varad has added just for his favourite girl. ❤️", color = Color.White) },
                                 confirmButton = {
                                     Button(
@@ -231,7 +230,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = PremiumAccent)
                                     ) {
-                                        Text("Update Now ✨")
+                                        Text("Update Now")
                                     }
                                 },
                                 dismissButton = {
