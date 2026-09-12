@@ -147,17 +147,6 @@ fun ReceiverScreen(initialMode: String = "split") {
         val chatRef = database.child("chat").limitToLast(50)
         chatRef.addValueEventListener(chatListener)
 
-        val buzzListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
-                    com.varad.unstoppableash.SoundUtil.playShockSound(context)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        val buzzRef = database.child("buzz").child("receiver")
-        buzzRef.addValueEventListener(buzzListener)
 
         val alertListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -180,7 +169,6 @@ fun ReceiverScreen(initialMode: String = "split") {
             vehicleRef.removeEventListener(vehicleListener)
             locationRef.removeEventListener(locationListener)
             chatRef.removeEventListener(chatListener)
-            buzzRef.removeEventListener(buzzListener)
             alertRef.removeEventListener(alertListener)
             destRef.removeEventListener(destListener)
             arrivedRef.removeEventListener(arrivedListener)

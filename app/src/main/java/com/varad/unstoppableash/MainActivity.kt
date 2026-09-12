@@ -103,6 +103,17 @@ class MainActivity : ComponentActivity() {
                             else -> "role_selection"
                         }
                         
+                        LaunchedEffect(savedRole) {
+                            if (savedRole == "receiver") {
+                                val serviceIntent = Intent(context, ReceiverService::class.java)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    context.startForegroundService(serviceIntent)
+                                } else {
+                                    context.startService(serviceIntent)
+                                }
+                            }
+                        }
+                        
                         NavHost(navController = navController, startDestination = startDest) {
                             composable("role_selection") {
                                 RoleSelectionScreen(
@@ -114,6 +125,12 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onReceiverSelected = { 
                                         sharedPrefs.edit().putString("user_role", "receiver").apply()
+                                        val serviceIntent = Intent(context, ReceiverService::class.java)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            context.startForegroundService(serviceIntent)
+                                        } else {
+                                            context.startService(serviceIntent)
+                                        }
                                         navController.navigate("receiver_home") {
                                             popUpTo("role_selection") { inclusive = true }
                                         }

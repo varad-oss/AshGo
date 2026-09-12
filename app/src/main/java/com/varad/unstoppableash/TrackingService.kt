@@ -32,6 +32,7 @@ class TrackingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        FirebaseDatabase.getInstance().goOnline()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
         setupLocationUpdates()
