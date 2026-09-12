@@ -194,8 +194,8 @@ class MainActivity : ComponentActivity() {
                         if (showUpdateDialog) {
                             AlertDialog(
                                 onDismissRequest = { },
-                                title = { Text("Update Available 🚀", color = Color.White) },
-                                text = { Text("A new version of Ash Go is ready with the latest features!\n\nTap \"Update Now\" — it will download in the background and ask you to install with one tap.", color = Color.White) },
+                                title = { Text("Hey Diva 💅", color = Color.White) },
+                                text = { Text("Your favourite developer has been busy making the app a little more special for you 🫶\n\nUpdate it to discover what your Mr. Handsome aka Varad has added just for his favourite girl. ❤️", color = Color.White) },
                                 confirmButton = {
                                     Button(
                                         onClick = {
