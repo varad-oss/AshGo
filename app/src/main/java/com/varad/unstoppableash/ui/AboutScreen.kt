@@ -121,7 +121,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Photo Ropes Section
                 val dipDp = 60.dp
@@ -271,9 +271,11 @@ fun AboutScreen(onBack: () -> Unit) {
                     // Screen area inside the TV
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.58f) 
-                            .fillMaxHeight(0.50f) 
-                            .offset(x = (-34).dp, y = (16).dp) 
+                            .fillMaxWidth(0.51f) 
+                            .fillMaxHeight(0.40f) 
+                            .offset(x = (-26).dp, y = (22).dp) 
+                            .background(Color.White)
+                            .padding(4.dp)
                             .background(placeholderColors[currentSlideIndex % placeholderColors.size])
                     )
                 }
