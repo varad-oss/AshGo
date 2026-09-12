@@ -66,6 +66,25 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(Unit) {
                         FirebaseAuth.getInstance().signInAnonymously()
+                        
+                        // Ghost Ash (and Ghost Receiver) Listener for testing single-device
+                        val db = FirebaseDatabase.getInstance().reference
+                        var isInitialLoadT = true
+                        db.child("buzz").child("traveler").addValueEventListener(object : ValueEventListener {
+                            override fun onDataChange(s: DataSnapshot) {
+                                if (isInitialLoadT) { isInitialLoadT = false; return }
+                                if (s.exists()) com.varad.unstoppableash.SoundUtil.playShockSound(this@MainActivity)
+                            }
+                            override fun onCancelled(e: DatabaseError) {}
+                        })
+                        var isInitialLoadR = true
+                        db.child("buzz").child("receiver").addValueEventListener(object : ValueEventListener {
+                            override fun onDataChange(s: DataSnapshot) {
+                                if (isInitialLoadR) { isInitialLoadR = false; return }
+                                if (s.exists()) com.varad.unstoppableash.SoundUtil.playShockSound(this@MainActivity)
+                            }
+                            override fun onCancelled(e: DatabaseError) {}
+                        })
                     }
 
                     DisposableEffect(Unit) {
@@ -448,6 +467,16 @@ fun RoleSelectionScreen(onTravelerSelected: () -> Unit, onReceiverSelected: () -
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
         ) {
             Text("I am the Receiver", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Button(
+            onClick = { com.varad.unstoppableash.SoundUtil.playShockSound(context) },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+        ) {
+            Text("Test Sound Locally")
         }
     }
 }
