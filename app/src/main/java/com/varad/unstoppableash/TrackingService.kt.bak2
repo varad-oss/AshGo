@@ -167,6 +167,31 @@ class TrackingService : Service() {
     }
 
     private fun triggerSOS() {
+    private fun sendEmergencySms(lat: Double, lng: Double) {
+        val sharedPrefs = getSharedPreferences("AshGoPrefs", Context.MODE_PRIVATE)
+        val contactsString = sharedPrefs.getString("emergency_contacts", "") ?: ""
+        if (contactsString.isBlank()) return
+
+        val message = "🚨 EMERGENCY SOS 🚨 Ash has triggered an SOS! Last known location: https://maps.google.com/?q=$lat,$lng"
+        val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(android.telephony.SmsManager::class.java)
+        } else {
+            android.telephony.SmsManager.getDefault()
+        }
+
+        val contacts = contactsString.split(",")
+        for (contact in contacts) {
+            val phone = contact.trim()
+            if (phone.isNotEmpty()) {
+                try {
+                    smsManager?.sendTextMessage(phone, null, message, null, null)
+                    Log.i("TrackingService", "Emergency SMS sent to $phone")
+                } catch (e: Exception) {
+                    Log.e("TrackingService", "Failed to send SMS to $phone", e)
+                }
+            }
+        }
+    }
         // Update Firebase that SOS is triggered!
         val alertData = mapOf(
             "isSosActive" to true,
@@ -187,6 +212,19 @@ class TrackingService : Service() {
         buzzListener?.let {
             database.child("buzz").child("traveler").removeEventListener(it)
         }
+    }
+
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val restartServiceIntent = Intent(applicationContext, this.javaClass)
+        restartServiceIntent.setPackage(packageName)
+        val restartServicePendingIntent = android.app.PendingIntent.getService(
+            applicationContext, 1, restartServiceIntent,
+            android.app.PendingIntent.FLAG_ONE_SHOT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmService = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+        alarmService.set(android.app.AlarmManager.ELAPSED_REALTIME, android.os.SystemClock.elapsedRealtime() + 1000, restartServicePendingIntent)
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? {

@@ -16,8 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 
-import androidx.compose.material.icons.rounded.Phone
-
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Shield
@@ -197,8 +195,6 @@ class MainActivity : ComponentActivity() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
-            , Manifest.permission.SEND_SMS
-
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
@@ -220,8 +216,6 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
-    var emergencyContacts by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "") ?: "") }
-
     var isTracking by remember { mutableStateOf(sharedPrefs.getBoolean("is_tracking", false)) }
 
     DisposableEffect(Unit) {
@@ -319,32 +313,6 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
                 cursorColor = PremiumAccent
-            )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = emergencyContacts,
-            onValueChange = { 
-                emergencyContacts = it 
-                sharedPrefs.edit().putString("emergency_contacts", it).apply()
-            },
-            label = { Text("Emergency Contacts (Comma separated)") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Phone,
-                    contentDescription = "Contacts",
-                    tint = TextSecondary
-                )
-            },
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PremiumAccent,
-                unfocusedBorderColor = PremiumSurface,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = PremiumAccent
-
             )
         )
 

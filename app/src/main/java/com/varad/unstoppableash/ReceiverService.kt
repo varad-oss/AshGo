@@ -20,6 +20,8 @@ class ReceiverService : Service() {
     
     private var buzzListener: ValueEventListener? = null
     private var locationListener: ValueEventListener? = null
+    private var alertListener: ValueEventListener? = null
+
     private var lastLocationTime: Long = 0L
     private var hasAlertedDeadSignal = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -67,6 +69,22 @@ class ReceiverService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("tracking").child("current_trip").addValueEventListener(locationListener!!)
+
+        alertListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                for (child in snapshot.children) {
+                    val active = child.child("isSosActive").getValue(Boolean::class.java) ?: false
+                    val time = child.child("timestamp").getValue(Long::class.java) ?: 0L
+                    if (active && (System.currentTimeMillis() - time) < 15 * 60 * 1000) {
+                        // Play shock sound if SOS is active within the last 15 minutes
+                        SoundUtil.playShockSound(this@ReceiverService)
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("alerts").orderByChild("timestamp").limitToLast(1).addValueEventListener(alertListener!!)
+
         handler.post(signalCheckRunnable)
 
     }
@@ -103,6 +121,10 @@ class ReceiverService : Service() {
             database.child("tracking").child("current_trip").removeEventListener(it)
         }
         handler.removeCallbacks(signalCheckRunnable)
+        alertListener?.let {
+            database.child("alerts").removeEventListener(it)
+        }
+
 
     }
 

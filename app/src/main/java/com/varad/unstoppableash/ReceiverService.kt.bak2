@@ -20,6 +20,8 @@ class ReceiverService : Service() {
     
     private var buzzListener: ValueEventListener? = null
     private var locationListener: ValueEventListener? = null
+    private var alertListener: ValueEventListener? = null
+
     private var lastLocationTime: Long = 0L
     private var hasAlertedDeadSignal = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -96,10 +98,14 @@ class ReceiverService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         buzzListener?.let {
             database.child("buzz").child("receiver").removeEventListener(it)
         }
+        locationListener?.let {
+            database.child("tracking").child("current_trip").removeEventListener(it)
+        }
+        handler.removeCallbacks(signalCheckRunnable)
+
     }
 
 

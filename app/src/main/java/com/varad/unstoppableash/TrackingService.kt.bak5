@@ -1,11 +1,7 @@
 package com.varad.unstoppableash
 
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.location.Location
@@ -14,13 +10,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
+import com.google.android.gms.location.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -39,11 +29,11 @@ class TrackingService : Service() {
     private var hasAlertedArrival = false
     private var destinationListener: ValueEventListener? = null
     private var buzzListener: ValueEventListener? = null
-    private var alertListener: ValueEventListener? = null
-
     private var lastKnownLat: Double = 0.0
     private var lastKnownLng: Double = 0.0
     private var lastSosSmsTime: Long = 0L
+    private var alertListener: ValueEventListener? = null
+
 
     override fun onCreate() {
         super.onCreate()
@@ -53,7 +43,6 @@ class TrackingService : Service() {
         setupLocationUpdates()
         listenForDestination()
         listenForBuzz()
-        listenForAlerts()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -95,19 +84,6 @@ class TrackingService : Service() {
     }
 
     private fun listenForBuzz() {
-        buzzListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
-                    Log.i("TrackingService", "Buzz received!")
-                    SoundUtil.playShockSound(this@TrackingService)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        database.child("buzz").child("traveler").addValueEventListener(buzzListener!!)
-    }
-
     private fun listenForAlerts() {
         alertListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -129,6 +105,18 @@ class TrackingService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("alerts").orderByChild("timestamp").limitToLast(1).addValueEventListener(alertListener!!)
+    }
+        buzzListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
+                    Log.i("TrackingService", "Buzz received!")
+                    SoundUtil.playShockSound(this@TrackingService)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("buzz").child("traveler").addValueEventListener(buzzListener!!)
     }
 
     private fun createNotificationChannel() {
@@ -209,15 +197,6 @@ class TrackingService : Service() {
     }
 
     private fun triggerSOS() {
-        // Update Firebase that SOS is triggered!
-        val alertData = mapOf(
-            "isSosActive" to true,
-            "timestamp" to System.currentTimeMillis()
-        )
-        database.child("alerts").push().setValue(alertData)
-        Log.i("TrackingService", "SOS TRIGGERED FROM LOCK SCREEN!")
-    }
-
     private fun sendEmergencySms(lat: Double, lng: Double) {
         val sharedPrefs = getSharedPreferences("AshGoPrefs", Context.MODE_PRIVATE)
         val contactsString = sharedPrefs.getString("emergency_contacts", "") ?: ""
@@ -243,7 +222,14 @@ class TrackingService : Service() {
             }
         }
     }
-
+        // Update Firebase that SOS is triggered!
+        val alertData = mapOf(
+            "isSosActive" to true,
+            "timestamp" to System.currentTimeMillis()
+        )
+        database.child("alerts").push().setValue(alertData)
+        Log.i("TrackingService", "SOS TRIGGERED FROM LOCK SCREEN!")
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -255,9 +241,6 @@ class TrackingService : Service() {
         }
         buzzListener?.let {
             database.child("buzz").child("traveler").removeEventListener(it)
-        }
-        alertListener?.let {
-            database.child("alerts").removeEventListener(it)
         }
     }
 
@@ -275,6 +258,6 @@ class TrackingService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        return null
+        return null // We don't need bound service, just started service
     }
 }

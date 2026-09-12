@@ -56,6 +56,19 @@ class ReceiverService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("buzz").child("receiver").addValueEventListener(buzzListener!!)
+
+        locationListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java)
+                if (timestamp != null) {
+                    lastLocationTime = timestamp
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("tracking").child("current_trip").addValueEventListener(locationListener!!)
+        handler.post(signalCheckRunnable)
+
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -83,10 +96,14 @@ class ReceiverService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         buzzListener?.let {
             database.child("buzz").child("receiver").removeEventListener(it)
         }
+        locationListener?.let {
+            database.child("tracking").child("current_trip").removeEventListener(it)
+        }
+        handler.removeCallbacks(signalCheckRunnable)
+
     }
 
 
