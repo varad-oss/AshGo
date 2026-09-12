@@ -212,8 +212,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf("") }
-    var isTracking by remember { mutableStateOf(false) }
+    var isTracking by remember { mutableStateOf(sharedPrefs.getBoolean("is_tracking", false)) }
 
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
@@ -348,6 +349,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                     checked = isTracking,
                     onCheckedChange = { checked ->
                         isTracking = checked
+                        sharedPrefs.edit().putBoolean("is_tracking", checked).apply()
                         val serviceIntent = Intent(context, TrackingService::class.java)
                         if (checked) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
