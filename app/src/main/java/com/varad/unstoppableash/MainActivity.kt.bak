@@ -17,6 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.KeyboardArrowRight
+import androidx.compose.foundation.clickable
+
+
 
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.LocationOn
@@ -198,6 +202,8 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
             , Manifest.permission.SEND_SMS
+            , Manifest.permission.READ_CONTACTS
+
 
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -221,6 +227,36 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
     var emergencyContacts by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "") ?: "") }
+    val contactPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickContact()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            if (cursor != null && cursor.moveToFirst()) {
+                val hasPhoneIndex = cursor.getColumnIndex(android.provider.ContactsContract.Contacts.HAS_PHONE_NUMBER)
+                val hasPhone = cursor.getString(hasPhoneIndex).toInt()
+                if (hasPhone > 0) {
+                    val idIndex = cursor.getColumnIndex(android.provider.ContactsContract.Contacts._ID)
+                    val id = cursor.getString(idIndex)
+                    val phones = context.contentResolver.query(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        null,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = " + id,
+                        null,
+                        null
+                    )
+                    if (phones != null && phones.moveToFirst()) {
+                        val numIndex = phones.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                        val number = phones.getString(numIndex)
+                        emergencyContacts = number
+                        sharedPrefs.edit().putString("emergency_contacts", number).apply()
+                        phones.close()
+                    }
+                }
+                cursor.close()
+            }
+        }
+    }
 
     var isTracking by remember { mutableStateOf(sharedPrefs.getBoolean("is_tracking", false)) }
 
@@ -292,118 +328,127 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             )
         }
 
-        // Modern Input Field
-        OutlinedTextField(
-            value = busNumber,
-            onValueChange = { 
-                busNumber = it 
-                sharedPrefs.edit().putString("vehicle_registration", it).apply()
-                val database = FirebaseDatabase.getInstance().reference
-                database.child("tracking").child("vehicle_info").setValue(it)
-            },
-            label = { Text("Vehicle Registration") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.DirectionsCar,
-                    contentDescription = "Vehicle",
-                    tint = TextSecondary
-                )
-            },
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PremiumAccent,
-                unfocusedBorderColor = PremiumSurface,
-                focusedContainerColor = PremiumSurface,
-                unfocusedContainerColor = PremiumSurface,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = PremiumAccent
-            )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = emergencyContacts,
-            onValueChange = { 
-                emergencyContacts = it 
-                sharedPrefs.edit().putString("emergency_contacts", it).apply()
-            },
-            label = { Text("Emergency Contacts (Comma separated)") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Phone,
-                    contentDescription = "Contacts",
-                    tint = TextSecondary
-                )
-            },
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PremiumAccent,
-                unfocusedBorderColor = PremiumSurface,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = PremiumAccent
-
-            )
-        )
-
-        // Sleek Glassmorphic-style Tracking Card
+        // Settings Card
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = PremiumSurface,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
         ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(PremiumAccent.copy(alpha = 0.1f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
+            Column {
+                // Vehicle Registration
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DirectionsCar,
+                        contentDescription = "Vehicle",
+                        tint = PremiumAccent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Vehicle Registration", fontSize = 12.sp, color = TextSecondary)
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = busNumber,
+                            onValueChange = { 
+                                busNumber = it 
+                                sharedPrefs.edit().putString("vehicle_registration", it).apply()
+                                val database = FirebaseDatabase.getInstance().reference
+                                database.child("tracking").child("vehicle_info").setValue(it)
+                            },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(PremiumAccent)
+                        )
+                    }
+                }
+                
+                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
+
+                // Emergency Contact Picker
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { contactPickerLauncher.launch(null) }
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Phone,
+                            contentDescription = "Contacts",
+                            tint = PremiumAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Emergency Contact", fontSize = 12.sp, color = TextSecondary)
+                            Text(
+                                text = if (emergencyContacts.isNotBlank()) emergencyContacts else "Tap to select",
+                                color = if (emergencyContacts.isNotBlank()) Color.White else TextSecondary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowRight,
+                        contentDescription = "Select",
+                        tint = TextSecondary
+                    )
+                }
+
+                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
+
+                // Location Tracking Toggle
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Icon(
                             imageVector = Icons.Rounded.LocationOn,
                             contentDescription = "Location",
                             tint = PremiumAccent,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(24.dp)
                         )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Share Location", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(if (isTracking) "Transmitting..." else "Offline", fontSize = 12.sp, color = if (isTracking) PremiumAccent else TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                        }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Tap to share your location, My Princess", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
-                        Text(if (isTracking) "Transmitting..." else "Offline", fontSize = 12.sp, color = if (isTracking) PremiumAccent else TextSecondary)
-                    }
-                }
-                Switch(
-                    checked = isTracking,
-                    onCheckedChange = { checked ->
-                        isTracking = checked
-                        sharedPrefs.edit().putBoolean("is_tracking", checked).apply()
-                        val serviceIntent = Intent(context, TrackingService::class.java)
-                        if (checked) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                context.startForegroundService(serviceIntent)
+                    Switch(
+                        checked = isTracking,
+                        onCheckedChange = { checked ->
+                            isTracking = checked
+                            sharedPrefs.edit().putBoolean("is_tracking", checked).apply()
+                            val serviceIntent = Intent(context, TrackingService::class.java)
+                            if (checked) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    context.startForegroundService(serviceIntent)
+                                } else {
+                                    context.startService(serviceIntent)
+                                }
                             } else {
+                                serviceIntent.action = "ACTION_STOP"
                                 context.startService(serviceIntent)
                             }
-                        } else {
-                            serviceIntent.action = "ACTION_STOP"
-                            context.startService(serviceIntent)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = PremiumAccent,
-                        uncheckedThumbColor = TextSecondary,
-                        uncheckedTrackColor = PremiumBackground
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PremiumAccent,
+                            uncheckedThumbColor = TextSecondary,
+                            uncheckedTrackColor = PremiumBackground
+                        )
                     )
-                )
+                }
             }
         }
 

@@ -420,7 +420,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text("Share Location", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text("Share your location, bbg <33 ", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Text(if (isTracking) "Transmitting..." else "Offline", fontSize = 12.sp, color = if (isTracking) PremiumAccent else TextSecondary, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
