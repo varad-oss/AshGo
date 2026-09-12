@@ -19,6 +19,26 @@ class ReceiverService : Service() {
     private val database = FirebaseDatabase.getInstance().reference
     
     private var buzzListener: ValueEventListener? = null
+    private var locationListener: ValueEventListener? = null
+    private var lastLocationTime: Long = 0L
+    private var hasAlertedDeadSignal = false
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val signalCheckRunnable = object : Runnable {
+        override fun run() {
+            if (lastLocationTime != 0L) {
+                if (System.currentTimeMillis() - lastLocationTime > 5 * 60 * 1000) {
+                    if (!hasAlertedDeadSignal) {
+                        hasAlertedDeadSignal = true
+                        SoundUtil.playShockSound(this@ReceiverService)
+                    }
+                } else {
+                    hasAlertedDeadSignal = false
+                }
+            }
+            handler.postDelayed(this, 15000)
+        }
+    }
+
 
     override fun onCreate() {
         super.onCreate()
@@ -67,6 +87,19 @@ class ReceiverService : Service() {
         buzzListener?.let {
             database.child("buzz").child("receiver").removeEventListener(it)
         }
+    }
+
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val restartServiceIntent = Intent(applicationContext, this.javaClass)
+        restartServiceIntent.setPackage(packageName)
+        val restartServicePendingIntent = android.app.PendingIntent.getService(
+            applicationContext, 1, restartServiceIntent,
+            android.app.PendingIntent.FLAG_ONE_SHOT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmService = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+        alarmService.set(android.app.AlarmManager.ELAPSED_REALTIME, android.os.SystemClock.elapsedRealtime() + 1000, restartServicePendingIntent)
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

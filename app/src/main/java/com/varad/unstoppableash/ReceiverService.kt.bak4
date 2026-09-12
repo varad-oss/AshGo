@@ -104,6 +104,7 @@ class ReceiverService : Service() {
         }
         handler.removeCallbacks(signalCheckRunnable)
 
+        }
     }
 
 
