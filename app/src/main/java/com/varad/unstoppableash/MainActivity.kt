@@ -68,6 +68,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
 data class FakeCallVoice(val id: String, val name: String, val uri: String?)
+data class EmergencyContact(val name: String, val number: String)
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -278,7 +279,18 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     }
 
     var showEmergencyContactsMenu by remember { mutableStateOf(false) }
-    var emergencyContactsList by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()) }
+    var emergencyContactsList by remember {
+        val list = mutableListOf<EmergencyContact>()
+        try {
+            val json = sharedPrefs.getString("emergency_contacts_v2", "[]") ?: "[]"
+            val arr = org.json.JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                list.add(EmergencyContact(obj.getString("name"), obj.getString("number")))
+            }
+        } catch (e: Exception) {}
+        mutableStateOf<List<EmergencyContact>>(list)
+    }
     var showFakeCallMenu by remember { mutableStateOf(false) }
     var newVoiceNameDialog by remember { mutableStateOf<android.net.Uri?>(null) }
     var newVoiceNameText by remember { mutableStateOf("") }
@@ -315,11 +327,23 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                     )
                     if (phones != null && phones.moveToFirst()) {
                         val numIndex = phones.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
-                        val number = phones.getString(numIndex)
-                        if (!emergencyContactsList.contains(number)) {
-                            val updatedList = emergencyContactsList + number
+                        val number = phones.getString(numIndex).trim()
+                        val nameIndex = cursor.getColumnIndex(android.provider.ContactsContract.Contacts.DISPLAY_NAME)
+                        val name = cursor.getString(nameIndex) ?: number
+                        if (emergencyContactsList.none { it.number == number }) {
+                            val newContact = EmergencyContact(name, number)
+                            val updatedList = emergencyContactsList + newContact
                             emergencyContactsList = updatedList
-                            sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",")).apply()
+                            val arr = org.json.JSONArray()
+                            updatedList.forEach { c ->
+                                val obj = org.json.JSONObject()
+                                obj.put("name", c.name)
+                                obj.put("number", c.number)
+                                arr.put(obj)
+                            }
+                            sharedPrefs.edit().putString("emergency_contacts_v2", arr.toString()).apply()
+                            // Also save plain numbers for SMS service
+                            sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",") { it.number }).apply()
                         }
                         phones.close()
                     }
@@ -430,22 +454,44 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                     Text("No contacts added yet.", color = TextSecondary, modifier = Modifier.padding(vertical = 12.dp))
                 } else {
                     emergencyContactsList.forEach { contact ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        androidx.compose.material3.Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = PremiumBackground),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Rounded.Phone, contentDescription = "Phone", tint = PremiumAccent)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Text(contact, color = Color.White, fontSize = 16.sp)
-                            }
-                            androidx.compose.material3.IconButton(onClick = {
-                                val updatedList = emergencyContactsList - contact
-                                emergencyContactsList = updatedList
-                                sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",")).apply()
-                            }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Remove", tint = Color.Red.copy(alpha = 0.8f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier.size(40.dp).background(PremiumAccent.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(contact.name.take(1).uppercase(), color = PremiumAccent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(contact.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                        Text(contact.number, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                                    }
+                                }
+                                androidx.compose.material3.IconButton(onClick = {
+                                    val updatedList = emergencyContactsList - contact
+                                    emergencyContactsList = updatedList
+                                    val arr = org.json.JSONArray()
+                                    updatedList.forEach { c ->
+                                        val obj = org.json.JSONObject()
+                                        obj.put("name", c.name)
+                                        obj.put("number", c.number)
+                                        arr.put(obj)
+                                    }
+                                    sharedPrefs.edit().putString("emergency_contacts_v2", arr.toString()).apply()
+                                    sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",") { it.number }).apply()
+                                }) {
+                                    Icon(Icons.Rounded.Close, contentDescription = "Remove", tint = Color.Red.copy(alpha = 0.8f))
+                                }
                             }
                         }
                     }
@@ -638,7 +684,14 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                             sharedPrefs.edit().putBoolean("is_tracking", checked).apply()
                             val serviceIntent = Intent(context, TrackingService::class.java)
                             if (checked) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+                                val isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                                    locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+                                if (!isGpsEnabled) {
+                                    isTracking = false
+                                    sharedPrefs.edit().putBoolean("is_tracking", false).apply()
+                                    android.widget.Toast.makeText(context, "⚠️ Please turn on GPS / Location first!", android.widget.Toast.LENGTH_LONG).show()
+                                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     context.startForegroundService(serviceIntent)
                                 } else {
                                     context.startService(serviceIntent)
