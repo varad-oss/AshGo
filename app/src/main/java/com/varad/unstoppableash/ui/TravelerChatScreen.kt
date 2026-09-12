@@ -30,10 +30,8 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.FirebaseStorage
 import com.varad.unstoppableash.ui.theme.*
 import java.io.ByteArrayOutputStream
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,31 +46,26 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
+            // Aggressive compression to prevent RTDB crash
+            val maxDim = 600
+            val scale = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
+            val matrix = android.graphics.Matrix()
+            matrix.postScale(scale, scale)
+            val scaledBitmap = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            
             val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 50, baos)
             val imageBytes = baos.toByteArray()
+            val base64String = android.util.Base64.encodeToString(imageBytes, android.util.Base64.DEFAULT)
             
-            val storageRef = FirebaseStorage.getInstance().reference.child("selfies/${UUID.randomUUID()}.jpg")
-            val uploadTask = storageRef.putBytes(imageBytes)
-            
-            uploadTask.continueWithTask { task ->
-                if (!task.isSuccessful) {
-                    task.exception?.let { throw it }
-                }
-                storageRef.downloadUrl
-            }.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val downloadUri = task.result
-                    val database = FirebaseDatabase.getInstance().reference
-                    val msgData = mapOf(
-                        "text" to "Here's a cute selfie! 📸",
-                        "isFromTraveler" to true,
-                        "timestamp" to System.currentTimeMillis(),
-                        "imageUrl" to downloadUri.toString()
-                    )
-                    database.child("chat").push().setValue(msgData)
-                }
-            }
+            val database = FirebaseDatabase.getInstance().reference
+            val msgData = mapOf(
+                "text" to "Here's a cute selfie! 📸",
+                "isFromTraveler" to true,
+                "timestamp" to System.currentTimeMillis(),
+                "imageBase64" to base64String
+            )
+            database.child("chat").push().setValue(msgData)
         }
     }
 
