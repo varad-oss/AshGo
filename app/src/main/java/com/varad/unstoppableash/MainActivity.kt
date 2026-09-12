@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
                     val context = androidx.compose.ui.platform.LocalContext.current
 
                     LaunchedEffect(Unit) {
-                        FirebaseAuth.getInstance().signInAnonymously()
+                        FirebaseAuth.getInstance().signInAnonymously(); 
                     }
 
                     DisposableEffect(Unit) {

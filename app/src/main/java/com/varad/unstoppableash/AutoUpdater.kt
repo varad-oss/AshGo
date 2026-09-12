@@ -1,14 +1,17 @@
 package com.varad.unstoppableash
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
-import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 object AutoUpdater {
     /**
@@ -16,8 +19,6 @@ object AutoUpdater {
      * that bypass the virus-scan warning page for large files.
      */
     private fun resolveDownloadUrl(url: String): String {
-        // Pattern: https://drive.google.com/uc?export=download&id=FILE_ID
-        // or:      https://drive.google.com/file/d/FILE_ID/view?...
         val filePattern = Regex("drive\\.google\\.com/file/d/([^/]+)")
         val ucPattern = Regex("drive\\.google\\.com/uc\\?.*id=([^&]+)")
 
@@ -25,74 +26,69 @@ object AutoUpdater {
             ?: ucPattern.find(url)?.groupValues?.get(1)
 
         return if (fileId != null) {
-            // Use the confirmed direct download URL that skips the virus-scan page
             "https://drive.google.com/uc?export=download&confirm=t&id=$fileId"
         } else {
-            url // Not a Drive URL, use as-is
+            url
         }
     }
 
     fun downloadAndInstallApk(context: Context, url: String, token: String? = null) {
         val resolvedUrl = resolveDownloadUrl(url)
-        Toast.makeText(context, "Downloading update...", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Downloading update... Please wait.", Toast.LENGTH_LONG).show()
 
-        // Delete any old update APK first to avoid stale installs
-        val destFile = java.io.File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "AshGo_Update.apk"
-        )
+        val destFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "AshGo_Update.apk")
         if (destFile.exists()) destFile.delete()
 
-        val request = DownloadManager.Request(Uri.parse(resolvedUrl))
-            .setTitle("AshGo Update")
-            .setDescription("Downloading the latest features...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "AshGo_Update.apk")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-            .setMimeType("application/vnd.android.package-archive")
+        Thread {
+            try {
+                val connection = URL(resolvedUrl).openConnection() as HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 60000
+                
+                if (!token.isNullOrBlank()) {
+                    // Send authorization to bypass private repo restrictions
+                    connection.setRequestProperty("Authorization", "token $token")
+                }
 
-        if (!token.isNullOrBlank()) {
-            request.addRequestHeader("Authorization", "token $token")
-        }
+                connection.connect()
 
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val downloadId = downloadManager.enqueue(request)
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    val input = connection.inputStream
+                    val output = FileOutputStream(destFile)
+                    input.copyTo(output)
+                    output.close()
+                    input.close()
 
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(ctxt: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (downloadId == id) {
-                    // Verify download succeeded
-                    val query = DownloadManager.Query().setFilterById(downloadId)
-                    val cursor = downloadManager.query(query)
-                    if (cursor != null && cursor.moveToFirst()) {
-                        val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                        if (statusIdx != -1 && cursor.getInt(statusIdx) == DownloadManager.STATUS_SUCCESSFUL) {
-                            val uri = downloadManager.getUriForDownloadedFile(downloadId)
-                            val installIntent = Intent(Intent.ACTION_VIEW)
-                            installIntent.setDataAndType(uri, "application/vnd.android.package-archive")
-                            installIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            try {
-                                context.startActivity(installIntent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Failed to launch installer", Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            Toast.makeText(context, "Download failed. Check your connection.", Toast.LENGTH_LONG).show()
-                        }
-                        cursor.close()
+                    // Launch install intent using FileProvider
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.provider",
+                        destFile
+                    )
+
+                    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                     }
-                    try { context.unregisterReceiver(this) } catch (e: Exception) {}
+
+                    Handler(Looper.getMainLooper()).post {
+                        try {
+                            context.startActivity(installIntent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Failed to launch installer", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "Download failed: HTTP ${connection.responseCode}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Download failed. Check your connection.", Toast.LENGTH_LONG).show()
                 }
             }
-        }
-
-        ContextCompat.registerReceiver(
-            context,
-            onComplete,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_EXPORTED
-        )
+        }.start()
     }
 }
