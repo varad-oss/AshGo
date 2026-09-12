@@ -18,8 +18,6 @@ import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
-import androidx.compose.foundation.clickable
-
 
 
 import androidx.compose.material.icons.rounded.DirectionsCar
