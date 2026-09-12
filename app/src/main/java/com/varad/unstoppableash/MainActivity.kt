@@ -610,16 +610,6 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
     ) {
-        IconButton(
-            onClick = onOpenDrawer,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .size(48.dp)
-        ) {
-            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
-        }
-        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -966,7 +956,18 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
             }
         }
     }
-    }
+    
+        IconButton(
+            onClick = onOpenDrawer,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp)
+        ) {
+            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
+        }
+}
+
 
 }
 
@@ -1120,16 +1121,6 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit,
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
     ) {
-        IconButton(
-            onClick = onOpenDrawer,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .size(48.dp)
-        ) {
-            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
-        }
-        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1208,6 +1199,17 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit,
             Text("Chat With Her", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
     }
-    }
+
+    
+        IconButton(
+            onClick = onOpenDrawer,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp)
+        ) {
+            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
+        }
+}
 
 }
