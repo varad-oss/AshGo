@@ -145,7 +145,7 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
             
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (role == "traveler") "Traveler (${displayName ?: defaultName})" else "Receiver (${displayName ?: defaultName})",
+                    text = displayName ?: defaultName,
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
