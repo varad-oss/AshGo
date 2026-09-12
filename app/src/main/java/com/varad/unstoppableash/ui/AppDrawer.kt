@@ -10,9 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,28 +26,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.varad.unstoppableash.ui.theme.PremiumBackground
+import com.varad.unstoppableash.ui.theme.PremiumSurface
+import com.varad.unstoppableash.ui.theme.PremiumAccent
+import com.varad.unstoppableash.ui.theme.TextSecondary
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
-val PremiumBackground = Color(0xFF0F0F13)
-val PremiumSurface = Color(0xFF1C1C22)
-val PremiumAccent = Color(0xFF635BFF)
-val TextSecondary = Color(0xFF8E8E93)
-
-
 @Composable
 fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
     var profilePicBase64 by remember { mutableStateOf<String?>(null) }
+    var displayName by remember { mutableStateOf<String?>(null) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+    var editNameText by remember { mutableStateOf("") }
+    
+    val defaultName = if (role == "traveler") "Aashika \ud83d\udc85" else "Varad \ud83d\udc51"
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(role) {
         if (role.isBlank()) return@LaunchedEffect
-        val ref = FirebaseDatabase.getInstance().reference.child("users").child(role).child("profilePicBase64")
+        val ref = FirebaseDatabase.getInstance().reference.child("users").child(role)
         ref.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                profilePicBase64 = snapshot.getValue(String::class.java)
+                profilePicBase64 = snapshot.child("profilePicBase64").getValue(String::class.java)
+                displayName = snapshot.child("displayName").getValue(String::class.java)
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
         })
@@ -75,6 +81,34 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
             val bytes = Base64.decode(profilePicBase64, Base64.DEFAULT)
             profileBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } catch (e: Exception) {}
+    }
+
+    if (showEditNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditNameDialog = false },
+            title = { Text("Edit Name") },
+            text = {
+                OutlinedTextField(
+                    value = editNameText,
+                    onValueChange = { editNameText = it },
+                    label = { Text("Name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    FirebaseDatabase.getInstance().reference.child("users").child(role).child("displayName").setValue(editNameText)
+                    showEditNameDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditNameDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     ModalDrawerSheet(
@@ -108,12 +142,26 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = if (role == "traveler") "Traveler (Diva 💅)" else "Receiver (Varad 👑)",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (role == "traveler") "Traveler (${displayName ?: defaultName})" else "Receiver (${displayName ?: defaultName})",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = { 
+                        editNameText = displayName ?: defaultName
+                        showEditNameDialog = true
+                    },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Edit Name", tint = PremiumAccent)
+                }
+            }
+            
             Text(
                 text = "Tap photo to change",
                 color = PremiumAccent,
@@ -126,12 +174,12 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
             Spacer(modifier = Modifier.height(24.dp))
 
-            DrawerItem(icon = Icons.Rounded.Help, label = "Help") {
-                android.widget.Toast.makeText(context, "Help coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+            DrawerItem(icon = Icons.AutoMirrored.Rounded.Help, label = "Help") {
+                onNavigate("help")
             }
             Spacer(modifier = Modifier.height(16.dp))
             DrawerItem(icon = Icons.Rounded.Info, label = "About Us") {
-                android.widget.Toast.makeText(context, "Made with ❤️ by Varad", android.widget.Toast.LENGTH_SHORT).show()
+                onNavigate("about")
             }
         }
     }

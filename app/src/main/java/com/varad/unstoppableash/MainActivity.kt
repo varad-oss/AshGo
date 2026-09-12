@@ -149,7 +149,10 @@ class MainActivity : ComponentActivity() {
                             drawerState = drawerState,
                             drawerContent = {
                                 val role = sharedPrefs.getString("user_role", "") ?: ""
-                                com.varad.unstoppableash.ui.AppDrawer(role = role, onNavigate = {})
+                                com.varad.unstoppableash.ui.AppDrawer(role = role, onNavigate = { route ->
+                                    coroutineScope.launch { drawerState.close() }
+                                    navController.navigate(route)
+                                })
                             }
                         ) {
 
@@ -203,6 +206,13 @@ class MainActivity : ComponentActivity() {
                             }
                             composable("receiver_chat_only") {
                                 com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "chat")
+                            }
+
+                            composable("help") {
+                                com.varad.unstoppableash.ui.HelpScreen(onBack = { navController.popBackStack() })
+                            }
+                            composable("about") {
+                                com.varad.unstoppableash.ui.AboutScreen(onBack = { navController.popBackStack() })
                             }
                         }
                         }
