@@ -620,7 +620,7 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
                 }
                 if (lastUpdated > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Schedule, contentDescription = "Time", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Rounded.Info, contentDescription = "Time", tint = TextSecondary, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         val dateFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
                         val formattedTime = dateFormat.format(java.util.Date(lastUpdated))
