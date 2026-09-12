@@ -57,6 +57,8 @@ import androidx.core.content.ContextCompat
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.verticalScroll
+
 
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -589,6 +591,8 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp)
@@ -1081,6 +1085,8 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

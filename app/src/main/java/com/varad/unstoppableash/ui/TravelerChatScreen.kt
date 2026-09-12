@@ -123,6 +123,8 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(PremiumBackground)
+            .systemBarsPadding()
+            .imePadding()
     ) {
         // Header
         Surface(

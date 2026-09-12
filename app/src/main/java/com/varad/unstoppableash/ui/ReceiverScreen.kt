@@ -204,6 +204,8 @@ fun ReceiverScreen(initialMode: String = "split") {
         modifier = Modifier
             .fillMaxSize()
             .background(PremiumBackground)
+            .systemBarsPadding()
+            .imePadding()
     ) {
         // Map Section
         if (viewMode == "map" || viewMode == "split") {
