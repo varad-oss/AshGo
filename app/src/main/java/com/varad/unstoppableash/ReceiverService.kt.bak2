@@ -32,7 +32,6 @@ class ReceiverService : Service() {
                     if (!hasAlertedDeadSignal) {
                         hasAlertedDeadSignal = true
                         SoundUtil.playShockSound(this@ReceiverService)
-                    showThunderNotification("Aashika wants to talk")
                     }
                 } else {
                     hasAlertedDeadSignal = false
@@ -54,7 +53,6 @@ class ReceiverService : Service() {
                 val timestamp = snapshot.getValue(Long::class.java) ?: 0L
                 if (System.currentTimeMillis() - timestamp < 10000) {
                     SoundUtil.playShockSound(this@ReceiverService)
-                    showThunderNotification("Aashika wants to talk")
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -80,7 +78,6 @@ class ReceiverService : Service() {
                     if (active && (System.currentTimeMillis() - time) < 15 * 60 * 1000) {
                         // Play shock sound if SOS is active within the last 15 minutes
                         SoundUtil.playShockSound(this@ReceiverService)
-                    showThunderNotification("Aashika wants to talk")
                     }
                 }
             }

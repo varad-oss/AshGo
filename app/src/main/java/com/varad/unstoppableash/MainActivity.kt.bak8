@@ -17,8 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
-import androidx.compose.material.icons.rounded.PlayArrow
-
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.foundation.clickable
 

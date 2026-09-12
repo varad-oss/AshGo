@@ -105,7 +105,6 @@ class ReceiverService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Guardian Service",
@@ -145,17 +144,4 @@ class ReceiverService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun showThunderNotification(message: String) {
-        val manager = getSystemService(android.app.NotificationManager::class.java)
-        val notification = androidx.core.app.NotificationCompat.Builder(this, "receiver_channel")
-            .setContentTitle("Thunder Alert ⚡")
-            .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
-            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
-            .setAutoCancel(true)
-            .build()
-        manager?.notify(System.currentTimeMillis().toInt(), notification)
-    }
 }

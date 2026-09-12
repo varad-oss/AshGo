@@ -101,7 +101,6 @@ class TrackingService : Service() {
                 if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
                     Log.i("TrackingService", "Buzz received!")
                     SoundUtil.playShockSound(this@TrackingService)
-                    showThunderNotification("Hey, Varad is missing you right now")
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
