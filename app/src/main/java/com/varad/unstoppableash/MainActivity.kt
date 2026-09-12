@@ -750,7 +750,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { contactPickerLauncher.launch(null) }
+                        .clickable { showEmergencyContactsMenu = true }
                         .padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
