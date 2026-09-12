@@ -147,14 +147,10 @@ fun ReceiverScreen(initialMode: String = "split") {
         val chatRef = database.child("chat").limitToLast(50)
         chatRef.addValueEventListener(chatListener)
 
-        var isInitialLoad = true
         val buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (isInitialLoad) {
-                    isInitialLoad = false
-                    return
-                }
-                if (snapshot.exists()) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
                 }
             }

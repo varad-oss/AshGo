@@ -78,14 +78,10 @@ class TrackingService : Service() {
     }
 
     private fun listenForBuzz() {
-        var isInitialLoad = true
         buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (isInitialLoad) {
-                    isInitialLoad = false
-                    return
-                }
-                if (snapshot.exists()) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
                     Log.i("TrackingService", "Buzz received!")
                     SoundUtil.playShockSound(this@TrackingService)
                 }
