@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
@@ -45,7 +46,10 @@ fun AboutScreen(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val annotatedText = buildAnnotatedString {
-                append("The chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed into... ")
+                withStyle(style = SpanStyle(fontSize = 56.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif, color = PremiumAccent)) {
+                    append("T")
+                }
+                append("he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed into... ")
                 withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                     append("Read more.")
                 }
@@ -56,7 +60,8 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = Color.White,
                 fontSize = 20.sp,
                 textAlign = TextAlign.Start,
-                lineHeight = 28.sp
+                lineHeight = 28.sp,
+                fontFamily = FontFamily.Serif
             )
             
             Spacer(modifier = Modifier.weight(1f))
