@@ -246,7 +246,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
-    var emergencyContacts by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "") ?: "") }
+    // emergencyContactsList is declared below with the full JSON-backed list
     val savedVoicesJson = sharedPrefs.getString("custom_fake_calls", "[]")
     val defaultVoice = FakeCallVoice("default", "Varad (Default)", null)
     var fakeCalls by remember { 
@@ -761,10 +761,10 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text("Emergency Contact", fontSize = 12.sp, color = TextSecondary)
+                            Text("Emergency Contacts", fontSize = 12.sp, color = TextSecondary)
                             Text(
-                                text = if (emergencyContacts.isNotBlank()) emergencyContacts else "Tap to select",
-                                color = if (emergencyContacts.isNotBlank()) Color.White else TextSecondary,
+                                text = if (emergencyContactsList.isNotEmpty()) "${emergencyContactsList.size} contact${if (emergencyContactsList.size == 1) "" else "s"} added" else "Tap to add",
+                                color = if (emergencyContactsList.isNotEmpty()) Color.White else TextSecondary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(top = 4.dp)
