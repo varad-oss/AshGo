@@ -21,7 +21,7 @@ object SoundUtil {
                 .build()
             ringtone.play()
             
-            // Stop after 3 seconds
+            // Stop after 1 second
             Handler(Looper.getMainLooper()).postDelayed({
                 if (ringtone.isPlaying) ringtone.stop()
             }, 1000)

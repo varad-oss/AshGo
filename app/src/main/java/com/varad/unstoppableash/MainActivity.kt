@@ -36,10 +36,17 @@ import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,9 +65,13 @@ class MainActivity : ComponentActivity() {
                     val context = androidx.compose.ui.platform.LocalContext.current
 
                     LaunchedEffect(Unit) {
-                        val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
-                        database.child("app_config").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-                            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                        FirebaseAuth.getInstance().signInAnonymously()
+                    }
+
+                    DisposableEffect(Unit) {
+                        val database = FirebaseDatabase.getInstance().reference
+                        val listener = object : ValueEventListener {
+                            override fun onDataChange(snapshot: DataSnapshot) {
                                 val latestVersion = snapshot.child("latest_version_code").getValue(Int::class.java) ?: 1
                                 val url = snapshot.child("apk_url").getValue(String::class.java) ?: ""
                                 
@@ -74,44 +85,49 @@ class MainActivity : ComponentActivity() {
                                     }
                                 } catch (e: Exception) {}
                             }
-                            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-                        })
+                            override fun onCancelled(error: DatabaseError) {}
+                        }
+                        val ref = database.child("app_config")
+                        ref.addValueEventListener(listener)
+                        onDispose { ref.removeEventListener(listener) }
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
+                        val navController = rememberNavController()
+                        NavHost(navController = navController, startDestination = "role_selection") {
+                            composable("role_selection") {
+                                RoleSelectionScreen(
+                                    onTravelerSelected = { navController.navigate("traveler_dashboard") },
+                                    onReceiverSelected = { navController.navigate("receiver_home") }
+                                )
+                            }
+                            composable("traveler_dashboard") {
+                                DashboardScreen(
+                                    onNavigateToChat = { navController.navigate("traveler_chat") }
+                                )
+                            }
+                            composable("traveler_chat") {
+                                com.varad.unstoppableash.ui.TravelerChatScreen(
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
+                            composable("receiver_home") {
+                                ReceiverDashboard(
+                                    onNavigateToMap = { navController.navigate("receiver_map_only") },
+                                    onNavigateToChat = { navController.navigate("receiver_chat_only") }
+                                )
+                            }
+                            composable("receiver_map") { // Legacy split route just in case
+                                com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "split")
+                            }
+                            composable("receiver_map_only") {
+                                com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "map")
+                            }
+                            composable("receiver_chat_only") {
+                                com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "chat")
+                            }
+                        }
 
-                    val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "role_selection") {
-                        composable("role_selection") {
-                            RoleSelectionScreen(
-                                onTravelerSelected = { navController.navigate("traveler_dashboard") },
-                                onReceiverSelected = { navController.navigate("receiver_home") }
-                            )
-                        }
-                        composable("traveler_dashboard") {
-                            DashboardScreen(
-                                onNavigateToChat = { navController.navigate("traveler_chat") }
-                            )
-                        }
-                        composable("traveler_chat") {
-                            com.varad.unstoppableash.ui.TravelerChatScreen(
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                        composable("receiver_home") {
-                            ReceiverDashboard(
-                                onNavigateToMap = { navController.navigate("receiver_map_only") },
-                                onNavigateToChat = { navController.navigate("receiver_chat_only") }
-                            )
-                        }
-                        composable("receiver_map") { // Legacy split route just in case
-                            com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "split")
-                        }
-                        composable("receiver_map_only") {
-                            com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "map")
-                        }
-                        composable("receiver_chat_only") {
-                            com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "chat")
                         if (showUpdateDialog) {
                             AlertDialog(
                                 onDismissRequest = { /* Force update */ },
@@ -130,8 +146,6 @@ class MainActivity : ComponentActivity() {
                                 },
                                 containerColor = PremiumSurface
                             )
-                        }
-                    }
                         }
                     }
                 }
@@ -158,19 +172,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var busNumber by remember { mutableStateOf("") }
     var isTracking by remember { mutableStateOf(false) }
 
-
-    LaunchedEffect(Unit) {
-        val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+    DisposableEffect(Unit) {
+        val database = FirebaseDatabase.getInstance().reference
         var isInitialLoad = true
-        database.child("buzz").child("traveler").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
                 if (isInitialLoad) {
                     isInitialLoad = false
                     return
@@ -179,8 +192,11 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
                 }
             }
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-        })
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val ref = database.child("buzz").child("traveler")
+        ref.addValueEventListener(listener)
+        onDispose { ref.removeEventListener(listener) }
     }
 
     // Subtle breathing animation for the SOS button
@@ -236,7 +252,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             value = busNumber,
             onValueChange = { 
                 busNumber = it 
-                val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+                val database = FirebaseDatabase.getInstance().reference
                 database.child("tracking").child("vehicle_info").setValue(it)
             },
             label = { Text("Vehicle Registration") },
@@ -333,25 +349,28 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // Minimalist Premium SOS Button
-        Button(
-            onClick = {
-                val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
-                val alertData = mapOf(
-                    "isSosActive" to true,
-                    "timestamp" to System.currentTimeMillis()
-                )
-                database.child("alerts").push().setValue(alertData)
-                Toast.makeText(context, "SOS TRIGGERED", Toast.LENGTH_SHORT).show()
-            },
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(containerColor = PremiumSOS),
-            contentPadding = PaddingValues(0.dp),
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(180.dp)
                 .padding(bottom = 16.dp)
                 .scale(scale)
-                // Fake glow effect
+                .background(PremiumSOS, CircleShape)
                 .border(4.dp, SOSGlow, CircleShape)
+                .combinedClickable(
+                    onLongClick = {
+                        val database = FirebaseDatabase.getInstance().reference
+                        val alertData = mapOf(
+                            "isSosActive" to true,
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                        database.child("alerts").push().setValue(alertData)
+                        Toast.makeText(context, "SOS TRIGGERED", Toast.LENGTH_SHORT).show()
+                    },
+                    onClick = {
+                        Toast.makeText(context, "Long press to trigger SOS", Toast.LENGTH_SHORT).show()
+                    }
+                )
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -457,29 +476,31 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
                             if (address.locality != null) append(address.locality)
                         }.trimEnd(',', ' ')
                         
-                        locationAddress = loc.ifBlank { "Loc: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}" }
+                        locationAddress = loc.ifBlank { "Loc: ${String.format("%.4f", lat!!)}, ${String.format("%.4f", lng!!)}" }
                     } else {
-                        locationAddress = "Loc: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}"
+                        locationAddress = "Loc: ${String.format("%.4f", lat!!)}, ${String.format("%.4f", lng!!)}"
                     }
                 } catch (e: Exception) {
-                    locationAddress = "Loc: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}"
+                    locationAddress = "Loc: ${String.format("%.4f", lat!!)}, ${String.format("%.4f", lng!!)}"
                 }
             }
         }
     }
 
-    LaunchedEffect(Unit) {
-        val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+    DisposableEffect(Unit) {
+        val database = FirebaseDatabase.getInstance().reference
         
-        database.child("tracking").child("vehicle_info").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val vehicleListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
                 vehicleInfo = snapshot.getValue(String::class.java) ?: "Not provided"
             }
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-        })
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val vehicleRef = database.child("tracking").child("vehicle_info")
+        vehicleRef.addValueEventListener(vehicleListener)
 
-        database.child("tracking").child("current_trip").addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val tripListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
                 val time = snapshot.child("timestamp").getValue(Long::class.java)
                 if (time != null) lastUpdated = time
                 
@@ -490,19 +511,29 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
                     lng = newLng
                 }
             }
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-        })
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val tripRef = database.child("tracking").child("current_trip")
+        tripRef.addValueEventListener(tripListener)
 
-        database.child("alerts").orderByChild("timestamp").limitToLast(1).addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val alertListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
                 for (child in snapshot.children) {
                     val active = child.child("isSosActive").getValue(Boolean::class.java) ?: false
                     val time = child.child("timestamp").getValue(Long::class.java) ?: 0L
                     isSosActive = active && (System.currentTimeMillis() - time) < 15 * 60 * 1000
                 }
             }
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-        })
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val alertRef = database.child("alerts").orderByChild("timestamp").limitToLast(1)
+        alertRef.addValueEventListener(alertListener)
+        
+        onDispose {
+            vehicleRef.removeEventListener(vehicleListener)
+            tripRef.removeEventListener(tripListener)
+            alertRef.removeEventListener(alertListener)
+        }
     }
 
     Column(

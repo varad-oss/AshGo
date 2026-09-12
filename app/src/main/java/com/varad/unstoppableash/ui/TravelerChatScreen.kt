@@ -1,12 +1,11 @@
 package com.varad.unstoppableash.ui
-import androidx.compose.material.icons.rounded.Bolt
 
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.ui.res.painterResource
 import com.varad.unstoppableash.R
 
-
 import android.graphics.Bitmap
-import android.util.Base64
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -18,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,8 +30,10 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.storage.FirebaseStorage
 import com.varad.unstoppableash.ui.theme.*
 import java.io.ByteArrayOutputStream
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,22 +51,34 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             val baos = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
             val imageBytes = baos.toByteArray()
-            val base64String = Base64.encodeToString(imageBytes, Base64.DEFAULT)
             
-            val database = FirebaseDatabase.getInstance().reference
-            val msgData = mapOf(
-                "text" to "Here's a cute selfie! 📸",
-                "isFromTraveler" to true,
-                "timestamp" to System.currentTimeMillis(),
-                "imageBase64" to base64String
-            )
-            database.child("chat").push().setValue(msgData)
+            val storageRef = FirebaseStorage.getInstance().reference.child("selfies/${UUID.randomUUID()}.jpg")
+            val uploadTask = storageRef.putBytes(imageBytes)
+            
+            uploadTask.continueWithTask { task ->
+                if (!task.isSuccessful) {
+                    task.exception?.let { throw it }
+                }
+                storageRef.downloadUrl
+            }.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val downloadUri = task.result
+                    val database = FirebaseDatabase.getInstance().reference
+                    val msgData = mapOf(
+                        "text" to "Here's a cute selfie! 📸",
+                        "isFromTraveler" to true,
+                        "timestamp" to System.currentTimeMillis(),
+                        "imageUrl" to downloadUri.toString()
+                    )
+                    database.child("chat").push().setValue(msgData)
+                }
+            }
         }
     }
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
-        database.child("chat").addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val newMessages = mutableListOf<ChatMessage>()
                 for (child in snapshot.children) {
@@ -74,15 +86,18 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                     val isFromTraveler = child.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                     val timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L
                     val imageBase64 = child.child("imageBase64").getValue(String::class.java)
-                    newMessages.add(ChatMessage(text, isFromTraveler, timestamp, imageBase64))
+                    val imageUrl = child.child("imageUrl").getValue(String::class.java)
+                    newMessages.add(ChatMessage(text, isFromTraveler, timestamp, imageBase64, imageUrl))
                 }
                 messages = newMessages
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        val ref = database.child("chat").limitToLast(50)
+        ref.addValueEventListener(listener)
+        onDispose { ref.removeEventListener(listener) }
     }
 
-    
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -134,8 +149,6 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                 ChatBubble(message = message, isTravelerContext = true)
             }
         }
-
-        
 
         // Cute Selfie Prompt
         if (showSelfiePrompt) {

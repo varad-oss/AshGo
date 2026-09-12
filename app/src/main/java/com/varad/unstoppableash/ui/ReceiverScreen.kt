@@ -1,7 +1,6 @@
 package com.varad.unstoppableash.ui
+
 import androidx.compose.ui.graphics.asImageBitmap
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -27,6 +26,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
 
 import com.varad.unstoppableash.ui.theme.PremiumAccent
 import com.varad.unstoppableash.ui.theme.PremiumBackground
@@ -44,7 +44,8 @@ data class ChatMessage(
     val text: String, 
     val isFromTraveler: Boolean, 
     val timestamp: Long,
-    val imageBase64: String? = null
+    val imageBase64: String? = null,
+    val imageUrl: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,19 +66,21 @@ fun ReceiverScreen(initialMode: String = "split") {
         Configuration.getInstance().userAgentValue = context.packageName
     }
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
         
         // Listen to Vehicle Info
-        database.child("tracking").child("vehicle_info").addValueEventListener(object : ValueEventListener {
+        val vehicleListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 vehicleInfo = snapshot.getValue(String::class.java) ?: ""
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        val vehicleRef = database.child("tracking").child("vehicle_info")
+        vehicleRef.addValueEventListener(vehicleListener)
 
         // Listen to Location
-        database.child("tracking").child("current_trip").addValueEventListener(object : ValueEventListener {
+        val locationListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val lat = snapshot.child("latitude").getValue(Double::class.java)
                 val lng = snapshot.child("longitude").getValue(Double::class.java)
@@ -86,10 +89,12 @@ fun ReceiverScreen(initialMode: String = "split") {
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        val locationRef = database.child("tracking").child("current_trip")
+        locationRef.addValueEventListener(locationListener)
 
         // Listen to Chat
-        database.child("chat").addValueEventListener(object : ValueEventListener {
+        val chatListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 messages.clear()
                 for (child in snapshot.children) {
@@ -97,16 +102,18 @@ fun ReceiverScreen(initialMode: String = "split") {
                     val isTraveler = child.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                     val time = child.child("timestamp").getValue(Long::class.java) ?: 0L
                     val imageBase64 = child.child("imageBase64").getValue(String::class.java)
-                    messages.add(ChatMessage(text, isTraveler, time, imageBase64))
+                    val imageUrl = child.child("imageUrl").getValue(String::class.java)
+                    messages.add(ChatMessage(text, isTraveler, time, imageBase64, imageUrl))
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
-
+        }
+        val chatRef = database.child("chat").limitToLast(50)
+        chatRef.addValueEventListener(chatListener)
 
         // Listen to Buzz
         var isInitialLoad = true
-        database.child("buzz").child("receiver").addValueEventListener(object : ValueEventListener {
+        val buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (isInitialLoad) {
                     isInitialLoad = false
@@ -117,10 +124,12 @@ fun ReceiverScreen(initialMode: String = "split") {
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        val buzzRef = database.child("buzz").child("receiver")
+        buzzRef.addValueEventListener(buzzListener)
 
         // Listen to Alerts
-        database.child("alerts").orderByChild("timestamp").limitToLast(1).addValueEventListener(object : ValueEventListener {
+        val alertListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (child in snapshot.children) {
                     val active = child.child("isSosActive").getValue(Boolean::class.java) ?: false
@@ -133,10 +142,19 @@ fun ReceiverScreen(initialMode: String = "split") {
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        val alertRef = database.child("alerts").orderByChild("timestamp").limitToLast(1)
+        alertRef.addValueEventListener(alertListener)
+        
+        onDispose {
+            vehicleRef.removeEventListener(vehicleListener)
+            locationRef.removeEventListener(locationListener)
+            chatRef.removeEventListener(chatListener)
+            buzzRef.removeEventListener(buzzListener)
+            alertRef.removeEventListener(alertListener)
+        }
     }
 
-    
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -162,7 +180,6 @@ fun ReceiverScreen(initialMode: String = "split") {
                         MapView(ctx).apply {
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(true)
-                            setBuiltInZoomControls(true)
                             controller.setZoom(16.0)
                         }
                     },
@@ -236,11 +253,9 @@ fun ReceiverScreen(initialMode: String = "split") {
                     .weight(1f)
                     .background(PremiumBackground)
             ) {
-                
-
                 // Messages List
                 LazyColumn(
-            state = listState,
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -315,9 +330,9 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
     val isMe = if (isTravelerContext) message.isFromTraveler else !message.isFromTraveler
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     
-    // Decode bitmap outside try-catch of composable
+    // Decode bitmap outside try-catch of composable for backward compatibility with base64
     var decodedBitmap: android.graphics.Bitmap? = null
-    if (!message.imageBase64.isNullOrBlank()) {
+    if (!message.imageBase64.isNullOrBlank() && message.imageUrl == null) {
         try {
             val imageBytes = android.util.Base64.decode(message.imageBase64, android.util.Base64.DEFAULT)
             decodedBitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
@@ -342,7 +357,17 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
                 modifier = Modifier.widthIn(max = 280.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    if (decodedBitmap != null) {
+                    if (message.imageUrl != null) {
+                        AsyncImage(
+                            model = message.imageUrl,
+                            contentDescription = "Selfie",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp)
+                                .padding(bottom = if (message.text.isNotBlank()) 8.dp else 0.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+                    } else if (decodedBitmap != null) {
                         androidx.compose.foundation.Image(
                             bitmap = decodedBitmap.asImageBitmap(),
                             contentDescription = "Selfie",
@@ -369,13 +394,5 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp)
             )
         }
-    }
-}
-
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-@Composable
-fun ReceiverScreenPreview() {
-    com.varad.unstoppableash.ui.theme.AshGoTheme(darkTheme = true) {
-        ReceiverScreen()
     }
 }
