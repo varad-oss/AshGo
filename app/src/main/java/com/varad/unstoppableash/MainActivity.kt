@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Menu
+import kotlinx.coroutines.launch
+
 import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
@@ -121,9 +124,11 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         val navController = rememberNavController()
+                        val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
+                        val coroutineScope = rememberCoroutineScope()
                         
                         val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
-                        val savedRole = sharedPrefs.getString("user_role", null)
+                        var savedRole by remember { mutableStateOf(sharedPrefs.getString("user_role", null)) }
                         val startDest = when (savedRole) {
                             "traveler" -> "traveler_dashboard"
                             "receiver" -> "receiver_home"
@@ -140,6 +145,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                        androidx.compose.material3.ModalNavigationDrawer(
+                            drawerState = drawerState,
+                            drawerContent = {
+                                val role = sharedPrefs.getString("user_role", "") ?: ""
+                                com.varad.unstoppableash.ui.AppDrawer(role = role, onNavigate = {})
+                            }
+                        ) {
+
                         
                         NavHost(navController = navController, startDestination = startDest) {
                             composable("role_selection") {
@@ -166,7 +179,8 @@ class MainActivity : ComponentActivity() {
                             }
                             composable("traveler_dashboard") {
                                 DashboardScreen(
-                                    onNavigateToChat = { navController.navigate("traveler_chat") }
+                                    onNavigateToChat = { navController.navigate("traveler_chat") },
+                                    onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
                                 )
                             }
                             composable("traveler_chat") {
@@ -177,7 +191,8 @@ class MainActivity : ComponentActivity() {
                             composable("receiver_home") {
                                 ReceiverDashboard(
                                     onNavigateToMap = { navController.navigate("receiver_map_only") },
-                                    onNavigateToChat = { navController.navigate("receiver_chat_only") }
+                                    onNavigateToChat = { navController.navigate("receiver_chat_only") },
+                                    onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
                                 )
                             }
                             composable("receiver_map") { // Legacy split route just in case
@@ -190,6 +205,8 @@ class MainActivity : ComponentActivity() {
                                 com.varad.unstoppableash.ui.ReceiverScreen(initialMode = "chat")
                             }
                         }
+                        }
+
 
                         if (showUpdateDialog) {
                             AlertDialog(
@@ -247,7 +264,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
+fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
@@ -587,17 +604,31 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             }
         }
     }
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
-            .verticalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-        // Premium Header
+        IconButton(
+            onClick = onOpenDrawer,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp)
+        ) {
+            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
+        }
+        
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(32.dp)
+        ) {
+            // Premium Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -935,6 +966,8 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             }
         }
     }
+    }
+
 }
 
 @Preview(showBackground = true)
@@ -998,7 +1031,7 @@ fun RoleSelectionScreen(onTravelerSelected: () -> Unit, onReceiverSelected: () -
 }
 
 @Composable
-fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit) {
+fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit, onOpenDrawer: () -> Unit = {}) {
     var vehicleInfo by remember { mutableStateOf("Waiting for data...") }
     var lastUpdated by remember { mutableStateOf(0L) }
     var isSosActive by remember { mutableStateOf(false) }
@@ -1081,16 +1114,30 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
-            .verticalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
     ) {
+        IconButton(
+            onClick = onOpenDrawer,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp)
+        ) {
+            Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = Color.White)
+        }
+        
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
         Icon(
             imageVector = Icons.Rounded.Shield,
             contentDescription = "Shield",
@@ -1161,4 +1208,6 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
             Text("Chat With Her", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
     }
+    }
+
 }

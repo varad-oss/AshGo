@@ -40,6 +40,17 @@ fun TravelerChatScreen(onBack: () -> Unit) {
     var showSelfiePrompt by remember { mutableStateOf(true) }
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var otherProfilePicBase64 by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val ref = FirebaseDatabase.getInstance().reference.child("users").child("receiver").child("profilePicBase64")
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                otherProfilePicBase64 = snapshot.getValue(String::class.java)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
     
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -163,7 +174,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(messages) { message ->
-                ChatBubble(message = message, isTravelerContext = true)
+                ChatBubble(message = message, isTravelerContext = true, otherProfilePicBase64 = otherProfilePicBase64)
             }
         }
 

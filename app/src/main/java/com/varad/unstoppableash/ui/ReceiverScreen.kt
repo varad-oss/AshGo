@@ -3,6 +3,11 @@ package com.varad.unstoppableash.ui
 import android.widget.Toast
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -58,6 +63,17 @@ fun ReceiverScreen(initialMode: String = "split") {
     var messageText by remember { mutableStateOf("") }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var otherProfilePicBase64 by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val ref = FirebaseDatabase.getInstance().reference.child("users").child("traveler").child("profilePicBase64")
+        ref.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                otherProfilePicBase64 = snapshot.getValue(String::class.java)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
     
     var travelerLocation by remember { mutableStateOf(Pair(18.5204, 73.8567)) }
     var destinationLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -338,7 +354,7 @@ fun ReceiverScreen(initialMode: String = "split") {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(messages) { message ->
-                        ChatBubble(message = message)
+                        ChatBubble(message = message, otherProfilePicBase64 = otherProfilePicBase64)
                     }
                 }
 
@@ -398,7 +414,7 @@ fun ReceiverScreen(initialMode: String = "split") {
 }
 
 @Composable
-fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
+fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false, otherProfilePicBase64: String? = null) {
     val isMe = if (isTravelerContext) message.isFromTraveler else !message.isFromTraveler
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     
@@ -414,8 +430,25 @@ fun ChatBubble(message: ChatMessage, isTravelerContext: Boolean = false) {
     
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        if (!isMe && otherProfilePicBase64 != null) {
+            var profileBmp: android.graphics.Bitmap? = null
+            try {
+                val pBytes = android.util.Base64.decode(otherProfilePicBase64, android.util.Base64.DEFAULT)
+                profileBmp = android.graphics.BitmapFactory.decodeByteArray(pBytes, 0, pBytes.size)
+            } catch (e: Exception) {}
+            if (profileBmp != null) {
+                Image(
+                    bitmap = profileBmp.asImageBitmap(),
+                    contentDescription = "Profile",
+                    modifier = Modifier.size(32.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+        }
         Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
             Surface(
                 shape = RoundedCornerShape(
