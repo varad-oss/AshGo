@@ -618,6 +618,15 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit)
                     } else "No location data yet"
                     Text(timeText, color = if (lastUpdated > 0 && (System.currentTimeMillis() - lastUpdated) > 300000) Color.Red else Color.White, fontSize = 16.sp)
                 }
+                if (lastUpdated > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Schedule, contentDescription = "Time", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        val dateFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+                        val formattedTime = dateFormat.format(java.util.Date(lastUpdated))
+                        Text("last updated on: $formattedTime", color = TextSecondary, fontSize = 14.sp)
+                    }
+                }
             }
         }
         
