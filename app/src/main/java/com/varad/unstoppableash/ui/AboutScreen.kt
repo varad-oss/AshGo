@@ -44,22 +44,33 @@ fun AboutScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = "T",
-                    color = Color.White,
-                    fontSize = 72.sp,
-                    fontFamily = FontFamily.Serif,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 72.sp,
-                    modifier = Modifier.padding(end = 4.dp).offset(y = (-8).dp)
-                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = "T",
+                        color = Color.White,
+                        fontSize = 72.sp,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 72.sp,
+                        modifier = Modifier.padding(end = 4.dp).offset(y = (-6).dp)
+                    )
+                    
+                    Text(
+                        text = "he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed ",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Start,
+                        lineHeight = 26.sp,
+                        fontFamily = FontFamily.Serif
+                    )
+                }
                 
                 val annotatedText = buildAnnotatedString {
-                    append("he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed into... ")
+                    append("into... ")
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Read more.")
                     }
@@ -71,7 +82,8 @@ fun AboutScreen(onBack: () -> Unit) {
                     fontSize = 18.sp,
                     textAlign = TextAlign.Start,
                     lineHeight = 26.sp,
-                    fontFamily = FontFamily.Serif
+                    fontFamily = FontFamily.Serif,
+                    modifier = Modifier.offset(y = (-4).dp)
                 )
             }
             
