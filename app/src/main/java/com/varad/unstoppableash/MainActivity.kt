@@ -343,7 +343,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
             border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
         ) {
-            Text("Open Guardian Chat", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Chat with Varad", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         
         Spacer(modifier = Modifier.height(16.dp))

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Ash Go</string>
+    <string name="accessibility_service_description">Provides a hardware shortcut for Ash Go SOS. Hold Volume Down for 3 seconds to trigger an emergency alert.</string>
 </resources>
