@@ -50,10 +50,10 @@ fun AboutScreen(onBack: () -> Unit) {
         R.drawable.photo_3,
         R.drawable.photo_4,
         R.drawable.photo_5,
-        null,
-        null,
-        null,
-        null
+        R.drawable.photo_6,
+        R.drawable.photo_7,
+        R.drawable.photo_8,
+        R.drawable.photo_9
     )
     val placeholderColors = listOf(Color(0xFFE57373), Color(0xFF81C784), Color(0xFF64B5F6), Color(0xFFFFB74D), Color(0xFFBA68C8), Color(0xFF4DB6AC), Color(0xFFFFD54F), Color(0xFF90A4AE), Color(0xFFF06292))
 
