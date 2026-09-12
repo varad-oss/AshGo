@@ -17,7 +17,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.varad.unstoppableash.ui.theme.PremiumBackground
-import com.varad.unstoppableash.ui.theme.PremiumAccent
 import com.varad.unstoppableash.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,24 +44,36 @@ fun AboutScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val annotatedText = buildAnnotatedString {
-                withStyle(style = SpanStyle(fontSize = 56.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif, color = PremiumAccent)) {
-                    append("T")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = "T",
+                    color = Color.White,
+                    fontSize = 72.sp,
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 72.sp,
+                    modifier = Modifier.padding(end = 4.dp).offset(y = (-8).dp)
+                )
+                
+                val annotatedText = buildAnnotatedString {
+                    append("he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed into... ")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Read more.")
+                    }
                 }
-                append("he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed into... ")
-                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                    append("Read more.")
-                }
+                
+                Text(
+                    text = annotatedText,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Start,
+                    lineHeight = 26.sp,
+                    fontFamily = FontFamily.Serif
+                )
             }
-            
-            Text(
-                text = annotatedText,
-                color = Color.White,
-                fontSize = 20.sp,
-                textAlign = TextAlign.Start,
-                lineHeight = 28.sp,
-                fontFamily = FontFamily.Serif
-            )
             
             Spacer(modifier = Modifier.weight(1f))
             
