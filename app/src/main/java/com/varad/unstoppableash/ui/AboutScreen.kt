@@ -65,7 +65,8 @@ fun AboutScreen(onBack: () -> Unit) {
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = { isSlideshowActive = true },
-                    containerColor = Color(0xFFFFC107) // Yellow button
+                    containerColor = Color(0xFFFFC107), // Yellow button
+                    modifier = Modifier.offset(y = (-32).dp) // Shifted up
                 ) {
                     Icon(Icons.Rounded.Tv, contentDescription = "Slideshow", tint = Color.Black)
                 }
@@ -75,7 +76,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(24.dp)
+                    .padding(horizontal = 24.dp)
             ) {
                 // Top Chronicle Section
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -86,19 +87,19 @@ fun AboutScreen(onBack: () -> Unit) {
                         Text(
                             text = "T",
                             color = Color.White,
-                            fontSize = 72.sp,
+                            fontSize = 64.sp,
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
-                            lineHeight = 72.sp,
+                            lineHeight = 64.sp,
                             modifier = Modifier.padding(end = 4.dp).offset(y = (-6).dp)
                         )
                         
                         Text(
                             text = "he chronicle of Aashika-Varad began in the year 2021, with violent battles in hindi lectures, that transformed ",
                             color = Color.White,
-                            fontSize = 18.sp,
+                            fontSize = 16.sp,
                             textAlign = TextAlign.Start,
-                            lineHeight = 26.sp,
+                            lineHeight = 22.sp,
                             fontFamily = FontFamily.Serif
                         )
                     }
@@ -113,9 +114,9 @@ fun AboutScreen(onBack: () -> Unit) {
                     Text(
                         text = annotatedText,
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         textAlign = TextAlign.Start,
-                        lineHeight = 26.sp,
+                        lineHeight = 22.sp,
                         fontFamily = FontFamily.Serif,
                         modifier = Modifier.offset(y = (-4).dp)
                     )
@@ -133,13 +134,14 @@ fun AboutScreen(onBack: () -> Unit) {
                         val ropeColor = Color.DarkGray
                         val stroke = Stroke(width = 4f)
                         
-                        val yOffsets = listOf(h * 0.15f, h * 0.5f, h * 0.85f)
+                        // Shifted ropes up by modifying yOffsets
+                        val yOffsets = listOf(h * 0.10f, h * 0.40f, h * 0.70f)
                         val dipPx = dipDp.toPx()
                         
                         yOffsets.forEach { y ->
                             val path = Path().apply {
                                 moveTo(0f, y)
-                                quadraticBezierTo(w / 2, y + dipPx, w, y)
+                                quadraticTo(w / 2, y + dipPx, w, y)
                             }
                             drawPath(path, color = ropeColor, style = stroke)
                         }
@@ -150,7 +152,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         val w = maxWidth.value
                         val h = maxHeight.value
                         
-                        val yOffsets = listOf(h * 0.15f, h * 0.5f, h * 0.85f)
+                        val yOffsets = listOf(h * 0.10f, h * 0.40f, h * 0.70f)
                         val dipValue = dipDp.value
                         
                         fun getCurveY(t: Float, startY: Float): Float {
@@ -194,7 +196,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     color = TextSecondary,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp)
                 )
             }
         }
