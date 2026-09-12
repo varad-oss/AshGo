@@ -17,6 +17,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import kotlinx.coroutines.delay
+
 import androidx.compose.material.icons.rounded.PlayArrow
 
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
@@ -58,6 +67,8 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
+data class FakeCallVoice(val id: String, val name: String, val uri: String?)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -222,13 +233,63 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
     var emergencyContacts by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "") ?: "") }
+    val savedVoicesJson = sharedPrefs.getString("custom_fake_calls", "[]")
+    val defaultVoice = FakeCallVoice("default", "Varad (Default)", null)
+    var fakeCalls by remember { 
+        val list = mutableListOf(defaultVoice)
+        try {
+            val array = org.json.JSONArray(savedVoicesJson)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(FakeCallVoice(obj.getString("id"), obj.getString("name"), obj.getString("uri")))
+            }
+        } catch (e: Exception) {}
+        mutableStateOf(list)
+    }
+    
+    var activeMediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var currentPosition by remember { mutableStateOf(0) }
+    var duration by remember { mutableStateOf(0) }
+
+    LaunchedEffect(activeMediaPlayer, isPlaying) {
+        if (activeMediaPlayer != null) {
+            duration = activeMediaPlayer!!.duration
+            while(isPlaying && activeMediaPlayer != null) {
+                try {
+                    currentPosition = activeMediaPlayer!!.currentPosition
+                } catch (e: Exception) {}
+                delay(500)
+            }
+        }
+    }
+
+    var showEmergencyContactsMenu by remember { mutableStateOf(false) }
+    var emergencyContactsList by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()) }
+    var showFakeCallMenu by remember { mutableStateOf(false) }
+    var newVoiceNameDialog by remember { mutableStateOf<android.net.Uri?>(null) }
+    var newVoiceNameText by remember { mutableStateOf("") }
+    
+    val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {}
+            newVoiceNameDialog = uri
+            newVoiceNameText = "Custom Voice"
+        }
+    }
+
     val contactPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.PickContact()
     ) { uri: android.net.Uri? ->
@@ -250,8 +311,11 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                     if (phones != null && phones.moveToFirst()) {
                         val numIndex = phones.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
                         val number = phones.getString(numIndex)
-                        emergencyContacts = number
-                        sharedPrefs.edit().putString("emergency_contacts", number).apply()
+                        if (!emergencyContactsList.contains(number)) {
+                            val updatedList = emergencyContactsList + number
+                            emergencyContactsList = updatedList
+                            sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",")).apply()
+                        }
                         phones.close()
                     }
                 }
@@ -261,6 +325,22 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     }
 
     var isTracking by remember { mutableStateOf(sharedPrefs.getBoolean("is_tracking", false)) }
+    var isSosActive by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+        val alertListener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                for (child in snapshot.children) {
+                    val active = child.child("isSosActive").getValue(Boolean::class.java) ?: false
+                    isSosActive = active
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        database.child("alerts").orderByChild("timestamp").limitToLast(1).addValueEventListener(alertListener)
+    }
+
 
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
@@ -294,6 +374,163 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
         label = "sos_scale"
     )
 
+
+    if (newVoiceNameDialog != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { newVoiceNameDialog = null },
+            title = { Text("Name this voice") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = newVoiceNameText,
+                    onValueChange = { newVoiceNameText = it },
+                    label = { Text("E.g. Dad, Brother") }
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val uri = newVoiceNameDialog!!
+                    val newVoice = FakeCallVoice(java.util.UUID.randomUUID().toString(), newVoiceNameText, uri.toString())
+                    val updatedList = fakeCalls + newVoice
+                    fakeCalls = updatedList.toMutableList()
+                    
+                    val array = org.json.JSONArray()
+                    updatedList.filter { it.id != "default" }.forEach {
+                        val obj = org.json.JSONObject()
+                        obj.put("id", it.id)
+                        obj.put("name", it.name)
+                        obj.put("uri", it.uri)
+                        array.put(obj)
+                    }
+                    sharedPrefs.edit().putString("custom_fake_calls", array.toString()).apply()
+                    newVoiceNameDialog = null
+                }) { Text("Save", color = PremiumAccent) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { newVoiceNameDialog = null }) { Text("Cancel", color = Color.Gray) }
+            }
+        )
+    }
+
+
+    if (showEmergencyContactsMenu) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showEmergencyContactsMenu = false },
+            containerColor = PremiumBackground
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Emergency Contacts", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("These contacts will receive SOS SMS alerts.", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp, bottom = 16.dp))
+                
+                if (emergencyContactsList.isEmpty()) {
+                    Text("No contacts added yet.", color = TextSecondary, modifier = Modifier.padding(vertical = 12.dp))
+                } else {
+                    emergencyContactsList.forEach { contact ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Rounded.Phone, contentDescription = "Phone", tint = PremiumAccent)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(contact, color = Color.White, fontSize = 16.sp)
+                            }
+                            androidx.compose.material3.IconButton(onClick = {
+                                val updatedList = emergencyContactsList - contact
+                                emergencyContactsList = updatedList
+                                sharedPrefs.edit().putString("emergency_contacts", updatedList.joinToString(",")).apply()
+                            }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Remove", tint = Color.Red.copy(alpha = 0.8f))
+                            }
+                        }
+                    }
+                }
+                
+                androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { contactPickerLauncher.launch(null) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add", tint = PremiumAccent)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Add Contact", color = PremiumAccent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+
+    if (showFakeCallMenu) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showFakeCallMenu = false },
+            containerColor = PremiumBackground
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Select Fake Call", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                fakeCalls.forEach { voice ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showFakeCallMenu = false
+                                try {
+                                    activeMediaPlayer?.release()
+                                    val mediaPlayer = android.media.MediaPlayer()
+                                    activeMediaPlayer = mediaPlayer
+                                    if (voice.uri == null) {
+                                        // Default
+                                        val afd = context.resources.openRawResourceFd(R.raw.varad_fake_call)
+                                        mediaPlayer.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                        afd.close()
+                                    } else {
+                                        mediaPlayer.setDataSource(context, android.net.Uri.parse(voice.uri))
+                                    }
+                                    mediaPlayer.prepare()
+                                    mediaPlayer.start()
+                                    isPlaying = true
+                                    mediaPlayer.setOnCompletionListener { 
+                                        it.release() 
+                                        if (activeMediaPlayer == it) activeMediaPlayer = null
+                                    }
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Error playing audio", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = "Play", tint = PremiumAccent)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(voice.name, color = Color.White, fontSize = 16.sp)
+                    }
+                }
+                
+                androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showFakeCallMenu = false
+                            audioPickerLauncher.launch(arrayOf("audio/*"))
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add", tint = PremiumAccent)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Add New Voice", color = PremiumAccent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -339,7 +576,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                 .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
         ) {
             Column {
-                // Vehicle Registration
+                                // Vehicle Registration
                 Row(
                     modifier = Modifier.padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -367,84 +604,12 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                         )
                     }
                 }
-                
-                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
-
-                // Emergency Contact Picker
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { contactPickerLauncher.launch(null) }
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Phone,
-                            contentDescription = "Contacts",
-                            tint = PremiumAccent,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text("Emergency Contact", fontSize = 12.sp, color = TextSecondary)
-                            Text(
-                                text = if (emergencyContacts.isNotBlank()) emergencyContacts else "Tap to select",
-                                color = if (emergencyContacts.isNotBlank()) Color.White else TextSecondary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowRight,
-                        contentDescription = "Select",
-                        tint = TextSecondary
-                    )
-                }
-
-                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
-
-                // Fake Call Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { 
-                            val mediaPlayer = android.media.MediaPlayer.create(context, R.raw.fake_call)
-                            mediaPlayer.start()
-                            mediaPlayer.setOnCompletionListener { it.release() }
-                        }
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Phone,
-                            contentDescription = "Fake Call",
-                            tint = PremiumAccent,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text("Simulate Fake Call", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                            Text("Play pre-recorded voice", fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
-                        }
-                    }
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = "Play",
-                        tint = PremiumAccent
-                    )
-                }
 
                 androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
 
                 // Location Tracking Toggle
                 Row(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -486,6 +651,152 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                         )
                     )
                 }
+
+                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
+
+                // Fake Call Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showFakeCallMenu = true }
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Phone,
+                            contentDescription = "Fake Call",
+                            tint = PremiumAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Simulate Fake Call", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text("Play pre-recorded voice", fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = "Play",
+                        tint = PremiumAccent
+                    )
+                }
+
+                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
+
+                // Emergency Contact Picker
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { contactPickerLauncher.launch(null) }
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Phone,
+                            contentDescription = "Contacts",
+                            tint = PremiumAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Emergency Contact", fontSize = 12.sp, color = TextSecondary)
+                            Text(
+                                text = if (emergencyContacts.isNotBlank()) emergencyContacts else "Tap to select",
+                                color = if (emergencyContacts.isNotBlank()) Color.White else TextSecondary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowRight,
+                        contentDescription = "Select",
+                        tint = TextSecondary
+                    )
+                }
+            }
+        }
+
+
+        if (activeMediaPlayer != null) {
+            androidx.compose.material3.Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = PremiumSurface),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Simulated Call Playing...", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        androidx.compose.material3.IconButton(onClick = { 
+                            activeMediaPlayer?.stop()
+                            activeMediaPlayer?.release()
+                            activeMediaPlayer = null 
+                        }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    
+                    Slider(
+                        value = currentPosition.toFloat(),
+                        onValueChange = { 
+                            currentPosition = it.toInt()
+                            try {
+                                activeMediaPlayer?.seekTo(currentPosition)
+                            } catch (e: Exception) {}
+                        },
+                        valueRange = 0f..maxOf(1f, duration.toFloat()),
+                        colors = SliderDefaults.colors(thumbColor = PremiumAccent, activeTrackColor = PremiumAccent)
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.IconButton(onClick = { 
+                            activeMediaPlayer?.let {
+                                try {
+                                    val newPos = maxOf(0, it.currentPosition - 10000)
+                                    it.seekTo(newPos)
+                                    currentPosition = newPos
+                                } catch (e: Exception) {}
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Replay10, contentDescription = "-10s", tint = Color.White)
+                        }
+
+                        androidx.compose.material3.IconButton(onClick = { 
+                            try {
+                                if (isPlaying) {
+                                    activeMediaPlayer?.pause()
+                                } else {
+                                    activeMediaPlayer?.start()
+                                }
+                                isPlaying = !isPlaying
+                            } catch (e: Exception) {}
+                        }) {
+                            Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = "Play/Pause", tint = PremiumAccent, modifier = Modifier.size(32.dp))
+                        }
+
+                        androidx.compose.material3.IconButton(onClick = { 
+                            activeMediaPlayer?.let {
+                                try {
+                                    val newPos = minOf(duration, it.currentPosition + 10000)
+                                    it.seekTo(newPos)
+                                    currentPosition = newPos
+                                } catch (e: Exception) {}
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Forward10, contentDescription = "+10s", tint = Color.White)
+                        }
+                    }
+                }
             }
         }
 
@@ -510,33 +821,46 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                 .size(180.dp)
                 .padding(bottom = 16.dp)
                 .scale(scale)
-                .background(PremiumSOS, CircleShape)
-                .border(4.dp, SOSGlow, CircleShape)
+                .background(if (isSosActive) Color.Red.copy(alpha = 0.8f) else PremiumSOS, CircleShape)
+                .border(4.dp, if (isSosActive) Color.Red else SOSGlow, CircleShape)
                 .combinedClickable(
                     onLongClick = {
                         val database = FirebaseDatabase.getInstance().reference
-                        val alertData = mapOf(
-                            "isSosActive" to true,
-                            "timestamp" to System.currentTimeMillis()
-                        )
-                        database.child("alerts").push().setValue(alertData)
-                        Toast.makeText(context, "SOS TRIGGERED", Toast.LENGTH_SHORT).show()
+                        if (!isSosActive) {
+                            val alertData = mapOf(
+                                "isSosActive" to true,
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            database.child("alerts").push().setValue(alertData)
+                            Toast.makeText(context, "SOS TRIGGERED", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val alertData = mapOf(
+                                "isSosActive" to false,
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            database.child("alerts").push().setValue(alertData)
+                            Toast.makeText(context, "SOS STOPPED", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onClick = {
-                        Toast.makeText(context, "Long press to trigger SOS", Toast.LENGTH_SHORT).show()
+                        if (isSosActive) {
+                            Toast.makeText(context, "Long press to STOP SOS", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Long press to trigger SOS", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 )
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "SOS",
+                    text = if (isSosActive) "STOP" else "SOS",
                     fontSize = 42.sp,
                     fontWeight = FontWeight.W900,
                     color = Color.White,
                     letterSpacing = 4.sp
                 )
                 Text(
-                    text = "HOLD TO ALERT",
+                    text = if (isSosActive) "HOLD TO CANCEL" else "HOLD TO ALERT",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = 0.8f),
@@ -550,6 +874,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
 
 @Preview(showBackground = true)
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun DashboardPreview() {
     AshGoTheme(darkTheme = true) {
         Surface(

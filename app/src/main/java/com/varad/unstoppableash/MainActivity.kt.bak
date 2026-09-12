@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.PlayArrow
+
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.foundation.clickable
 
@@ -56,6 +58,8 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
+data class FakeCallVoice(val id: String, val name: String, val uri: String?)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -220,13 +224,44 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
     var busNumber by remember { mutableStateOf(sharedPrefs.getString("vehicle_registration", "") ?: "") }
     var emergencyContacts by remember { mutableStateOf(sharedPrefs.getString("emergency_contacts", "") ?: "") }
+    val savedVoicesJson = sharedPrefs.getString("custom_fake_calls", "[]")
+    val defaultVoice = FakeCallVoice("default", "Varad (Default)", null)
+    var fakeCalls by remember { 
+        val list = mutableListOf(defaultVoice)
+        try {
+            val array = org.json.JSONArray(savedVoicesJson)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(FakeCallVoice(obj.getString("id"), obj.getString("name"), obj.getString("uri")))
+            }
+        } catch (e: Exception) {}
+        mutableStateOf(list)
+    }
+    
+    var showFakeCallMenu by remember { mutableStateOf(false) }
+    var newVoiceNameDialog by remember { mutableStateOf<android.net.Uri?>(null) }
+    var newVoiceNameText by remember { mutableStateOf("") }
+    
+    val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {}
+            newVoiceNameDialog = uri
+            newVoiceNameText = "Custom Voice"
+        }
+    }
+
     val contactPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.PickContact()
     ) { uri: android.net.Uri? ->
@@ -292,6 +327,104 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
         label = "sos_scale"
     )
 
+
+    if (newVoiceNameDialog != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { newVoiceNameDialog = null },
+            title = { Text("Name this voice") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = newVoiceNameText,
+                    onValueChange = { newVoiceNameText = it },
+                    label = { Text("E.g. Dad, Brother") }
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val uri = newVoiceNameDialog!!
+                    val newVoice = FakeCallVoice(java.util.UUID.randomUUID().toString(), newVoiceNameText, uri.toString())
+                    val updatedList = fakeCalls + newVoice
+                    fakeCalls = updatedList.toMutableList()
+                    
+                    val array = org.json.JSONArray()
+                    updatedList.filter { it.id != "default" }.forEach {
+                        val obj = org.json.JSONObject()
+                        obj.put("id", it.id)
+                        obj.put("name", it.name)
+                        obj.put("uri", it.uri)
+                        array.put(obj)
+                    }
+                    sharedPrefs.edit().putString("custom_fake_calls", array.toString()).apply()
+                    newVoiceNameDialog = null
+                }) { Text("Save", color = PremiumAccent) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { newVoiceNameDialog = null }) { Text("Cancel", color = Color.Gray) }
+            }
+        )
+    }
+
+    if (showFakeCallMenu) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showFakeCallMenu = false },
+            containerColor = PremiumBackground
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Select Fake Call", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                fakeCalls.forEach { voice ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showFakeCallMenu = false
+                                try {
+                                    val mediaPlayer = android.media.MediaPlayer()
+                                    if (voice.uri == null) {
+                                        // Default
+                                        val afd = context.resources.openRawResourceFd(R.raw.varad_fake_call)
+                                        mediaPlayer.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                        afd.close()
+                                    } else {
+                                        mediaPlayer.setDataSource(context, android.net.Uri.parse(voice.uri))
+                                    }
+                                    mediaPlayer.prepare()
+                                    mediaPlayer.start()
+                                    mediaPlayer.setOnCompletionListener { it.release() }
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Error playing audio", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = "Play", tint = PremiumAccent)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(voice.name, color = Color.White, fontSize = 16.sp)
+                    }
+                }
+                
+                androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showFakeCallMenu = false
+                            audioPickerLauncher.launch(arrayOf("audio/*"))
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add", tint = PremiumAccent)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Add New Voice", color = PremiumAccent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -405,9 +538,40 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
 
                 androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
 
+                // Fake Call Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showFakeCallMenu = true }
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Phone,
+                            contentDescription = "Fake Call",
+                            tint = PremiumAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Simulate Fake Call", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text("Play pre-recorded voice", fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = "Play",
+                        tint = PremiumAccent
+                    )
+                }
+
+                androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(horizontal = 20.dp))
+
                 // Location Tracking Toggle
                 Row(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -420,7 +584,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text("Share Location", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text("Share your location, bbg <33 ", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Text(if (isTracking) "Transmitting..." else "Offline", fontSize = 12.sp, color = if (isTracking) PremiumAccent else TextSecondary, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
@@ -513,6 +677,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}) {
 
 @Preview(showBackground = true)
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun DashboardPreview() {
     AshGoTheme(darkTheme = true) {
         Surface(
