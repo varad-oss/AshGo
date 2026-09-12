@@ -28,6 +28,7 @@ class TrackingService : Service() {
     private var destinationLocation: Location? = null
     private var hasAlertedArrival = false
     private var destinationListener: ValueEventListener? = null
+    private var buzzListener: ValueEventListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -35,6 +36,7 @@ class TrackingService : Service() {
         createNotificationChannel()
         setupLocationUpdates()
         listenForDestination()
+        listenForBuzz()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -61,7 +63,6 @@ class TrackingService : Service() {
                         latitude = lat
                         longitude = lng
                     }
-                    // Reset alert flag if destination changed significantly (e.g. > 50m)
                     if (destinationLocation == null || destinationLocation!!.distanceTo(newDest) > 50f) {
                         hasAlertedArrival = false
                     }
@@ -74,6 +75,24 @@ class TrackingService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("tracking").child("destination").addValueEventListener(destinationListener!!)
+    }
+
+    private fun listenForBuzz() {
+        var isInitialLoad = true
+        buzzListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (isInitialLoad) {
+                    isInitialLoad = false
+                    return
+                }
+                if (snapshot.exists()) {
+                    Log.i("TrackingService", "Buzz received!")
+                    SoundUtil.playShockSound(this@TrackingService)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("buzz").child("traveler").addValueEventListener(buzzListener!!)
     }
 
     private fun createNotificationChannel() {
@@ -167,6 +186,9 @@ class TrackingService : Service() {
         }
         destinationListener?.let {
             database.child("tracking").child("destination").removeEventListener(it)
+        }
+        buzzListener?.let {
+            database.child("buzz").child("traveler").removeEventListener(it)
         }
     }
 
