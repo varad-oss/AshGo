@@ -69,9 +69,11 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
-        val listener = object : ValueEventListener {
+        val chatListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val newMessages = mutableListOf<ChatMessage>()
                 for (child in snapshot.children) {
@@ -86,9 +88,29 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        val ref = database.child("chat").limitToLast(50)
-        ref.addValueEventListener(listener)
-        onDispose { ref.removeEventListener(listener) }
+        val chatRef = database.child("chat").limitToLast(50)
+        chatRef.addValueEventListener(chatListener)
+
+        var isInitialBuzzLoad = true
+        val buzzListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (isInitialBuzzLoad) {
+                    isInitialBuzzLoad = false
+                    return
+                }
+                if (snapshot.exists()) {
+                    com.varad.unstoppableash.SoundUtil.playShockSound(context)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val buzzRef = database.child("buzz").child("traveler")
+        buzzRef.addValueEventListener(buzzListener)
+
+        onDispose { 
+            chatRef.removeEventListener(chatListener)
+            buzzRef.removeEventListener(buzzListener)
+        }
     }
 
     LaunchedEffect(messages.size) {
