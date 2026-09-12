@@ -44,8 +44,17 @@ fun AboutScreen(onBack: () -> Unit) {
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
     var isSlideshowActive by remember { mutableStateOf(false) }
     
-    // Placeholder photos (you will replace these with actual R.drawable resources)
-    val photos = remember { List(9) { it } } 
+    val photoResIds = listOf(
+        R.drawable.photo_1,
+        R.drawable.photo_2,
+        R.drawable.photo_3,
+        R.drawable.photo_4,
+        R.drawable.photo_5,
+        null,
+        null,
+        null,
+        null
+    )
     val placeholderColors = listOf(Color(0xFFE57373), Color(0xFF81C784), Color(0xFF64B5F6), Color(0xFFFFB74D), Color(0xFFBA68C8), Color(0xFF4DB6AC), Color(0xFFFFD54F), Color(0xFF90A4AE), Color(0xFFF06292))
 
     Box(modifier = Modifier.fillMaxSize().background(PremiumBackground)) {
@@ -163,7 +172,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         val photoHeight = 70.dp
                         val tValues = listOf(0.15f, 0.5f, 0.85f)
                         
-                        photos.forEachIndexed { index, _ ->
+                        photoResIds.forEachIndexed { index, _ ->
                             val ropeIndex = index / 3
                             if (ropeIndex < 3) {
                                 val tIndex = index % 3
@@ -185,7 +194,16 @@ fun AboutScreen(onBack: () -> Unit) {
                                         .clip(RoundedCornerShape(2.dp))
                                         .background(placeholderColors[index % placeholderColors.size])
                                         .clickable { selectedPhotoIndex = index }
-                                )
+                                ) {
+                                    photoResIds[index]?.let { resId ->
+                                        Image(
+                                            painter = painterResource(id = resId),
+                                            contentDescription = "Photo $index",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -221,7 +239,16 @@ fun AboutScreen(onBack: () -> Unit) {
                             .aspectRatio(3f/4f)
                             .padding(32.dp)
                             .background(placeholderColors[index % placeholderColors.size])
-                    )
+                    ) {
+                        photoResIds[index]?.let { resId ->
+                            Image(
+                                painter = painterResource(id = resId),
+                                contentDescription = "Photo full",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
                 
                 IconButton(
@@ -246,7 +273,7 @@ fun AboutScreen(onBack: () -> Unit) {
             LaunchedEffect(isSlideshowActive) {
                 while (isSlideshowActive) {
                     delay(2000)
-                    currentSlideIndex = (currentSlideIndex + 1) % photos.size
+                    currentSlideIndex = (currentSlideIndex + 1) % photoResIds.size
                 }
             }
             
@@ -279,7 +306,16 @@ fun AboutScreen(onBack: () -> Unit) {
                             .background(Color.White)
                             .padding(4.dp)
                             .background(placeholderColors[currentSlideIndex % placeholderColors.size])
-                    )
+                    ) {
+                        photoResIds[currentSlideIndex]?.let { resId ->
+                            Image(
+                                painter = painterResource(id = resId),
+                                contentDescription = "TV Photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
                 
                 IconButton(
