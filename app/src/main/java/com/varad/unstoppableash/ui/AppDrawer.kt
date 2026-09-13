@@ -52,7 +52,10 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
         ref.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 profilePicBase64 = snapshot.child("profilePicBase64").getValue(String::class.java)
-                displayName = snapshot.child("displayName").getValue(String::class.java)
+                val storedName = snapshot.child("displayName").getValue(String::class.java)
+                // Only use the stored name if it's not the wrong role's default
+                val wrongDefault = if (role == "traveler") "Varad" else "Aashika"
+                displayName = if (storedName == wrongDefault) null else storedName
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
         })

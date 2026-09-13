@@ -23,6 +23,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -153,22 +157,45 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             shadowElevation = 8.dp
         ) {
             Row(
-                modifier = Modifier.padding(16.dp).padding(top = 24.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).padding(top = 24.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(
-                    onClick = onBack,
-                    colors = ButtonDefaults.buttonColors(containerColor = PremiumAccent)
-                ) {
-                    Text("Back", fontWeight = FontWeight.Bold)
+                IconButton(onClick = onBack) {
+                    Icon(androidx.compose.material.icons.Icons.Rounded.Close, contentDescription = "Back", tint = Color.White)
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "Varad",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Profile picture of Varad (receiver)
+                val profileBmp = remember(otherProfilePicBase64) {
+                    if (otherProfilePicBase64 != null) {
+                        try {
+                            val bytes = android.util.Base64.decode(otherProfilePicBase64, android.util.Base64.DEFAULT)
+                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        } catch (e: Exception) { null }
+                    } else null
+                }
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(PremiumBackground),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (profileBmp != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = profileBmp.asImageBitmap(),
+                            contentDescription = "Varad",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(androidx.compose.material.icons.Icons.Rounded.Person, contentDescription = null, tint = PremiumAccent, modifier = Modifier.size(24.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Varad", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Your love 👑", fontSize = 12.sp, color = PremiumAccent)
+                }
             }
         }
 

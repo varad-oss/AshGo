@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material3.*
@@ -357,6 +358,54 @@ fun ReceiverScreen(initialMode: String = "split") {
                     .weight(1f)
                     .background(PremiumBackground)
             ) {
+                // Chat top bar
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = PremiumSurface,
+                    shadowElevation = 4.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val aashikaProfileBmp = remember(otherProfilePicBase64) {
+                            if (otherProfilePicBase64 != null) {
+                                try {
+                                    val bytes = android.util.Base64.decode(otherProfilePicBase64, android.util.Base64.DEFAULT)
+                                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                } catch (e: Exception) { null }
+                            } else null
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(PremiumBackground),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (aashikaProfileBmp != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = aashikaProfileBmp.asImageBitmap(),
+                                    contentDescription = "Aashika",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    tint = PremiumAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Aashika", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Your traveller 🌍", fontSize = 12.sp, color = PremiumAccent)
+                        }
+                    }
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
