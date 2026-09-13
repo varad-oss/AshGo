@@ -85,10 +85,12 @@ class MainActivity : ComponentActivity() {
         
         requestPermissions()
 
-        // Auto-cleanup: delete chat messages older than 3 days and keep only last 10 alerts
+        // Auto-cleanup: delete chat, alerts, and buzzes older than 3 days
         // Runs in background on every launch to keep RTDB storage lean
         val db = FirebaseDatabase.getInstance().reference
         val threeDaysAgo = System.currentTimeMillis() - (3L * 24 * 60 * 60 * 1000)
+        
+        // Cleanup old chats
         db.child("chat").orderByChild("timestamp").endAt(threeDaysAgo.toDouble())
             .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
@@ -96,11 +98,24 @@ class MainActivity : ComponentActivity() {
                 }
                 override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
             })
-        db.child("alerts").orderByChild("timestamp").addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            
+        // Cleanup old alerts
+        db.child("alerts").orderByChild("timestamp").endAt(threeDaysAgo.toDouble())
+            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    for (child in snapshot.children) child.ref.removeValue()
+                }
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+            })
+            
+        // Cleanup old buzz timestamps (even though they overwrite, good for hygiene)
+        db.child("buzz").addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                val all = snapshot.children.toList()
-                if (all.size > 10) {
-                    all.dropLast(10).forEach { it.ref.removeValue() }
+                for (child in snapshot.children) {
+                    val ts = child.getValue(Long::class.java) ?: 0L
+                    if (ts > 0L && ts < threeDaysAgo) {
+                        child.ref.removeValue()
+                    }
                 }
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
