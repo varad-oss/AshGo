@@ -32,7 +32,7 @@ class ReceiverService : Service() {
                     if (!hasAlertedDeadSignal) {
                         hasAlertedDeadSignal = true
                         SoundUtil.playShockSound(this@ReceiverService)
-                    showThunderNotification("Aashika wants to talk")
+                    showThunderNotification("Connection lost! Last location > 5 mins ago.")
                     }
                 } else {
                     hasAlertedDeadSignal = false
@@ -80,7 +80,7 @@ class ReceiverService : Service() {
                     if (active && (System.currentTimeMillis() - time) < 15 * 60 * 1000) {
                         // Play shock sound if SOS is active within the last 15 minutes
                         SoundUtil.playShockSound(this@ReceiverService)
-                    showThunderNotification("Aashika wants to talk")
+                    showThunderNotification("⚠️ EMERGENCY SOS ACTIVATED by Aashika!")
                     }
                 }
             }

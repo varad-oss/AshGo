@@ -137,12 +137,15 @@ class MainActivity : ComponentActivity() {
                         
                         LaunchedEffect(savedRole) {
                             if (savedRole == "receiver") {
+                                context.stopService(Intent(context, TrackingService::class.java))
                                 val serviceIntent = Intent(context, ReceiverService::class.java)
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     context.startForegroundService(serviceIntent)
                                 } else {
                                     context.startService(serviceIntent)
                                 }
+                            } else if (savedRole == "traveler") {
+                                context.stopService(Intent(context, ReceiverService::class.java))
                             }
                         }
                         androidx.compose.material3.ModalNavigationDrawer(
@@ -156,23 +159,19 @@ class MainActivity : ComponentActivity() {
                             }
                         ) {
 
-                        NavHost(navController = navController, startDestination = "role_selection") {
+                        NavHost(navController = navController, startDestination = startDest) {
                             composable("role_selection") {
                                 RoleSelectionScreen(
                                     onTravelerSelected = { 
                                         sharedPrefs.edit().putString("user_role", "traveler").apply()
+                                        savedRole = "traveler"
                                         navController.navigate("traveler_dashboard") {
                                             popUpTo("role_selection") { inclusive = true }
                                         }
                                     },
                                     onReceiverSelected = { 
                                         sharedPrefs.edit().putString("user_role", "receiver").apply()
-                                        val serviceIntent = Intent(context, ReceiverService::class.java)
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            context.startForegroundService(serviceIntent)
-                                        } else {
-                                            context.startService(serviceIntent)
-                                        }
+                                        savedRole = "receiver"
                                         navController.navigate("receiver_home") {
                                             popUpTo("role_selection") { inclusive = true }
                                         }

@@ -41,7 +41,7 @@ fun AppDrawer(role: String, onNavigate: (String) -> Unit) {
     var showEditNameDialog by remember { mutableStateOf(false) }
     var editNameText by remember { mutableStateOf("") }
     
-    val defaultName = if (role == "traveler") "Aashika \ud83d\udc85" else "Varad \ud83d\udc51"
+    val defaultName = if (role == "traveler") "Aashika" else "Varad"
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
