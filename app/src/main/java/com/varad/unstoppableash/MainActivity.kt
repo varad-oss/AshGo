@@ -138,11 +138,13 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(savedRole) {
                             if (savedRole == "receiver") {
                                 context.stopService(Intent(context, TrackingService::class.java))
-                                val serviceIntent = Intent(context, ReceiverService::class.java)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(serviceIntent)
-                                } else {
-                                    context.startService(serviceIntent)
+                                if (sharedPrefs.getBoolean("is_receiving", false)) {
+                                    val serviceIntent = Intent(context, ReceiverService::class.java)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        context.startForegroundService(serviceIntent)
+                                    } else {
+                                        context.startService(serviceIntent)
+                                    }
                                 }
                             } else if (savedRole == "traveler") {
                                 context.stopService(Intent(context, ReceiverService::class.java))
@@ -1151,6 +1153,46 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit,
         )
         
         Spacer(modifier = Modifier.height(32.dp))
+        
+        val sharedPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+        var isReceiving by remember { mutableStateOf(sharedPrefs.getBoolean("is_receiving", false)) }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isReceiving) "Listening for Updates..." else "Updates Paused",
+                color = if (isReceiving) PremiumAccent else Color.Gray,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Switch(
+                checked = isReceiving,
+                onCheckedChange = { checked ->
+                    isReceiving = checked
+                    sharedPrefs.edit().putBoolean("is_receiving", checked).apply()
+                    val serviceIntent = Intent(context, ReceiverService::class.java)
+                    if (checked) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } else {
+                        context.stopService(serviceIntent)
+                    }
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = PremiumAccent,
+                    uncheckedThumbColor = TextSecondary,
+                    uncheckedTrackColor = PremiumBackground
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Info Card
         Surface(
