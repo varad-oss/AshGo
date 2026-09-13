@@ -99,8 +99,10 @@ class MainActivity : ComponentActivity() {
                 override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
             })
             
-        // Cleanup old alerts
-        db.child("alerts").orderByChild("timestamp").endAt(threeDaysAgo.toDouble())
+        val oneDayAgo = System.currentTimeMillis() - (24L * 60 * 60 * 1000)
+        
+        // Cleanup old alerts (> 24 hours old)
+        db.child("alerts").orderByChild("timestamp").endAt(oneDayAgo.toDouble())
             .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                     for (child in snapshot.children) child.ref.removeValue()
@@ -108,12 +110,12 @@ class MainActivity : ComponentActivity() {
                 override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
             })
             
-        // Cleanup old buzz timestamps (even though they overwrite, good for hygiene)
+        // Cleanup old buzz timestamps (> 24 hours old)
         db.child("buzz").addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 for (child in snapshot.children) {
                     val ts = child.getValue(Long::class.java) ?: 0L
-                    if (ts > 0L && ts < threeDaysAgo) {
+                    if (ts > 0L && ts < oneDayAgo) {
                         child.ref.removeValue()
                     }
                 }
