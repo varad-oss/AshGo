@@ -85,6 +85,27 @@ class MainActivity : ComponentActivity() {
         
         requestPermissions()
 
+        // Auto-cleanup: delete chat messages older than 3 days and keep only last 10 alerts
+        // Runs in background on every launch to keep RTDB storage lean
+        val db = FirebaseDatabase.getInstance().reference
+        val threeDaysAgo = System.currentTimeMillis() - (3L * 24 * 60 * 60 * 1000)
+        db.child("chat").orderByChild("timestamp").endAt(threeDaysAgo.toDouble())
+            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    for (child in snapshot.children) child.ref.removeValue()
+                }
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+            })
+        db.child("alerts").orderByChild("timestamp").addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val all = snapshot.children.toList()
+                if (all.size > 10) {
+                    all.dropLast(10).forEach { it.ref.removeValue() }
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        })
+
         setContent {
             AshGoTheme(darkTheme = true) {
                 Surface(

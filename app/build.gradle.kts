@@ -14,8 +14,8 @@ android {
         applicationId = "com.varad.unstoppableash"
         minSdk = 26
         targetSdk = 37
-        versionCode = 34
-        versionName = "1.3.21"
+        versionCode = 36
+        versionName = "1.3.23"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

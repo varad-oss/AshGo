@@ -86,7 +86,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             
             val database = FirebaseDatabase.getInstance().reference
             val msgData = mapOf(
-                "text" to "Here's a cute selfie! 📸",
+                "text" to "",
                 "isFromTraveler" to true,
                 "timestamp" to System.currentTimeMillis(),
                 "imageBase64" to base64String
