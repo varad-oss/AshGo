@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,13 +35,12 @@ import androidx.compose.ui.unit.sp
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.ui.theme.PremiumBackground
 import com.varad.unstoppableash.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.Brush
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
-    var isSlideshowActive by remember { mutableStateOf(false) }
     
     val photoResIds = listOf(
         R.drawable.photo_1,
@@ -70,16 +68,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             },
-            containerColor = Color.Transparent,
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { isSlideshowActive = true },
-                    containerColor = Color(0xFFFFC107), // Yellow button
-                    modifier = Modifier.offset(y = (-32).dp) // Shifted up
-                ) {
-                    Icon(Icons.Rounded.Tv, contentDescription = "Slideshow", tint = Color.Black)
-                }
-            }
+            containerColor = Color.Transparent
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -136,12 +125,34 @@ fun AboutScreen(onBack: () -> Unit) {
                 // Photo Ropes Section
                 val dipDp = 60.dp
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    // Brick Wall Background
+                    Image(
+                        painter = painterResource(id = R.drawable.brick_wall),
+                        contentDescription = "Brick Wall Background",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    // Fade effect to blend into the rest of the app
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0.0f to PremiumBackground,
+                                    0.15f to Color.Transparent,
+                                    0.85f to Color.Transparent,
+                                    1.0f to PremiumBackground
+                                )
+                            )
+                    )
+                    
                     // Draw ropes
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val w = size.width
                         val h = size.height
-                        val ropeColor = Color.DarkGray
-                        val stroke = Stroke(width = 4f)
+                        val ropeColor = Color(0xFF1C130D) // Very dark brown/black
+                        val stroke = Stroke(width = 5f)
                         
                         // Shifted ropes up by modifying yOffsets
                         val yOffsets = listOf(h * 0.10f, h * 0.40f, h * 0.70f)
@@ -228,7 +239,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
+                    .background(Color.Black.copy(alpha = 0.95f))
             ) {
                 selectedPhotoIndex?.let { index ->
                     // Full screen photo placeholder
@@ -253,73 +264,6 @@ fun AboutScreen(onBack: () -> Unit) {
                 
                 IconButton(
                     onClick = { selectedPhotoIndex = null },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(top = 48.dp, start = 16.dp)
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(32.dp))
-                }
-            }
-        }
-        
-        // Retro TV Slideshow Overlay
-        AnimatedVisibility(
-            visible = isSlideshowActive,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            var currentSlideIndex by remember { mutableStateOf(0) }
-            
-            LaunchedEffect(isSlideshowActive) {
-                while (isSlideshowActive) {
-                    delay(2000)
-                    currentSlideIndex = (currentSlideIndex + 1) % photoResIds.size
-                }
-            }
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.95f)),
-                contentAlignment = Alignment.Center
-            ) {
-                // TV Frame
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.retro_tv),
-                        contentDescription = "Retro TV",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
-                    
-                    // Screen area inside the TV
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.51f) 
-                            .fillMaxHeight(0.40f) 
-                            .offset(x = (-26).dp, y = (22).dp) 
-                            .background(Color.White)
-                            .padding(4.dp)
-                            .background(placeholderColors[currentSlideIndex % placeholderColors.size])
-                    ) {
-                        photoResIds[currentSlideIndex]?.let { resId ->
-                            Image(
-                                painter = painterResource(id = resId),
-                                contentDescription = "TV Photo",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-                }
-                
-                IconButton(
-                    onClick = { isSlideshowActive = false },
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(top = 48.dp, start = 16.dp)
