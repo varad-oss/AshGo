@@ -238,7 +238,7 @@ fun AboutScreen(onBack: () -> Unit) {
                             .fillMaxWidth()
                             .aspectRatio(3f/4f)
                             .padding(32.dp)
-                            .background(placeholderColors[index % placeholderColors.size])
+                            .background(if (photoResIds[index] != null) Color.Transparent else placeholderColors[index % placeholderColors.size])
                     ) {
                         photoResIds[index]?.let { resId ->
                             Image(
