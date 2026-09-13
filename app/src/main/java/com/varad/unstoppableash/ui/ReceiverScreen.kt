@@ -64,6 +64,20 @@ fun ReceiverScreen(initialMode: String = "split") {
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     var otherProfilePicBase64 by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    DisposableEffect(viewMode) {
+        val isChatVisible = viewMode == "chat" || viewMode == "split"
+        com.varad.unstoppableash.ChatState.isChatOpen = isChatVisible
+        val prefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+        if (isChatVisible) {
+            prefs.edit().putLong("last_read_timestamp", System.currentTimeMillis()).apply()
+        }
+        onDispose {
+            com.varad.unstoppableash.ChatState.isChatOpen = false
+            prefs.edit().putLong("last_read_timestamp", System.currentTimeMillis()).apply()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val ref = FirebaseDatabase.getInstance().reference.child("users").child("traveler").child("profilePicBase64")
@@ -84,7 +98,6 @@ fun ReceiverScreen(initialMode: String = "split") {
 
     var vehicleInfo by remember { mutableStateOf("") }
     
-    val context = LocalContext.current
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }

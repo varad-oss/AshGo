@@ -41,6 +41,9 @@ class TrackingService : Service() {
     private var buzzListener: ValueEventListener? = null
     private var alertListener: ValueEventListener? = null
 
+    private var chatListener: com.google.firebase.database.ChildEventListener? = null
+
+
     private var lastKnownLat: Double = 0.0
     private var lastKnownLng: Double = 0.0
     private var lastSosSmsTime: Long = 0L
@@ -107,6 +110,23 @@ class TrackingService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("buzz").child("traveler").addValueEventListener(buzzListener!!)
+
+        chatListener = object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val isFromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
+                val text = snapshot.child("text").getValue(String::class.java) ?: ""
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                if (!isFromTraveler && !ChatState.isChatOpen && System.currentTimeMillis() - timestamp < 30000) {
+                    showChatNotification("Varad: $text")
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("chat").addChildEventListener(chatListener!!)
+
     }
 
     private fun listenForAlerts() {
@@ -209,6 +229,25 @@ class TrackingService : Service() {
         )
     }
 
+    
+    private fun showChatNotification(message: String) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(this, (System.currentTimeMillis() % 10000).toInt(), intent, PendingIntent.FLAG_IMMUTABLE)
+
+        val notification = NotificationCompat.Builder(this, "tracking_channel")
+            .setContentTitle("New Message")
+            .setContentText(message)
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        notificationManager.notify((System.currentTimeMillis() % 10000).toInt(), notification)
+    }
+
     private fun triggerSOS() {
         // Update Firebase that SOS is triggered!
         val alertData = mapOf(
@@ -256,6 +295,11 @@ class TrackingService : Service() {
         }
         buzzListener?.let {
             database.child("buzz").child("traveler").removeEventListener(it)
+
+        chatListener?.let {
+            database.child("chat").removeEventListener(it)
+        }
+
         }
         alertListener?.let {
             database.child("alerts").removeEventListener(it)

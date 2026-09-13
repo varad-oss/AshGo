@@ -42,6 +42,17 @@ fun TravelerChatScreen(onBack: () -> Unit) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     var otherProfilePicBase64 by remember { mutableStateOf<String?>(null) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    DisposableEffect(Unit) {
+        com.varad.unstoppableash.ChatState.isChatOpen = true
+        val prefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putLong("last_read_timestamp", System.currentTimeMillis()).apply()
+        onDispose {
+            com.varad.unstoppableash.ChatState.isChatOpen = false
+            prefs.edit().putLong("last_read_timestamp", System.currentTimeMillis()).apply()
+        }
+    }
+
     LaunchedEffect(Unit) {
         val ref = FirebaseDatabase.getInstance().reference.child("users").child("receiver").child("profilePicBase64")
         ref.addValueEventListener(object : ValueEventListener {
@@ -79,8 +90,6 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             database.child("chat").push().setValue(msgData)
         }
     }
-
-    val context = androidx.compose.ui.platform.LocalContext.current
 
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference

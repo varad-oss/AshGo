@@ -2,6 +2,7 @@ package com.varad.unstoppableash
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,9 @@ class ReceiverService : Service() {
     
     private var buzzListener: ValueEventListener? = null
     private var locationListener: ValueEventListener? = null
+
+    private var chatListener: com.google.firebase.database.ChildEventListener? = null
+
     private var alertListener: ValueEventListener? = null
 
     private var lastLocationTime: Long = 0L
@@ -60,6 +64,23 @@ class ReceiverService : Service() {
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("buzz").child("receiver").addValueEventListener(buzzListener!!)
+
+        chatListener = object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val isFromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
+                val text = snapshot.child("text").getValue(String::class.java) ?: ""
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                if (isFromTraveler && !ChatState.isChatOpen && System.currentTimeMillis() - timestamp < 30000) {
+                    showChatNotification("Aashika: $text")
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("chat").addChildEventListener(chatListener!!)
+
 
         locationListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -116,9 +137,33 @@ class ReceiverService : Service() {
         }
     }
 
+    
+    private fun showChatNotification(message: String) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(this, (System.currentTimeMillis() % 10000).toInt(), intent, PendingIntent.FLAG_IMMUTABLE)
+
+        val notification = NotificationCompat.Builder(this, "tracking_channel")
+            .setContentTitle("New Message")
+            .setContentText(message)
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        notificationManager.notify((System.currentTimeMillis() % 10000).toInt(), notification)
+    }
+
     override fun onDestroy() {
         buzzListener?.let {
             database.child("buzz").child("receiver").removeEventListener(it)
+
+        chatListener?.let {
+            database.child("chat").removeEventListener(it)
+        }
+
         }
         locationListener?.let {
             database.child("tracking").child("current_trip").removeEventListener(it)

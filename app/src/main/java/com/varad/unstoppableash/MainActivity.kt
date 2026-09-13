@@ -71,6 +71,10 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import android.app.NotificationManager
+import androidx.core.app.NotificationCompat
+import android.app.PendingIntent
+import com.google.firebase.database.ChildEventListener
 
 data class FakeCallVoice(val id: String, val name: String, val uri: String?)
 data class EmergencyContact(val name: String, val number: String)
@@ -412,8 +416,24 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
                     isInitialLoad = false
                     return
                 }
-                if (snapshot.exists()) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (snapshot.exists() && System.currentTimeMillis() - timestamp < 10000) {
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
+                    // Also show a system notification so it appears even when app is backgrounded
+                    val nm = context.getSystemService(android.app.NotificationManager::class.java)
+                    val pi = PendingIntent.getActivity(context, 5001,
+                        Intent(context, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        }, PendingIntent.FLAG_IMMUTABLE)
+                    val notif = NotificationCompat.Builder(context, "tracking_channel")
+                        .setContentTitle("Varad is missing you right now 💛")
+                        .setContentText("Tap to open the app")
+                        .setSmallIcon(android.R.drawable.ic_dialog_email)
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setContentIntent(pi)
+                        .setAutoCancel(true)
+                        .build()
+                    nm?.notify(5001, notif)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -421,6 +441,42 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
         val ref = database.child("buzz").child("traveler")
         ref.addValueEventListener(listener)
         onDispose { ref.removeEventListener(listener) }
+    }
+
+    // Receiver also needs in-app notification when buzz/receiver fires (for when ReceiverService isn't running)
+    val savedRole2 = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE).getString("user_role", "")
+    if (savedRole2 == "receiver") {
+        DisposableEffect(Unit) {
+            val database = FirebaseDatabase.getInstance().reference
+            var isInitialLoad = true
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (isInitialLoad) { isInitialLoad = false; return }
+                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                    if (snapshot.exists() && System.currentTimeMillis() - timestamp < 10000) {
+                        com.varad.unstoppableash.SoundUtil.playShockSound(context)
+                        val nm = context.getSystemService(android.app.NotificationManager::class.java)
+                        val pi = PendingIntent.getActivity(context, 5002,
+                            Intent(context, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }, PendingIntent.FLAG_IMMUTABLE)
+                        val notif = NotificationCompat.Builder(context, "tracking_channel")
+                            .setContentTitle("Aashika wants to talk 💛")
+                            .setContentText("Tap to open the app")
+                            .setSmallIcon(android.R.drawable.ic_dialog_email)
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setContentIntent(pi)
+                            .setAutoCancel(true)
+                            .build()
+                        nm?.notify(5002, notif)
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            }
+            val ref = database.child("buzz").child("receiver")
+            ref.addValueEventListener(listener)
+            onDispose { ref.removeEventListener(listener) }
+        }
     }
 
     // Subtle breathing animation for the SOS button
@@ -898,14 +954,55 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
 
         Spacer(modifier = Modifier.weight(1f))
 
-        OutlinedButton(
-            onClick = onNavigateToChat,
-            modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-        ) {
-            Text("Chat with Varad", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        val travelerPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+        var travelerUnreadCount by remember { mutableStateOf(0) }
+        DisposableEffect(Unit) {
+            val db = FirebaseDatabase.getInstance().reference
+            var firstLoad = true
+            val lastRead = travelerPrefs.getLong("last_read_timestamp", 0L)
+            val listener = object : ChildEventListener {
+                override fun onChildAdded(snapshot: DataSnapshot, prev: String?) {
+                    if (firstLoad) return
+                    val ts = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                    val fromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: true
+                    if (!fromTraveler && ts > lastRead) travelerUnreadCount++
+                }
+                override fun onChildChanged(s: DataSnapshot, p: String?) {}
+                override fun onChildRemoved(s: DataSnapshot) {}
+                override fun onChildMoved(s: DataSnapshot, p: String?) {}
+                override fun onCancelled(e: DatabaseError) {}
+            }
+            val ref = db.child("chat")
+            ref.addChildEventListener(listener)
+            firstLoad = false
+            onDispose { ref.removeEventListener(listener) }
+        }
+        Box {
+            OutlinedButton(
+                onClick = { travelerUnreadCount = 0; onNavigateToChat() },
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 24.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Text("Chat with Varad", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+            if (travelerUnreadCount > 0) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Red,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 28.dp).size(22.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (travelerUnreadCount > 99) "99+" else travelerUnreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -1239,14 +1336,55 @@ fun ReceiverDashboard(onNavigateToMap: () -> Unit, onNavigateToChat: () -> Unit,
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedButton(
-            onClick = onNavigateToChat,
-            modifier = Modifier.fillMaxWidth().height(64.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-        ) {
-            Text("Chat With Her", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        val receiverPrefs = context.getSharedPreferences("AshGoPrefs", android.content.Context.MODE_PRIVATE)
+        var receiverUnreadCount by remember { mutableStateOf(0) }
+        DisposableEffect(Unit) {
+            val db = FirebaseDatabase.getInstance().reference
+            var firstLoad = true
+            val lastRead = receiverPrefs.getLong("last_read_timestamp", 0L)
+            val listener = object : ChildEventListener {
+                override fun onChildAdded(snapshot: DataSnapshot, prev: String?) {
+                    if (firstLoad) return
+                    val ts = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                    val fromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
+                    if (fromTraveler && ts > lastRead) receiverUnreadCount++
+                }
+                override fun onChildChanged(s: DataSnapshot, p: String?) {}
+                override fun onChildRemoved(s: DataSnapshot) {}
+                override fun onChildMoved(s: DataSnapshot, p: String?) {}
+                override fun onCancelled(e: DatabaseError) {}
+            }
+            val ref = db.child("chat")
+            ref.addChildEventListener(listener)
+            firstLoad = false
+            onDispose { ref.removeEventListener(listener) }
+        }
+        Box {
+            OutlinedButton(
+                onClick = { receiverUnreadCount = 0; onNavigateToChat() },
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(2.dp, PremiumAccent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Text("Chat With Her", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            if (receiverUnreadCount > 0) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Red,
+                    modifier = Modifier.align(Alignment.TopEnd).size(22.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (receiverUnreadCount > 99) "99+" else receiverUnreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 
