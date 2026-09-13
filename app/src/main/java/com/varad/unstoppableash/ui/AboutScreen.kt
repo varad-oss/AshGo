@@ -125,34 +125,12 @@ fun AboutScreen(onBack: () -> Unit) {
                 // Photo Ropes Section
                 val dipDp = 60.dp
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    // Brick Wall Background
-                    Image(
-                        painter = painterResource(id = R.drawable.brick_wall),
-                        contentDescription = "Brick Wall Background",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    
-                    // Fade effect to blend into the rest of the app
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    0.0f to PremiumBackground,
-                                    0.15f to Color.Transparent,
-                                    0.85f to Color.Transparent,
-                                    1.0f to PremiumBackground
-                                )
-                            )
-                    )
-                    
                     // Draw ropes
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val w = size.width
                         val h = size.height
-                        val ropeColor = Color(0xFF1C130D) // Very dark brown/black
-                        val stroke = Stroke(width = 5f)
+                        val ropeColor = Color.DarkGray
+                        val stroke = Stroke(width = 4f)
                         
                         // Shifted ropes up by modifying yOffsets
                         val yOffsets = listOf(h * 0.10f, h * 0.40f, h * 0.70f)
