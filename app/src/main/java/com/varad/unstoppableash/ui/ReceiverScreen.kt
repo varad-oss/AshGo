@@ -402,7 +402,6 @@ fun ReceiverScreen(initialMode: String = "split") {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("Aashika", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Your traveller 🌍", fontSize = 12.sp, color = PremiumAccent)
                         }
                     }
                 }

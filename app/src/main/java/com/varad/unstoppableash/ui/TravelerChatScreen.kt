@@ -157,7 +157,7 @@ fun TravelerChatScreen(onBack: () -> Unit) {
             shadowElevation = 8.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).padding(top = 24.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -194,7 +194,6 @@ fun TravelerChatScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Varad", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Your love 👑", fontSize = 12.sp, color = PremiumAccent)
                 }
             }
         }
