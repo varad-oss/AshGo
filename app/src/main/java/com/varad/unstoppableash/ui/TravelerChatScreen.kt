@@ -115,14 +115,10 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         val chatRef = database.child("chat").limitToLast(50)
         chatRef.addValueEventListener(chatListener)
 
-        var isInitialBuzzLoad = true
         val buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (isInitialBuzzLoad) {
-                    isInitialBuzzLoad = false
-                    return
-                }
-                if (snapshot.exists()) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) {
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
                 }
             }

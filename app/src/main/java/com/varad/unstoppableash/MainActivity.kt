@@ -455,14 +455,10 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
 
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance().reference
-        var isInitialLoad = true
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (isInitialLoad) {
-                    isInitialLoad = false
-                    return
-                }
-                if (snapshot.exists()) {
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) {
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
                     // Also show a system notification so it appears even when app is backgrounded
                     val nm = context.getSystemService(android.app.NotificationManager::class.java)
@@ -493,11 +489,10 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
     if (savedRole2 == "receiver") {
         DisposableEffect(Unit) {
             val database = FirebaseDatabase.getInstance().reference
-            var isInitialLoad = true
             val listener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    if (isInitialLoad) { isInitialLoad = false; return }
-                    if (snapshot.exists()) {
+                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                    if (System.currentTimeMillis() - timestamp < 10000) {
                         com.varad.unstoppableash.SoundUtil.playShockSound(context)
                         val nm = context.getSystemService(android.app.NotificationManager::class.java)
                         val pi = PendingIntent.getActivity(context, 5002,

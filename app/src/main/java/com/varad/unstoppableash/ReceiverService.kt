@@ -53,33 +53,24 @@ class ReceiverService : Service() {
         
         FirebaseDatabase.getInstance().goOnline()
 
-        var isInitialBuzzLoad = true
         buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (isInitialBuzzLoad) {
-                    isInitialBuzzLoad = false
-                    return
+                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 10000) {
+                    SoundUtil.playShockSound(this@ReceiverService)
+                    showThunderNotification("Aashika wants to talk")
                 }
-                SoundUtil.playShockSound(this@ReceiverService)
-                showThunderNotification("Aashika wants to talk")
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("buzz").child("receiver").addValueEventListener(buzzListener!!)
 
-        var isInitialChatLoadDone = false
-        database.child("chat").addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                isInitialChatLoadDone = true
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
-
         chatListener = object : com.google.firebase.database.ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val isFromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                 val text = snapshot.child("text").getValue(String::class.java) ?: ""
-                if (isInitialChatLoadDone && isFromTraveler && !ChatState.isChatOpen) {
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                if (isFromTraveler && !ChatState.isChatOpen && System.currentTimeMillis() - timestamp < 30000) {
                     showChatNotification("Aashika: $text")
                 }
             }
