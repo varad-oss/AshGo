@@ -190,6 +190,14 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else if (savedRole == "traveler") {
                                 context.stopService(Intent(context, ReceiverService::class.java))
+                                if (sharedPrefs.getBoolean("is_tracking", false)) {
+                                    val serviceIntent = Intent(context, TrackingService::class.java)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        context.startForegroundService(serviceIntent)
+                                    } else {
+                                        context.startService(serviceIntent)
+                                    }
+                                }
                             }
                         }
                         androidx.compose.material3.ModalNavigationDrawer(

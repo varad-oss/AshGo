@@ -13,9 +13,9 @@ android {
     defaultConfig {
         applicationId = "com.varad.unstoppableash"
         minSdk = 26
-        targetSdk = 37
-        versionCode = 38
-        versionName = "1.3.25"
+        targetSdk = 34
+        versionCode = 39
+        versionName = "1.3.26"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
