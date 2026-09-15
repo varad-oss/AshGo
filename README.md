@@ -2,7 +2,7 @@
 
 > A completely private, real-time safety tracking and connection app built natively for Android.
 
-## 📖 Overview
+##  Overview
 AshGo is a bespoke Android application designed with a single purpose: to provide absolute peace of mind and seamless connection between two individuals. Built natively in Kotlin using **Jetpack Compose**, it completely bypasses the need for third-party commercial tracking apps, offering a 100% private, self-hosted environment where data is never shared.
 
 It features robust background location tracking, real-time chat, emergency SOS broadcasting, and a custom in-house auto-updater system.
