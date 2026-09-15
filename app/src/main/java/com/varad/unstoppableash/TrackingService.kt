@@ -98,25 +98,34 @@ class TrackingService : Service() {
     }
 
     private fun listenForBuzz() {
+        var isInitialBuzzLoad = true
         buzzListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                if (System.currentTimeMillis() - timestamp < 10000) { // Buzz sent within last 10 seconds
-                    Log.i("TrackingService", "Buzz received!")
-                    SoundUtil.playShockSound(this@TrackingService)
-                    showThunderNotification("Hey, Varad is missing you right now")
+                if (isInitialBuzzLoad) {
+                    isInitialBuzzLoad = false
+                    return
                 }
+                Log.i("TrackingService", "Buzz received!")
+                SoundUtil.playShockSound(this@TrackingService)
+                showThunderNotification("Hey, Varad is missing you right now")
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         database.child("buzz").child("traveler").addValueEventListener(buzzListener!!)
 
+        var isInitialChatLoadDone = false
+        database.child("chat").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                isInitialChatLoadDone = true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
         chatListener = object : com.google.firebase.database.ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val isFromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                 val text = snapshot.child("text").getValue(String::class.java) ?: ""
-                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
-                if (!isFromTraveler && !ChatState.isChatOpen && System.currentTimeMillis() - timestamp < 30000) {
+                if (isInitialChatLoadDone && !isFromTraveler && !ChatState.isChatOpen) {
                     showChatNotification("Varad: $text")
                 }
             }

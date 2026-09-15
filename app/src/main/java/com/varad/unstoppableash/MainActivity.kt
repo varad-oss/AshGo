@@ -462,8 +462,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
                     isInitialLoad = false
                     return
                 }
-                val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                if (snapshot.exists() && System.currentTimeMillis() - timestamp < 10000) {
+                if (snapshot.exists()) {
                     com.varad.unstoppableash.SoundUtil.playShockSound(context)
                     // Also show a system notification so it appears even when app is backgrounded
                     val nm = context.getSystemService(android.app.NotificationManager::class.java)
@@ -498,8 +497,7 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
             val listener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (isInitialLoad) { isInitialLoad = false; return }
-                    val timestamp = snapshot.getValue(Long::class.java) ?: 0L
-                    if (snapshot.exists() && System.currentTimeMillis() - timestamp < 10000) {
+                    if (snapshot.exists()) {
                         com.varad.unstoppableash.SoundUtil.playShockSound(context)
                         val nm = context.getSystemService(android.app.NotificationManager::class.java)
                         val pi = PendingIntent.getActivity(context, 5002,
