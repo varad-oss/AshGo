@@ -349,13 +349,29 @@ fun DashboardScreen(onNavigateToChat: () -> Unit = {}, onOpenDrawer: () -> Unit 
     var duration by remember { mutableStateOf(0) }
 
     LaunchedEffect(activeMediaPlayer, isPlaying) {
-        if (activeMediaPlayer != null) {
-            duration = activeMediaPlayer!!.duration
+        val player = activeMediaPlayer
+        if (player != null) {
+            try {
+                duration = player.duration
+            } catch (e: Exception) {}
             while(isPlaying && activeMediaPlayer != null) {
                 try {
-                    currentPosition = activeMediaPlayer!!.currentPosition
+                    currentPosition = activeMediaPlayer?.currentPosition ?: 0
                 } catch (e: Exception) {}
                 delay(500)
+            }
+        }
+    }
+
+    // Clean up MediaPlayer when the composable leaves composition to prevent leaks
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                activeMediaPlayer?.stop()
+                activeMediaPlayer?.release()
+                activeMediaPlayer = null
+            } catch (e: Exception) {
+                // Already released
             }
         }
     }

@@ -16,6 +16,14 @@ object SoundUtil {
             
             val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100) // 100 = max volume
             toneGen.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 2000) // Play for 2 seconds
+            // Release the ToneGenerator after the tone finishes to prevent native audio resource leak
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    toneGen.release()
+                } catch (e: Exception) {
+                    // Already released
+                }
+            }, 2500)
         } catch (e: Exception) {
             android.util.Log.e("SoundUtil", "Failed to play sound: ${e.message}")
             e.printStackTrace()
@@ -26,6 +34,14 @@ object SoundUtil {
         try {
             val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
             toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 1000)
+            // Release the ToneGenerator after the tone finishes to prevent native audio resource leak
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    toneGen.release()
+                } catch (e: Exception) {
+                    // Already released
+                }
+            }, 1500)
         } catch (e: Exception) {
             e.printStackTrace()
         }

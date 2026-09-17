@@ -20,6 +20,7 @@ class ReceiverService : Service() {
     private val database = FirebaseDatabase.getInstance().reference
     
     private var buzzListener: ValueEventListener? = null
+    private var customNotificationListener: ValueEventListener? = null
     private var locationListener: ValueEventListener? = null
 
     private var chatListener: com.google.firebase.database.ChildEventListener? = null
@@ -65,13 +66,28 @@ class ReceiverService : Service() {
         }
         database.child("buzz").child("receiver").addValueEventListener(buzzListener!!)
 
+        customNotificationListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val title = snapshot.child("title").getValue(String::class.java) ?: "New Update"
+                val message = snapshot.child("message").getValue(String::class.java) ?: ""
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() - timestamp < 30000 && message.isNotEmpty()) {
+                    SoundUtil.playShockSound(this@ReceiverService)
+                    showCustomNotification(title, message)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("notifications").child("receiver").addValueEventListener(customNotificationListener!!)
+
         chatListener = object : com.google.firebase.database.ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val isFromTraveler = snapshot.child("isFromTraveler").getValue(Boolean::class.java) ?: false
                 val text = snapshot.child("text").getValue(String::class.java) ?: ""
                 val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
-                if (isFromTraveler && !ChatState.isChatOpen && System.currentTimeMillis() - timestamp < 30000) {
-                    showChatNotification("Aashika: $text")
+                // We removed !ChatState.isChatOpen because Compose doesn't dispose when home button is pressed, leading to silent drops.
+                if (isFromTraveler && System.currentTimeMillis() - timestamp < 30000) {
+                    showChatNotification("Varad: $text")
                 }
             }
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
@@ -159,11 +175,12 @@ class ReceiverService : Service() {
     override fun onDestroy() {
         buzzListener?.let {
             database.child("buzz").child("receiver").removeEventListener(it)
-
+        }
         chatListener?.let {
             database.child("chat").removeEventListener(it)
         }
-
+        customNotificationListener?.let {
+            database.child("notifications").child("receiver").removeEventListener(it)
         }
         locationListener?.let {
             database.child("tracking").child("current_trip").removeEventListener(it)
@@ -199,6 +216,24 @@ class ReceiverService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
             .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .build()
+        manager?.notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    private fun showCustomNotification(title: String, message: String) {
+        val manager = getSystemService(android.app.NotificationManager::class.java)
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(this, (System.currentTimeMillis() % 10000).toInt(), intent, PendingIntent.FLAG_IMMUTABLE)
+
+        val notification = androidx.core.app.NotificationCompat.Builder(this, "tracking_channel")
+            .setContentTitle(title)
+            .setContentText(message)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
         manager?.notify(System.currentTimeMillis().toInt(), notification)

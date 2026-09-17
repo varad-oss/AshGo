@@ -57,14 +57,16 @@ fun TravelerChatScreen(onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
         val ref = FirebaseDatabase.getInstance().reference.child("users").child("receiver").child("profilePicBase64")
-        ref.addValueEventListener(object : ValueEventListener {
+        val profileListener = object : ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 otherProfilePicBase64 = snapshot.getValue(String::class.java)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        ref.addValueEventListener(profileListener)
+        onDispose { ref.removeEventListener(profileListener) }
     }
     
     // Camera launcher
