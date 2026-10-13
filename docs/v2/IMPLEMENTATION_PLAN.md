@@ -656,3 +656,116 @@ The `demo-` project ID guarantees nothing ever talks to the real project.
 - ARCHITECTURE §6 is updated if any rule deviates.
 - SECURITY_PRIVACY_AUDIT §7 lists the deploy steps for the owner.
 - A fresh reviewer checks the rules, which are security-critical.
+
+---
+
+## Stage 4 — Data layer (detailed, written 2026-10-14)
+
+**Goal:** repositories that talk to the Stage 3 rules, fully JVM-testable, with an end-to-end check against the local emulators.
+
+**Design:**
+- **`RtdbClient` is the only Firebase-database seam:**
+  - `observe(path): Flow<Any?>`
+  - `observeLast(path, limit, orderByChild)`
+  - `set`, `update`, `remove`, each returning `Outcome<Unit>`
+  - `newKey(path)`, `connected(): Flow<Boolean>`, `onDisconnectSet(path, value)`, `serverTimestamp` sentinel, `serverTimeOffset(): Flow<Long>`
+- **Implementations:**
+  - `FirebaseRtdbClient` (real; `callbackFlow` + `awaitClose { removeEventListener }`)
+  - `FakeRtdb` (test fixture: in-memory tree, server-time substitution, live-observer count, per-path failure injection)
+- **Mappers** turn the Firebase value (`Map<String, Any?>`, `Long`, `Double`, `String`, `Boolean`) into domain models, so no `DataSnapshot` appears in tests.
+- **Firebase Auth** sits behind `AuthGateway` (`currentUser: Flow<AuthUser?>`, `signInWithGoogleIdToken(idToken)`, which links an anonymous v1 user when present, `signOut()`).
+- **Credential Manager** UI glue is in Stage 5.
+
+**New dependencies** (free, Apache-2.0):
+- `kotlinx-serialization-json:1.11.0` + the `org.jetbrains.kotlin.plugin.serialization:2.4.21` plugin, for local stores and the v1 contacts migration
+- `app.cash.turbine:turbine:1.2.1` (test only)
+
+**Test command:** `./gradlew testDebugUnitTest --tests "com.varad.unstoppableash.data.*" --tests "com.varad.unstoppableash.core.*"`
+
+### Task 4.1 — Foundations
+**Files:** `core/result/Outcome.kt`, `core/time/ServerClock.kt`, `data/firebase/RtdbClient.kt`, `data/firebase/FirebaseRtdbClient.kt`, `data/firebase/DbPaths.kt`; test fixture `src/test/.../data/firebase/FakeRtdb.kt`.
+
+**Tests:**
+- `ServerClock` adds the latest offset and starts at offset 0
+- `DbPaths` builds every ARCHITECTURE §5 path
+- `emailKey` lowercases and replaces every `.` with `,` and trims whitespace
+- `FakeRtdb` contract tests:
+  - set / observe / update / remove
+  - `serverTimestamp` becomes clock time
+  - observer count returns to 0 after collection is cancelled
+  - injected failure becomes `Outcome.Failure(PermissionDenied)`
+
+### Task 4.2 — Auth + pairing
+**Files:** `data/auth/AuthGateway.kt` (+ `FirebaseAuthGateway`), `data/pair/PairRepository.kt`, `data/firebase/Mappers.kt` (pair part).
+
+**Tests (with FakeRtdb and a fake AuthGateway):**
+- `createPair` writes meta, own profile and `userPairs` in rule-compatible order
+- `invite` writes `invites/<key>/<pairId>` with `fromEmail` and expiry ≤ 24 h
+- `myInvites` lists invites for the signed-in email
+- `join` writes memberB, then `userPairs`, then deletes the invite
+- `confirm` sets `confirmedAt`
+- `leave` removes the pair and clears own `userPairs`
+- `observePairState`:
+  - Unpaired / Waiting / NeedsConfirmation / Paired
+  - a stale `userPairs` pointing at a deleted pair reads as Unpaired, never a crash (review #9)
+- `signIn` failure surfaces typed `Outcome`
+
+### Task 4.3 — Presence + location
+**Files:** `data/presence/PresenceRepository.kt`, `data/location/LocationRepository.kt`, mappers.
+
+**Tests:**
+- `partnerPresence` combines `presence/<partner>` + `location/<partner>` into a `PresenceSnapshot`
+- legacy/partial values map to null fields
+- `locationAt` ≤ 0 is treated as absent (review M10)
+- `setSharing` writes mode + `sharingUntil`
+- `goOnline` registers `onDisconnect` (`online=false`, `lastSeen=server`)
+- `writeLocation` sends `at=serverTimestamp` and drops accuracy 0 as unknown (review M10)
+- battery is written only on a ≥ 5 % change
+
+### Task 4.4 — Chat + events
+**Files:** `data/chat/ChatRepository.kt`, `data/events/EventRepository.kt`, `domain/model/Chat.kt`, `domain/model/OrbitEvent.kt`.
+
+**Tests:**
+- `messages` maps and orders the last 100
+- `send` with the same client id twice writes once and reports success
+- a photo over `ImageBudget.HARD_LIMIT_BYTES` is rejected before any write
+- `markRead` writes `lastReadAt=server`
+- `unreadCount` counts partner messages after `lastReadAt`
+- `checkIn` / `nudge` write typed events
+- `markSeen` writes only for partner events
+- nudge is rate-limited to 1 per 30 s (returns `Failure(RateLimited)`)
+
+### Task 4.5 — SOS + trips
+**Files:** `data/sos/SosRepository.kt`, `data/trips/TripRepository.kt`, mappers.
+
+**Tests:**
+- `raise` writes `{from, state:active, at:server, lat/lng/locAt when known}`
+- `cancel` updates state + `cancelledAt` together
+- `ack` / `markDelivered` only for partner SOS
+- `partnerActiveSos` emits the latest active one
+- SMS counts are written by the sender
+- `startTrip` / `extend` / `end` / `arrive` write rule-valid shapes
+- `partnerTrip` maps to `TripSnapshot`
+
+### Task 4.6 — Local stores, v1 local migration, AppContainer
+**Files:** `data/local/SettingsStore.kt`, `EmergencyContactsStore.kt`, `ActiveSosStore.kt`, `data/legacy/LegacyLocalMigration.kt`, `AppContainer.kt`, `AshGoApplication.kt` (creates the container only; v1 behaviour unchanged).
+
+**Tests:**
+- contacts round-trip
+- parse the v1 `emergency_contacts_v2` JSON (and the plain `emergency_contacts` CSV fallback), de-duplicating numbers
+- fake-call voices parse
+- `ActiveSosStore` round-trips an `Active` SOS with receipts
+
+### Task 4.7 — End-to-end against the emulators (instrumented)
+**Files:** `src/androidTest/.../data/FirebaseEndToEndTest.kt`, `firebase/firebase.json` (+ auth emulator on 9099).
+
+**Steps:**
+1. Run `firebase emulators:start --only auth,database --project demo-ashgo` on the host.
+2. The Android emulator reaches it at `10.0.2.2`.
+3. Two Google test users sign in with emulator fake ID tokens.
+4. Through the real `FirebaseRtdbClient` + repositories: create → invite → join → confirm, then chat round-trip, SOS raise/ack/cancel, and an outsider denied.
+
+**Exit:**
+- all unit, rules and connected tests pass
+- lint has no new issues
+- a fresh review of the stage
