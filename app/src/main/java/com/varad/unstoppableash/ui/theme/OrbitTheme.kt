@@ -19,7 +19,7 @@ fun OrbitTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Un
     }
     val colors = if (dark) DarkOrbitColors else LightOrbitColors
     CompositionLocalProvider(LocalOrbitColors provides colors) {
-        MaterialTheme(colorScheme = colors.toMaterial(), shapes = OrbitShapes, content = content)
+        MaterialTheme(colorScheme = colors.toMaterial(), typography = OrbitTypography, shapes = OrbitShapes, content = content)
     }
 }
 

@@ -38,7 +38,7 @@ Last verified: 2026-10-13. Re-verify pricing before each release.
 | Coil | Apache-2.0 | Image loading | Free | Keep only if needed for Base64 bitmaps; otherwise remove |
 | kotlinx-coroutines | Apache-2.0 | Concurrency | Free | Keep |
 | JUnit 4, kotlinx-coroutines-test, Turbine (proposed) | EPL-1.0 / Apache-2.0 / Apache-2.0 | Tests | Free | Add test-only |
-| **Nunito** typeface | SIL OFL 1.1 (confirmed via the `googlefonts/nunito` repo licence) | Brand type | Free; bundling permitted; the font can't be sold on its own | **Adopt**. Bundle as `res/font`. No runtime fetching. Include OFL.txt in assets. |
+| **Nunito** typeface | SIL OFL 1.1 (OFL.txt shipped at `assets/licenses/OFL.txt`) | Brand type | Free; bundling permitted; the font can't be sold on its own | **Adopted 2026-10-14.** Variable font `fonts/variable/Nunito[wght].ttf` from github.com/googlefonts/nunito (276 932 B, SHA-256 `bb55a5ca…1e85207`) bundled as `res/font/nunito_variable.ttf`; one file serves weights 400/600/700/800. No runtime fetching. |
 | Material Symbols / Icons | Apache-2.0 | Icons | Free | Keep. Prefer specific icons over the 30 MB extended set once R8 is enabled. |
 | Firebase Emulator Suite (`firebase-tools`) | MIT (CLI), emulators free | Rules tests, local only | Free, no project billing | **Adopt** for rules tests |
 | Custom vector illustrations (orbit, heart, route) | Original work in this repo | Brand accents | Free | Create in-house |
