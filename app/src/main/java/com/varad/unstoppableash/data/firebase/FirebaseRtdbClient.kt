@@ -2,7 +2,6 @@ package com.varad.unstoppableash.data.firebase
 
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.DatabaseException
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.Query
 import com.google.firebase.database.ServerValue
@@ -58,11 +57,10 @@ class FirebaseRtdbClient(private val db: FirebaseDatabase) : RtdbClient {
 
     private suspend fun <T> attempt(block: suspend () -> T): Outcome<T> = try {
         Outcome.Success(block())
-    } catch (e: DatabaseException) {
-        Outcome.Failure(reasonOf(e.message), e.message)
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
     } catch (e: Exception) {
-        val error = runCatching { DatabaseError.fromException(e) }.getOrNull()
-        Outcome.Failure(error?.let { reasonOf(it.code) } ?: reasonOf(e.message), e.message)
+        Outcome.Failure(failureReasonOf(e), e.message)
     }
 
     companion object {
@@ -81,12 +79,20 @@ class FirebaseRtdbClient(private val db: FirebaseDatabase) : RtdbClient {
             else -> FailureReason.UNKNOWN
         }
 
-        private fun reasonOf(message: String?): FailureReason = when {
-            message == null -> FailureReason.UNKNOWN
-            message.contains("permission", ignoreCase = true) -> FailureReason.PERMISSION_DENIED
-            message.contains("network", ignoreCase = true) || message.contains("disconnect", ignoreCase = true) -> FailureReason.OFFLINE
-            else -> FailureReason.UNKNOWN
-        }
+    }
+}
+
+/**
+ * Maps any failure the SDK surfaces (DatabaseException, Task wrappers, causes) to a reason the UI can
+ * explain. Firebase's own DatabaseError.fromException() reports wrapped errors as "unknown", so the
+ * message chain is the reliable signal.
+ */
+fun failureReasonOf(error: Throwable): FailureReason {
+    val messages = generateSequence(error) { it.cause }.take(5).mapNotNull { it.message?.lowercase() }.toList()
+    return when {
+        messages.any { "permission" in it } -> FailureReason.PERMISSION_DENIED
+        messages.any { "network" in it || "offline" in it || "disconnect" in it } -> FailureReason.OFFLINE
+        else -> FailureReason.UNKNOWN
     }
 }
 
