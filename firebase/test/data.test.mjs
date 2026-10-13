@@ -11,7 +11,7 @@ before(async () => { env = await makeEnv(); });
 after(async () => { await env.cleanup(); });
 beforeEach(async () => {
   await env.clearDatabase();
-  await seed(env, pp('meta'), { memberA: A, memberB: B, relationship: 'PARTNER', createdAt: Date.now() - DAY });
+  await seed(env, pp('meta'), { memberA: A, memberB: B, relationship: 'PARTNER', createdAt: Date.now() - DAY, confirmedAt: Date.now() - DAY });
   a = user(env, A); b = user(env, B); c = user(env, C);
 });
 
@@ -26,6 +26,24 @@ test('member writes own profile, presence and location; not the partner\'s; outs
   await assertFails(set(ref(a, pp(`location/${B}`)), { lat: 1, lng: 1, at: now() }));
   await assertFails(set(ref(c, pp(`profiles/${C}`)), { name: 'Carol' }));
   await assertSucceeds(get(ref(b, pp(`location/${A}`))));
+});
+
+test('profile email must be the member\'s own verified email', async () => {
+  await assertFails(set(ref(a, pp(`profiles/${A}`)), { name: 'Alice', email: 'bob@example.com' }));
+  await assertSucceeds(set(ref(a, pp(`profiles/${A}`)), { name: 'Alice', email: 'alice@example.com' }));
+});
+
+test('objects cannot be replaced by strings (presence, status, dest)', async () => {
+  await assertFails(set(ref(a, pp(`presence/${A}`)), 'x'.repeat(1000)));
+  await assertFails(set(ref(a, pp(`presence/${A}/status`)), 'x'.repeat(1000)));
+  await assertFails(set(ref(a, pp(`trips/${A}`)), { state: 'active', startedAt: now(), notifyPartner: true, dest: 'x' }));
+});
+
+test('receipt maps must be maps, on events and SOS', async () => {
+  await assertFails(set(ref(a, pp('events/e1')), { from: A, type: 'checkin', kind: 'k', at: now(), deliveredTo: 'x' }));
+  await assertFails(set(ref(a, pp('events/e2')), { from: A, type: 'checkin', kind: 'k', at: now(), seenBy: true }));
+  await assertFails(set(ref(a, pp('sos/s1')), { from: A, state: 'active', at: now(), ackBy: true }));
+  await assertFails(set(ref(a, pp('sos/s2')), { from: A, state: 'active', at: now(), deliveredTo: 'x' }));
 });
 
 test('profile limits: name 1–40 chars, avatar ≤ 41 000 chars', async () => {

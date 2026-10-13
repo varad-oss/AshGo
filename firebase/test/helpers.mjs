@@ -21,6 +21,13 @@ export function user(env, uid, email = `${uid}@example.com`, verified = true) {
   return env.authenticatedContext(uid, { email, email_verified: verified, firebase: { sign_in_provider: 'google.com' } }).database();
 }
 
+/** A signed-in account from another provider (anonymous, password, ...). */
+export function provider(env, uid, sign_in_provider, email = undefined, verified = false) {
+  const token = { firebase: { sign_in_provider } };
+  if (email) { token.email = email; token.email_verified = verified; }
+  return env.authenticatedContext(uid, token).database();
+}
+
 export function anon(env) {
   return env.unauthenticatedContext().database();
 }

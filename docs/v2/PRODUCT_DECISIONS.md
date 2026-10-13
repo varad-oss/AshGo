@@ -43,6 +43,14 @@ Nothing here is final until the owner reviews it. Decisions marked Recommended a
 
 **Not acceptable, any option:** the current shared global paths with `auth != null`.
 
+## D-16 Pairing safeguards and leaving — **Decided 2026-10-14 (Stage 3 security review)**
+- **Who can pair:** only Google-verified accounts can create pairs, invite, or join. Anonymous accounts (v1) and other providers can't.
+- **Invites can't be squatted:** invites are stored per inviting pair, so no invite can block another.
+- **Invites show who really sent them:** the invite carries the inviter's real email, which the rules check against their sign-in token. The invitee is shown that email, not just a typed name.
+- **Nothing private before confirmation:** until memberA confirms ("Yes, that's them"), the joiner can see only the pair's metadata and profiles, never location, presence, trips, chat, media, events or SOS. This protects against a mistyped email.
+- **Leaving is always possible, even during the partner's active SOS.** It deletes the shared data. Blocking it would let an abusive partner hold someone in the orbit indefinitely. The SOS texts to emergency contacts have already been sent by the sender's phone, independently of the database.
+- **Stage 10 note:** `LegacyImporter` can't write partner-authored messages with old timestamps under these rules, by design. The import must be redesigned so that each phone imports only its *own* legacy messages, keeping the original time in a separate field. It must not relax `from`/`at` validation, because the legacy paths are writable by any signed-in client until phase 2.
+
 ## D-2 Data model and legacy migration — **Recommended**
 - New tree: `pairs/{pairId}/{members, profiles, presence, location, trips, events, chat, media, sos}`, plus `invites/{codeHash}` and `userPairs/{uid}`.
 - Rules use membership checks, sender-ownership checks (`newData.child('senderUid').val() === auth.uid`), and server-time validation (`now`).

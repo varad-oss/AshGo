@@ -112,7 +112,7 @@ com.varad.unstoppableash
 
 ```
 userPairs/{uid}             pairId (string)   — not under legacy `users/`, which phase 1 keeps open to any signed-in client
-invites/{emailKey}          { pairId, fromUid, fromName, createdAt, expiresAt }
+invites/{emailKey}/{pairId} { fromUid, fromName, fromEmail (= inviter's token email), createdAt, expiresAt }   one invite per inviting pair, so none can block another
                             emailKey = lowercase(email).replace(".", ",")
 pairs/{pairId}/
   meta                      { memberA, memberB?, relationship, createdAt, confirmedAt? }
@@ -147,16 +147,17 @@ Helper: `isMember = root.child('pairs/'+$pairId+'/meta/memberA').val() === auth.
 | Path | Read | Create | Update | Delete |
 |---|---|---|---|---|
 | `userPairs/$uid` | self | self, value must be a pair the user is a member of | same | self |
-| `invites/$k` | inviter, or the user whose verified email key = `$k` | memberA of `newData.pairId`, with `fromUid == auth.uid`, `expiresAt ≤ now+24h` | ✗ | inviter or invitee |
-| `pairs/$p/meta` | members | creator becomes `memberA`, `memberB` absent | `memberB`: set once, `== auth.uid`, `email_verified`, the invite for `auth.token.email` points to `$p` and is unexpired. `confirmedAt`: memberA only | — |
+| `invites/$k/$pairId` | inviter; the verified Google invitee lists `invites/$k` | Google-verified memberA of `$pairId` while memberB is empty; `fromEmail == auth.token.email`; `expiresAt ≤ now+24h` | inviter re-invites | inviter or invitee |
+| `pairs/$p/meta` | members | Google-verified creator becomes `memberA`, `memberB` absent | `memberB`: set once by a Google-verified account, `== auth.uid`, an unexpired invite exists at `invites/<own email>/$p` **and** its `fromUid` is the current memberA. `confirmedAt`: memberA only | — |
 | `pairs/$p` (whole) | members | — | — | members (Leave orbit = delete the pair) |
-| `profiles/$uid`, `presence/$uid`, `location/$uid`, `trips/$uid` | members | `$uid == auth.uid` | same | same |
-| `chat/$id`, `media/$id` | members | `from == auth.uid`, `at == now`, size limits | ✗ (immutable) | sender, or anyone when `at < now − retention` (cleanup) |
-| `events/$id` | members | `from == auth.uid`, `at == now`; no receipts at creation | only `deliveredTo/$uid`, `seenBy/$uid` where `$uid == auth.uid ≠ from`, on an event that already exists, value `== now`, set once | as chat |
-| `sos/$id` | members | `from == auth.uid`, `state == 'active'`, `at == now` | `state → cancelled` + `cancelledAt == now` only by `from`; `smsSent/smsFailed` only by `from`; `deliveredTo/ackBy/$uid` only by that `$uid` | `from` only, and only when `state == 'cancelled'` and `cancelledAt < now − 30d` |
+| `profiles/$uid` | members | own; `email == auth.token.email` | same | same |
+| `presence/$uid`, `location/$uid`, `trips/$uid` | members, **after `meta/confirmedAt` exists** | `$uid == auth.uid` | same | same |
+| `chat/$id`, `media/$id` | members after confirmation | `from == auth.uid`, `at == now`, size limits | ✗ (immutable) | sender, or anyone when `at < now − retention` (cleanup) |
+| `events/$id` | members after confirmation | `from == auth.uid`, `at == now`; no receipts at creation | only `deliveredTo/$uid`, `seenBy/$uid` where `$uid == auth.uid ≠ from`, on an event that already exists, value `== now`, set once | as chat |
+| `sos/$id` | members after confirmation | `from == auth.uid`, `state == 'active'`, `at == now` | `state → cancelled` + `cancelledAt == now` only by `from`; `smsSent/smsFailed` only by `from`; `deliveredTo/ackBy/$uid` only by that `$uid` | `from` only, and only when `state == 'cancelled'` and `cancelledAt < now − 30d` |
 | legacy `/chat`, `/tracking`, `/alerts`, `/buzz`, `/users`, `/app_config`, `/notifications` | phase 1: unchanged (owner's current rules); phase 2: ✗ | | | |
 
-**Implemented** in `firebase/database.rules.json` (phase 1), with 45 emulator tests in `firebase/test/*.test.mjs`. Run them with `cd firebase && npm test`, with `JAVA_HOME` set to a JDK. Receipts (`deliveredTo`/`seenBy`/`ackBy`) can only be added to an already-existing event or SOS, so a sender can't pre-fill "seen" with `serverTimestamp()`.
+**Implemented** in `firebase/database.rules.json` (phase 1), with 54 emulator tests (after the Stage 3 security review) in `firebase/test/*.test.mjs`. Run them with `cd firebase && npm test`, with `JAVA_HOME` set to a JDK. Receipts (`deliveredTo`/`seenBy`/`ackBy`) can only be added to an already-existing event or SOS, so a sender can't pre-fill "seen" with `serverTimestamp()`.
 
 **Rules tests** (originally planned as `firebase/rules.test.ts`, `@firebase/rules-unit-testing` against the Database emulator) must cover:
 - an outsider is denied every read and write
