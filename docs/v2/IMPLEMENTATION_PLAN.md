@@ -859,3 +859,79 @@ Run the full flow against the emulators:
 4. Confirm, then view Home with seeded presence
 
 Screenshots go in the stage report. A fresh review of the stage follows.
+
+---
+
+## Stage 6 — Chat (detailed, written 2026-10-14)
+
+**Spec:** REDESIGN_SPEC §Chat, O-3 nudges, D-5 media budget. **Owner input:** none; the owner asked (2026-10-14) for Stages 6–11 to run without per-stage approval.
+
+**Approach:** same pattern as Stage 5. Pure timeline logic in `domain/chat`. A `PhotoEncoder` seam: the Android implementation runs on `Dispatchers.Default`, and JVM tests use a fake. `ChatViewModel` is tested with `FakeRtdb`, and the stateless `ChatScreen` is tested with built states.
+
+### Task 6.1 — Timeline (pure)
+**Files:** `domain/chat/Timeline.kt`.
+
+`buildTimeline(messages, events, outbox, myUid, zone): List<TimelineItem>` merges messages, check-in/nudge chips and my not-yet-confirmed sends. Items are oldest → newest:
+- `DaySeparator(date)` when the local date changes;
+- `Bubble(id, mine, text?, mediaId?, at, status, showTime)`, where `showTime` is true on the last bubble of a group (same sender, within 5 min);
+- `EventChip(event)`.
+
+An outbox entry whose id is already on the server is dropped, so a send is never shown twice. Outbox statuses are SENDING and FAILED. Server messages are SENT, or SEEN once the partner's `lastReadAt` ≥ `at`.
+
+**Tests:** separators across midnight in the given zone; grouping at 5 min; outbox deduped by id; a FAILED entry stays put; SEEN only from the partner's lastReadAt.
+
+### Task 6.2 — Repository additions
+`ChatRepository.lastReadAt(pairId, uid): Flow<Long?>`, plus paging: `messages(pairId, limit)` exists, and the VM grows `limit` in steps of 50. `hasMore = list.size >= limit`.
+
+**Tests:** reading the partner's lastReadAt; a bigger limit returns older messages.
+
+### Task 6.3 — PhotoEncoder
+- `interface PhotoEncoder { suspend fun encode(uri: String): EncodedPhoto? }`, with `EncodedPhoto(jpeg, w, h)`.
+- `AndroidPhotoEncoder(contentResolver)`: `ImageDecoder` to a target size from `ImageBudget.scaledSize`, then JPEG over `ImageBudget.QUALITY_STEPS` via `chooseQuality`, on `Dispatchers.Default`. Returns null when even the lowest step exceeds `HARD_LIMIT_BYTES`.
+- **Instrumented tests:**
+  - 4000×3000 gradient → ≤ 1024 px edge and ≤ 150 KB;
+  - random-noise 1024² at the lowest quality, too big → null;
+  - the call doesn't run on the main thread.
+
+### Task 6.4 — ChatViewModel
+**State:** partner name/avatar/presence, timeline, composer text, `sending`, `hasMore`, `loadingOlder`, `error`, `photoError`, `nudgeStatus`.
+
+**Behaviour:**
+- `send()`: the client id is generated once per composed message. Re-entry while in flight is ignored (a double tap sends once). On failure the entry stays FAILED with Retry, which reuses the same id.
+- `sendPhoto(uri)`: encode, then refuse when null ("Photo too large even after compression"), then send with a fresh id.
+- `retry(id)`.
+- `nudge(kind)`: the shared EventRepository, limited to one per 30 s.
+- `markRead()` whenever the visible timeline gains a partner message, and `markSeen` on partner events.
+- `loadOlder()`.
+
+**Tests:**
+- a double send writes one message;
+- failure → FAILED → retry with the same id → one message;
+- an over-budget photo → `photoError`, nothing written;
+- markRead advances lastReadAt and the unread count goes to 0;
+- loadOlder raises the limit;
+- a nudge inside 30 s → RATE_LIMITED.
+
+### Task 6.5 — ChatScreen
+- Reverse `LazyColumn` anchored at the newest message, with `imePadding`.
+- Day separators and bubbles: mine blush/right, partner lavender/left, 20 dp radius with a 6 dp tail. Status 🕓/✓/Seen/⚠ Retry.
+- Centred event chips.
+- Photo bubble: base64 decoded off the main thread (`produceState` + `Dispatchers.Default`), max 240 dp, tap → fullscreen dialog.
+- Composer: 📷 (`PickVisualMedia`, no permission), ⚡ (NudgeSheet), multiline field up to 5 lines, Send disabled when blank or in flight.
+- Empty state "Say hi" per CopyVariant. Reaching the top triggers loadOlder.
+- **UI tests:**
+  - the send button disables while sending;
+  - a failed bubble shows Retry and calls back with its id;
+  - an event chip renders the kind label;
+  - the empty state;
+  - the photo-too-large message;
+  - TalkBack: each bubble reads "{name}: {text}, {time}, {status}".
+
+### Task 6.6 — Wire-up + manual verification
+- The Chat tab in MainShell, and the unread badge from Home's state.
+- Run on the emulator against the emulators with Bob (REST, as in 5.6):
+  - a message both ways;
+  - a photo;
+  - a nudge chip;
+  - unread clears when the tab opens.
+- Then the fresh review.
