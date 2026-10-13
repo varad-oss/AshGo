@@ -159,7 +159,10 @@
     <string name="tab_map">Map</string>
     <string name="tab_chat">Chat</string>
     <string name="tab_safety">Safety</string>
-    <string name="unread_badge_cd">%1$d unread</string>
+    <plurals name="unread_badge_cd">
+        <item quantity="one">%1$d unread</item>
+        <item quantity="other">%1$d unread</item>
+    </plurals>
     <string name="coming_later_title">Not built yet</string>
     <string name="coming_later_body">This part of v2 arrives in a later stage. Use the current app for it meanwhile.</string>
     <string name="settings_title">Settings</string>
@@ -172,7 +175,6 @@
     <string name="settings_sign_out">Sign out</string>
     <string name="action_cancel">Cancel</string>
     <string name="sign_in_no_account">No Google account on this phone. Add one in Android Settings first.</string>
-    <string name="sign_in_cancelled">Sign-in was cancelled.</string>
 
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>

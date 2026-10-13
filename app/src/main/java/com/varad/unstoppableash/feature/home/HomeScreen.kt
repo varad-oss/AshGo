@@ -89,7 +89,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                     Text(stringResource(R.string.partner_sos_banner, state.partnerName), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(Spacing.lg))
                 }
             }
-            state.error?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissError) }
+            state.error?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissError, actionLabel = stringResource(R.string.action_dismiss)) }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(greeting(state), style = MaterialTheme.typography.titleLarge, color = Orbit.colors.text, modifier = Modifier.weight(1f))

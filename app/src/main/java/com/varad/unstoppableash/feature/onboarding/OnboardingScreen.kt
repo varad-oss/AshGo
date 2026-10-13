@@ -70,7 +70,7 @@ fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modif
             .padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        state.failure?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissFailure) }
+        state.failure?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissFailure, actionLabel = stringResource(R.string.action_dismiss)) }
         when (state.step) {
             OnboardingStep.SIGN_IN -> SignIn(state, actions)
             OnboardingStep.CHOOSE -> Choose(state, actions)

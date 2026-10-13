@@ -54,6 +54,12 @@ class PresenceRepository(private val db: RtdbClient) {
             .then { db.update(path, mapOf("online" to true, "lastSeen" to db.serverTimestamp)) }
     }
 
+    /** Explicitly offline (sign-out): cancels the disconnect handler so nothing is written later, then marks offline. */
+    suspend fun goOffline(pairId: String, uid: String): Outcome<Unit> {
+        val path = DbPaths.presence(pairId, uid)
+        return db.cancelOnDisconnect(path).then { db.update(path, mapOf("online" to false, "lastSeen" to db.serverTimestamp)) }
+    }
+
     suspend fun heartbeat(pairId: String, uid: String): Outcome<Unit> =
         db.update(DbPaths.presence(pairId, uid), mapOf("heartbeatAt" to db.serverTimestamp))
 

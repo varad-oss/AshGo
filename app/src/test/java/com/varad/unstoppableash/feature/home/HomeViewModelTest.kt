@@ -102,6 +102,22 @@ class HomeViewModelTest {
         assertEquals(ActionStatus.Failed(Action.NUDGE, FailureReason.RATE_LIMITED), vm.state.first { it.action is ActionStatus.Failed }.action)
     }
 
+    @Test fun marksMeOnlineAndReRegistersAfterReconnect() = runTest(main.dispatcher) {
+        seedPair()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.state.first { !it.loading }
+        main.dispatcher.scheduler.advanceTimeBy(1_000); main.dispatcher.scheduler.runCurrent()
+        assertEquals(true, db.read("pairs/p1/presence/alice/online"))
+        db.disconnect()
+        assertEquals(false, db.read("pairs/p1/presence/alice/online"))
+        main.dispatcher.scheduler.advanceTimeBy(1_000); main.dispatcher.scheduler.runCurrent() // time passes while offline
+        db.connectedState.value = true
+        main.dispatcher.scheduler.advanceTimeBy(1_000); main.dispatcher.scheduler.runCurrent()
+        assertEquals("online again after reconnect", true, db.read("pairs/p1/presence/alice/online"))
+        assertTrue("disconnect handler re-registered", db.onDisconnectWrites.containsKey("pairs/p1/presence/alice"))
+    }
+
     @Test fun offlineAndReadFailuresShowBanners() = runTest(main.dispatcher) {
         seedPair()
         val vm = vm()

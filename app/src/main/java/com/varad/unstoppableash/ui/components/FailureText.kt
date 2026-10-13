@@ -13,6 +13,7 @@ fun failureMessage(reason: FailureReason): String = stringResource(
         FailureReason.PERMISSION_DENIED, FailureReason.NOT_PAIRED -> R.string.error_denied
         FailureReason.RATE_LIMITED -> R.string.error_rate_limited
         FailureReason.INVALID -> R.string.error_invalid
+        FailureReason.NOT_SIGNED_IN -> R.string.sign_in_no_account
         else -> R.string.error_generic
     },
 )

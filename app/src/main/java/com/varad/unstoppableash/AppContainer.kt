@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.varad.unstoppableash.core.time.Clock
@@ -41,8 +43,34 @@ private val Context.activeSosStore by preferencesDataStore(name = "v2_active_sos
 class AppContainer(private val app: Application) {
     val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    val rtdb: RtdbClient by lazy { FirebaseRtdbClient(FirebaseDatabase.getInstance()) }
-    val auth: AuthGateway by lazy { FirebaseAuthGateway(FirebaseAuth.getInstance()) }
+    private var emulatorHost: String? = null
+    @Volatile private var backendCreated = false
+
+    /** Debug builds only: point v2 at the local Firebase emulators (demo project). Must run before first use. */
+    fun useLocalEmulators(host: String = "10.0.2.2") {
+        check(!backendCreated) { "Firebase backend already created" }
+        emulatorHost = host
+    }
+
+    val usesEmulators: Boolean get() = emulatorHost != null
+
+    private val firebaseApp: FirebaseApp by lazy {
+        backendCreated = true
+        if (emulatorHost == null) FirebaseApp.getInstance()
+        else FirebaseApp.getApps(app).firstOrNull { it.name == DEV_APP } ?: FirebaseApp.initializeApp(
+            app,
+            FirebaseOptions.Builder().setProjectId("demo-ashgo").setApplicationId("1:1:android:1").setApiKey("demo-key")
+                .setDatabaseUrl("https://demo-ashgo-default-rtdb.firebaseio.com").build(),
+            DEV_APP,
+        )
+    }
+
+    val rtdb: RtdbClient by lazy {
+        FirebaseRtdbClient(FirebaseDatabase.getInstance(firebaseApp).also { db -> emulatorHost?.let { db.useEmulator(it, 9000) } })
+    }
+    val auth: AuthGateway by lazy {
+        FirebaseAuthGateway(FirebaseAuth.getInstance(firebaseApp).also { a -> emulatorHost?.let { a.useEmulator(it, 9099) } })
+    }
     val clock: Clock by lazy { ServerClock(rtdb.serverTimeOffset(), appScope) }
 
     val pairs by lazy { PairRepository(rtdb, auth, clock) }
@@ -67,5 +95,6 @@ class AppContainer(private val app: Application) {
 
     private companion object {
         const val LEGACY_PREFS = "AshGoPrefs"
+        const val DEV_APP = "dev-emulators"
     }
 }

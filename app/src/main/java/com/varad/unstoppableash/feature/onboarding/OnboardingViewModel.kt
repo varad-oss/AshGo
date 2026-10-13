@@ -94,6 +94,7 @@ class OnboardingViewModel(
     fun back() = local.update { Local() }
     fun inviteAgain() = local.update { it.copy(sentInviteTo = null) }
     fun clearFailure() = local.update { it.copy(failure = null) }
+    fun reportFailure(reason: FailureReason) = local.update { it.copy(busy = false, failure = reason) }
 
     fun create(name: String, relationship: Relationship) {
         if (!nameIsUsable(name)) return local.update { it.copy(nameError = true) }

@@ -54,7 +54,7 @@ fun EmptyState(
 
 /** Recoverable problem. Uses the uncertainty colours — red is reserved for emergencies. */
 @Composable
-fun ErrorBanner(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
+fun ErrorBanner(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null, actionLabel: String? = null) {
     val c = Orbit.colors
     Row(
         modifier
@@ -68,7 +68,7 @@ fun ErrorBanner(message: String, modifier: Modifier = Modifier, onRetry: (() -> 
     ) {
         Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = c.warnInk)
         Text(message, color = c.warnInk, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        if (onRetry != null) OrbitButton(stringResource(R.string.action_retry), onRetry, style = OrbitButtonStyle.Quiet)
+        if (onRetry != null) OrbitButton(actionLabel ?: stringResource(R.string.action_retry), onRetry, style = OrbitButtonStyle.Quiet)
     }
 }
 

@@ -3,6 +3,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Debug only: lets instrumented tests reach the local Firebase emulators over plain HTTP at 10.0.2.2. -->
     <application android:networkSecurityConfig="@xml/network_security_config_debug">
+        <!-- v2 dev entry point (debug only until the Stage 11 cutover). -->
+        <activity
+            android:name="com.varad.unstoppableash.V2Activity"
+            android:exported="true"
+            android:label="AshGo v2 (dev)"
+            android:theme="@style/Theme.AshGo"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".catalog.DesignCatalogActivity"
             android:exported="true"

@@ -29,7 +29,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -72,6 +74,15 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch { rtdb.readFailures.collect { error.value = it } }
+        // While Home is alive, mark me online. onDisconnect handlers are consumed when the connection
+        // drops, so re-register on every reconnect.
+        viewModelScope.launch {
+            pairs.pairState().map { it as? PairState.Paired }
+                .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid }
+                .collectLatest { paired ->
+                    if (paired != null) rtdb.connected().filter { it }.collect { presence.goOnline(paired.meta.pairId, paired.myUid) }
+                }
+        }
     }
 
     private val details: Flow<HomeUiState> = pairs.pairState().flatMapLatest { state ->
