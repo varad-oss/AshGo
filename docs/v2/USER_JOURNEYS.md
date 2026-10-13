@@ -90,9 +90,9 @@ Covered by J2.4–5: both see the other's Google avatar and email before the pai
 4. **AshGo never auto-calls emergency services.**
 
 ## J10. Emergency: raising SOS and understanding what succeeded
-1. A presses and holds SOS (on Home, the widget, the QS tile, or the notification) for 3 s; a ring fills.
-2. A full red screen appears: "Sending SOS in 5… **Cancel**".
-3. **Raised.** The screen shows live receipts:
+1. A holds SOS on Home for 3 s: a ring fills with haptic ticks, and releasing early sends nothing. The widget, the QS tile and the notification action open the full-screen SOS hold screen, which works over the lock screen, and the same 3 s hold happens there (D-6).
+2. At 3 s the SOS is sent immediately; there is no countdown. A strong haptic confirms it.
+3. **Raised.** The screen leads with a large hold-to-confirm **"I'm safe: cancel SOS"** and shows live receipts:
    - ✓ Saved to AshGo (server time 22:41:07)
    - ✓ B has seen your SOS (22:41:20) — or "B's phone hasn't confirmed yet"
    - ✓ SMS to Mum: sent · delivered

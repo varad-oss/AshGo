@@ -21,7 +21,7 @@ Nothing here is final until the owner reviews it. Decisions marked Recommended a
 
   This removes guessable codes entirely. A short "Is this you, B?" confirmation (avatar + email shown on both sides) replaces orbit words. A QR code remains an optional convenience.
 - **Migration:** on the first v2 launch, call `linkWithCredential` on the existing anonymous user, so the UID is preserved where possible. If the Google account is already linked elsewhere, sign in instead and re-import.
-- **Owner setup (one-time, free):**
+- **Owner setup: ✅ done 2026-10-13.** Verified locally: `google-services.json` now has an Android OAuth client whose certificate hash equals the debug-key SHA-1, plus a web client (type 3). The file is still git-ignored. Steps for reference:
   1. Firebase console → Authentication → enable the **Google** provider.
   2. Project settings → Android app `com.varad.unstoppableash` → add the signing certificate fingerprints:
      - SHA-1 `43:16:66:AE:F0:61:DD:BF:09:CB:39:8F:8A:4F:51:B6:CC:80:ED:FC`
@@ -79,7 +79,15 @@ Keep RTDB Base64, but:
 
 Text chat works with photos disabled. Cloud Storage is rejected (Blaze-only).
 
-## D-6 SOS activation friction — **Recommended: hold 3 s + 5 s cancellable countdown; open question Q-3**
+## D-6 SOS activation friction — **Decided 2026-10-13: (B) hold 3 s, send immediately, no countdown**
+
+**Owner chose B.** Design consequences:
+- **The hold is the only safeguard,** so it must be unmistakable. It shows a ring that fills over 3 s with haptic ticks at 1 s and 2 s and a strong haptic on send. Releasing early sends nothing and shows "Hold for 3 seconds to send SOS".
+- **Undo after sending:** the first screen after sending leads with a large **"I'm safe: cancel SOS"** button, itself hold-to-confirm for 1.5 s. Cancelling notifies the partner ("Cancelled by A") and sends an SMS "Sorry, false alarm, I'm safe" **only to contacts whose SOS SMS was already sent**. That follow-up SMS is shown and confirmed on screen before it goes, since it costs money.
+- **Widgets, the QS tile and notification actions cannot detect a long-press.** Android `RemoteViews` only deliver taps. These entry points therefore open a full-screen **SOS hold screen** (shown over the lock screen) where the 3 s hold happens. A tap alone never sends.
+- **Duplicate protection:** holding again while an SOS is active doesn't create a second event. It offers "Resend SMS to failed contacts" instead.
+
+**Earlier recommendation (superseded):** hold 3 s + 5 s cancellable countdown.
 **Alternatives considered:**
 - Single tap: rejected, because of accidental-trigger evidence in the current app.
 - Hold only: faster, but has no undo.
@@ -157,7 +165,7 @@ Cleanup runs at most once a day from either phone, using server-time cutoffs.
 ## Open questions for the owner
 - ~~**Q-1:** Identity~~: **Answered: C, Google Sign-In** (see D-1).
 - **Q-2:** Make the main repo private, or keep it public and scrub personal media?
-- **Q-3:** SOS activation: hold 3 s **plus** a 5 s cancellable countdown, or hold only?
+- ~~**Q-3:** SOS activation~~: **Answered: B, hold 3 s and send immediately** (see D-6).
 - **Q-4:** Are the retention defaults in D-14 acceptable? In particular, should precise location be cleared when sharing pauses?
 - **Q-5:** Should the partner be told automatically when a trip starts (the Google Safety Check makes this optional; we default to *on* for Partner and Family, *off* for Friends)?
 - **Q-6:** Is the owner willing to verify Cloudflare's no-card free plan, so a later push relay can be considered? (Not needed for v2.0.)
