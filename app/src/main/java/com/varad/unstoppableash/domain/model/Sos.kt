@@ -29,6 +29,7 @@ sealed interface SosAction {
     data class Raise(val sosId: String, val now: Long, val targets: List<SmsTarget>) : SosAction
     data class BackendSaved(val sosId: String, val serverAt: Long) : SosAction
     data class BackendFailed(val sosId: String) : SosAction
+    /** One aggregated (worst-of-parts) result per message attempt; never one per multipart part. */
     data class SmsResult(val sosId: String, val contactId: String, val status: SmsStatus, val failure: String? = null) : SosAction
     data class PartnerDelivered(val sosId: String, val at: Long) : SosAction
     data class PartnerAcked(val sosId: String, val at: Long) : SosAction

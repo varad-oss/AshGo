@@ -12,6 +12,8 @@ object PresenceCalculator {
     const val LIVE_MS = 120_000L
     const val RECENT_MS = 900_000L
     const val OFFLINE_GRACE_MS = 120_000L
+    /** Timestamps up to this far in the future are clock skew; anything further is not trusted. */
+    const val FUTURE_TOLERANCE_MS = 120_000L
 
     fun compute(s: PresenceSnapshot?, now: Long): PresenceState {
         if (s == null) return PresenceState.Unknown
@@ -24,6 +26,7 @@ object PresenceCalculator {
             return PresenceState.Offline(s.lastSeen)
         }
         val locationAt = s.locationAt ?: return PresenceState.Unknown
+        if (locationAt - now > FUTURE_TOLERANCE_MS) return PresenceState.Unknown
         val age = (now - locationAt).coerceAtLeast(0)
         return when {
             age < LIVE_MS -> PresenceState.Live(age)

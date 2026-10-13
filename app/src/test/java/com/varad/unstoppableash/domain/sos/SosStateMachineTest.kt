@@ -86,12 +86,30 @@ class SosStateMachineTest {
         assertEquals(SmsStatus.DELIVERED, s.sms("c1"))
     }
 
-    @Test fun smsSentAfterFailed_upgrades() {
+    @Test fun failedStaysFailedUntilRetry() {
         val s = raised().apply(
             SosAction.SmsResult(id, "c1", SmsStatus.FAILED, "no service"),
             SosAction.SmsResult(id, "c1", SmsStatus.SENT),
         ) as SosState.Active
-        assertEquals(SmsReceipt(SmsStatus.SENT), s.sms.getValue("c1"))
+        assertEquals(SmsReceipt(SmsStatus.FAILED, "no service"), s.sms.getValue("c1"))
+    }
+
+    @Test fun backendSavedIsNeverDowngraded() {
+        val s = raised().apply(SosAction.BackendSaved(id, 1_234L), SosAction.BackendFailed(id)) as SosState.Active
+        assertEquals(BackendStatus.SAVED, s.backend)
+        assertEquals(1_234L, s.serverAt)
+    }
+
+    @Test fun duplicateTargetsSendOnce() {
+        val t = reduce(SosState.Idle, SosAction.Raise(id, t0, listOf(SmsTarget("c1"), SmsTarget("c1"))))
+        assertEquals(listOf(SosEffect.WriteBackend(id), SosEffect.SendSms(id, "c1")), t.effects)
+    }
+
+    @Test fun resetWhileActiveIsNoOp() {
+        val active = raised()
+        val t = reduce(active, SosAction.Reset)
+        assertEquals(active, t.state)
+        assertTrue(t.effects.isEmpty())
     }
 
     @Test fun smsFailed_thenRetry_requeuesOnlyFailed() {
@@ -163,7 +181,7 @@ class SosStateMachineTest {
         assertEquals(SmsStatus.DELIVERED, s.sms("c2"))
     }
 
-    @Test fun resetReturnsToIdle() {
-        assertEquals(SosState.Idle, raised().apply(SosAction.Reset))
+    @Test fun resetFromCancelledReturnsToIdle() {
+        assertEquals(SosState.Idle, raised().apply(SosAction.Cancel(id, 9_000L), SosAction.Reset))
     }
 }

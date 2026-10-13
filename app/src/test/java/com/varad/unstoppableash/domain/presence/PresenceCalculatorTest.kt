@@ -41,6 +41,10 @@ class PresenceCalculatorTest {
         assertEquals(PresenceState.Live(0), compute(snap(online = true, sharing = SharingMode.LIVE, locationAt = n)))
     @Test fun r10_futureTimestampClampsToLiveZero() =
         assertEquals(PresenceState.Live(0), compute(snap(locationAt = n + 5_000)))
+    @Test fun futureWithinToleranceIsLive() =
+        assertEquals(PresenceState.Live(0), compute(snap(locationAt = n + PresenceCalculator.FUTURE_TOLERANCE_MS)))
+    @Test fun farFutureTimestampIsUnknownNotLive() =
+        assertEquals(PresenceState.Unknown, compute(snap(locationAt = n + HOUR)))
     @Test fun r11_justUnderLiveThreshold() =
         assertTrue(compute(snap(locationAt = n - 119_999)) is PresenceState.Live)
     @Test fun r12_atLiveThresholdIsRecent() =

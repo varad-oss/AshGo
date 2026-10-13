@@ -16,7 +16,8 @@ object SosStateMachine {
 
     fun reduce(state: SosState, action: SosAction): SosTransition = when (action) {
         is SosAction.Raise -> raise(state, action)
-        SosAction.Reset -> SosTransition(SosState.Idle)
+        // An active SOS ends only through Cancel, so Reset can never silently drop it.
+        SosAction.Reset -> SosTransition(if (state is SosState.Active) state else SosState.Idle)
         is SosAction.Cancel -> cancel(state, action)
         is SosAction.SmsResult -> withSms(state, action.sosId) { sms ->
             val current = sms[action.contactId] ?: return@withSms sms
@@ -27,13 +28,16 @@ object SosStateMachine {
         is SosAction.BackendSaved -> withActive(state, action.sosId) {
             it.copy(backend = BackendStatus.SAVED, serverAt = action.serverAt)
         }
-        is SosAction.BackendFailed -> withActive(state, action.sosId) { it.copy(backend = BackendStatus.FAILED) }
+        is SosAction.BackendFailed -> withActive(state, action.sosId) {
+            if (it.backend == BackendStatus.SAVED) it else it.copy(backend = BackendStatus.FAILED)
+        }
         is SosAction.PartnerDelivered -> withActive(state, action.sosId) { it.copy(deliveredToPartnerAt = action.at) }
         is SosAction.PartnerAcked -> withActive(state, action.sosId) { it.copy(partnerAckAt = action.at) }
     }
 
     private fun raise(state: SosState, action: SosAction.Raise): SosTransition {
         if (state is SosState.Active) return SosTransition(state)
+        val targets = action.targets.distinctBy { it.contactId }
         val active = SosState.Active(
             sosId = action.sosId,
             raisedAt = action.now,
@@ -41,10 +45,10 @@ object SosStateMachine {
             serverAt = null,
             deliveredToPartnerAt = null,
             partnerAckAt = null,
-            sms = action.targets.associate { it.contactId to SmsReceipt(SmsStatus.QUEUED) },
+            sms = targets.associate { it.contactId to SmsReceipt(SmsStatus.QUEUED) },
         )
         val effects = listOf(SosEffect.WriteBackend(action.sosId)) +
-            action.targets.map { SosEffect.SendSms(action.sosId, it.contactId) }
+            targets.map { SosEffect.SendSms(action.sosId, it.contactId) }
         return SosTransition(active, effects)
     }
 
@@ -78,10 +82,16 @@ object SosStateMachine {
         },
     )
 
-    /** Delivery facts only move forward; FAILED can never erase a confirmed DELIVERED. */
-    private fun supersedes(incoming: SmsStatus, current: SmsStatus): Boolean =
-        if (incoming == SmsStatus.FAILED) current == SmsStatus.QUEUED || current == SmsStatus.SENT
-        else rank(incoming) > rank(current)
+    /**
+     * Delivery facts only move forward. FAILED is sticky until [SosAction.RetryFailedSms]
+     * and never erases a confirmed DELIVERED. Contract: the SMS dispatcher reports one
+     * aggregated (worst-of-parts) result per message attempt, not one per multipart part.
+     */
+    private fun supersedes(incoming: SmsStatus, current: SmsStatus): Boolean = when {
+        current == SmsStatus.FAILED -> false
+        incoming == SmsStatus.FAILED -> current == SmsStatus.QUEUED || current == SmsStatus.SENT
+        else -> rank(incoming) > rank(current)
+    }
 
     private fun rank(s: SmsStatus) = when (s) {
         SmsStatus.QUEUED, SmsStatus.FAILED -> 0
