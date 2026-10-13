@@ -587,7 +587,7 @@ Install them with `npm install --save-dev` into `firebase/`, and git-ignore `fir
 **Test command** (from `firebase/`, with the Android Studio JBR as `JAVA_HOME` for the emulator):
 
 ```bash
-npx firebase emulators:exec --only database --project demo-ashgo "node --test test/"
+npx firebase emulators:exec --only database --project demo-ashgo "node --test --test-concurrency=1 test/"
 ```
 
 The `demo-` project ID guarantees nothing ever talks to the real project.

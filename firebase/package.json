@@ -4,7 +4,7 @@
   "description": "Realtime Database security rules for AshGo v2 and their emulator tests (local only, demo project).",
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only database --project demo-ashgo \"node --test test/\""
+    "test": "firebase emulators:exec --only database --project demo-ashgo \"node --test --test-concurrency=1 test/\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
