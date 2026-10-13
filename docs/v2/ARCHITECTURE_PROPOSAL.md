@@ -33,7 +33,9 @@ Inputs: CURRENT_STATE_AUDIT, SECURITY_PRIVACY_AUDIT, PRODUCT_DECISIONS (D-1 Goog
 com.varad.unstoppableash
 ├── AshGoApplication.kt          creates AppContainer, registers notification channels
 ├── AppContainer.kt              manual DI: repositories, clocks, stores, dispatchers
-├── MainActivity.kt              v2: hosts AshGoNavHost only (v1 code moves to legacy/ until cutover)
+├── MainActivity.kt              v1 until cutover; then hosts AshGoNavHost only
+│                                v1 sources stay in place (not moved) until the cutover deletes them
+├── SosWidgetProvider.kt         keeps this exact FQCN in v2, so widgets already placed on home screens survive the update
 ├── core/
 │   ├── time/ServerClock.kt      .info/serverTimeOffset → now(); interface Clock for tests
 │   ├── result/Outcome.kt        sealed Loading | Success | Failure(reason)
@@ -70,7 +72,7 @@ com.varad.unstoppableash
 │   ├── sms/SmsResultReceiver.kt
 │   ├── notify/Channels.kt, Notifier.kt
 │   ├── sos/SosHoldActivity.kt, PartnerSosActivity.kt   showWhenLocked/turnScreenOn
-│   ├── sos/SosWidgetProvider.kt (tap → SosHoldActivity), SosTileService.kt
+│   ├── sos/SosTileService.kt    (widget provider stays at the root package, see above)
 │   ├── trips/OverdueAlarmReceiver.kt
 │   ├── fakecall/FakeCallActivity.kt, FakeCallScheduler.kt
 │   ├── update/UpdateChecker.kt  public GitHub Releases + SHA-256
@@ -85,7 +87,6 @@ com.varad.unstoppableash
 ├── feature/
 │   ├── onboarding/   home/   map/   chat/   safety/   trips/   settings/
 │   │   each: XScreen.kt (stateless), XViewModel.kt, XUiState.kt
-└── legacy/                      v1 sources moved here unchanged at stage start; deleted at cutover
 ```
 
 **Layering rules**
