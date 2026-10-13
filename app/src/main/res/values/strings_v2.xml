@@ -55,11 +55,9 @@
     <string name="offline_bar">No connection · showing what we last knew</string>
     <string name="offline_bar_cd">No connection, showing last known information</string>
     <string name="text_field_counter">%1$d/%2$d</string>
-    <string name="action_close">Close</string>
 
     <!-- SOS hold button -->
     <string name="hold_released_early">Hold for the full time to send</string>
-    <string name="hold_progress_cd">%1$d of %2$d seconds</string>
 
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>

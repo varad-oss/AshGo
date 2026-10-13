@@ -28,12 +28,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.domain.model.PresenceState
 import com.varad.unstoppableash.domain.time.Durations.HOUR
 import com.varad.unstoppableash.domain.time.Durations.MINUTE
 import com.varad.unstoppableash.ui.components.EmptyState
 import com.varad.unstoppableash.ui.components.ErrorBanner
+import com.varad.unstoppableash.ui.components.HoldDefaults
+import com.varad.unstoppableash.ui.components.HoldToConfirmButton
 import com.varad.unstoppableash.ui.components.LoadingOrbit
 import com.varad.unstoppableash.ui.components.LoadingOrbitSize
 import com.varad.unstoppableash.ui.components.OfflineBar
@@ -111,6 +114,12 @@ private fun Catalog(dark: Boolean, onDark: (Boolean) -> Unit, scale: Float, onSc
                 ReceiptRow(stringResource(R.string.catalog_receipt_partner), ReceiptStatus.PENDING, null, null)
                 ReceiptRow(stringResource(R.string.catalog_receipt_seen), ReceiptStatus.UNKNOWN, null, null)
                 ReceiptRow(stringResource(R.string.catalog_receipt_sms), ReceiptStatus.FAILED, null, {})
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                HoldToConfirmButton(stringResource(R.string.catalog_hold), 3_000, {}, visibleText = "SOS")
+                HoldToConfirmButton(stringResource(R.string.catalog_quiet), 1_500, {}, colors = HoldDefaults.primary(), size = 96.dp)
             }
         }
         item { ErrorBanner(stringResource(R.string.catalog_error), onRetry = {}) }
