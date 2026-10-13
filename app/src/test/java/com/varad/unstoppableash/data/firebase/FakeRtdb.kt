@@ -21,6 +21,7 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     private var root: Map<String, Any?> = emptyMap()
     private val version = MutableStateFlow(0L)
     private val writeFailures = mutableMapOf<String, FailureReason>()
+    private val readFailures = mutableSetOf<String>()
     private var keyCounter = 0
 
     val connectedState = MutableStateFlow(true)
@@ -31,10 +32,12 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         private set
 
     fun failWrites(pathPrefix: String, reason: FailureReason) { writeFailures[pathPrefix] = reason }
-    fun clearFailures() = writeFailures.clear()
+    /** Observing under [pathPrefix] terminates with [RtdbException] (as rules denying a read do). */
+    fun failReads(pathPrefix: String) { readFailures += pathPrefix }
+    fun clearFailures() { writeFailures.clear(); readFailures.clear() }
     fun read(path: String): Any? = readAt(root, segments(path))
 
-    override fun observe(path: String): Flow<Any?> = counted(version.map { read(path) })
+    override fun observe(path: String): Flow<Any?> = counted(version.map { checkRead(path); read(path) })
 
     override fun observeLast(path: String, limit: Int, orderByChild: String?): Flow<Any?> = counted(
         version.map {
@@ -83,6 +86,10 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         writeLog += log
         version.value++
         return Outcome.Success(Unit)
+    }
+
+    private fun checkRead(path: String) {
+        if (readFailures.any { path == it || path.startsWith("$it/") }) throw RtdbException(FailureReason.PERMISSION_DENIED, "denied")
     }
 
     private fun counted(source: Flow<Any?>): Flow<Any?> = flow {

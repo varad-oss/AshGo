@@ -212,7 +212,7 @@ The stream volume is never modified.
 |---|---|---|
 | 0 | Export the DB JSON and current rules (SECURITY_PRIVACY_AUDIT §7). Back up `~/.android/debug.keystore`. Revoke the GitHub token. | — |
 | 1 | Deploy rules v2-phase-1: the new `userPairs/invites/pairs` rules plus the legacy paths enumerated one by one (no root-level grant, `notifications` and `app_config` made client read-only) | v1 keeps working |
-| 2 | Both install v2 | Google sign-in: `linkWithCredential` on the anonymous user (`credential-already-in-use` → `signInWithCredential`). Local migration of contacts and voices from `AshGoPrefs`. |
+| 2 | Both install v2 | Google sign-in with `signInWithCredential`, replacing the v1 anonymous session. Nothing in v1 is keyed by user id, so there is nothing to link, and a fresh session guarantees `sign_in_provider == google.com` for the rules. Local migration of contacts and voices from `AshGoPrefs`. |
 | 3 | Pairing completes | memberA's device runs `LegacyImporter` once: last 7 days of `/chat` (sender mapped via memberA's legacy role), `/users/*` names and avatars (downscaled), with a recorded `importedAt` |
 | 4 | Deploy rules v2-phase-2 (legacy denied), then delete legacy nodes | — |
 | Rollback | Before phase 4: reinstall v1. After: redeploy the phase-1 rules from git. | — |

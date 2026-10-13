@@ -1,0 +1,133 @@
+package com.varad.unstoppableash.data.pair
+
+import app.cash.turbine.test
+import com.varad.unstoppableash.core.result.FailureReason
+import com.varad.unstoppableash.core.result.Outcome
+import com.varad.unstoppableash.core.time.Clock
+import com.varad.unstoppableash.data.auth.AuthUser
+import com.varad.unstoppableash.data.auth.FakeAuthGateway
+import com.varad.unstoppableash.data.firebase.FakeRtdb
+import com.varad.unstoppableash.domain.model.PairState
+import com.varad.unstoppableash.domain.model.Relationship
+import com.varad.unstoppableash.domain.time.Durations.DAY
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class PairRepositoryTest {
+    private val db = FakeRtdb(nowMs = 10 * DAY)
+    private val alice = FakeAuthGateway.google("alice")
+    private val bob = FakeAuthGateway.google("bob", "Bob.Smith@example.com")
+    private val auth = FakeAuthGateway(alice)
+    private val repo = PairRepository(db, auth, Clock { db.nowMs })
+
+    private suspend fun created(): String = (repo.createPair(Relationship.PARTNER, "Alice") as Outcome.Success).value
+
+    private suspend fun joinedAsBob(pairId: String) {
+        repo.invite("Bob.Smith@example.com", "Alice")
+        auth.user.value = bob
+        val invite = repo.myInvites().first().single()
+        assertEquals(pairId, invite.pairId)
+        assertTrue(repo.join(invite, "Bob") is Outcome.Success)
+    }
+
+    @Test fun createPairWritesMetaThenProfileThenPointer() = runTest {
+        val pid = created()
+        assertEquals(listOf("set pairs/$pid/meta", "set pairs/$pid/profiles/alice", "set userPairs/alice"), db.writeLog)
+        assertEquals(mapOf("memberA" to "alice", "relationship" to "PARTNER", "createdAt" to db.nowMs), db.read("pairs/$pid/meta"))
+        assertEquals(mapOf("name" to "Alice", "email" to "alice@example.com", "greeting" to true), db.read("pairs/$pid/profiles/alice"))
+        assertEquals(pid, db.read("userPairs/alice"))
+    }
+
+    @Test fun createPairNeedsGoogleSignIn() = runTest {
+        auth.user.value = null
+        assertEquals(FailureReason.NOT_SIGNED_IN, (repo.createPair(Relationship.PARTNER, "A") as Outcome.Failure).reason)
+        auth.user.value = AuthUser("anon", null, false, null, null, isGoogle = false)
+        assertEquals(FailureReason.NOT_SIGNED_IN, (repo.createPair(Relationship.PARTNER, "A") as Outcome.Failure).reason)
+        assertTrue(db.writeLog.isEmpty())
+    }
+
+    @Test fun inviteCarriesRealEmailAndExpiresWithinADay() = runTest {
+        val pid = created()
+        assertTrue(repo.invite(" Bob.Smith@Example.com ", "Alice") is Outcome.Success)
+        @Suppress("UNCHECKED_CAST")
+        val inv = db.read("invites/bob,smith@example,com/$pid") as Map<String, Any?>
+        assertEquals("alice", inv["fromUid"]); assertEquals("Alice", inv["fromName"]); assertEquals("alice@example.com", inv["fromEmail"])
+        assertEquals(db.nowMs, inv["createdAt"])
+        val expires = inv["expiresAt"] as Long
+        assertTrue(expires > db.nowMs && expires <= db.nowMs + DAY)
+    }
+
+    @Test fun malformedEmailIsRejectedWithoutWriting() = runTest {
+        created(); db.writeLog.clear()
+        for (bad in listOf("", "bob", "bob@", "@x.com", "bob@x", "a b@x.com")) {
+            assertEquals(bad, FailureReason.INVALID, (repo.invite(bad, "Alice") as Outcome.Failure).reason)
+        }
+        assertTrue(db.writeLog.isEmpty())
+    }
+
+    @Test fun joinWritesMemberProfilePointerThenDeletesInvite() = runTest {
+        val pid = created(); db.writeLog.clear()
+        joinedAsBob(pid)
+        assertEquals(
+            listOf("set invites/bob,smith@example,com/$pid", "set pairs/$pid/meta/memberB", "set pairs/$pid/profiles/bob", "set userPairs/bob", "remove invites/bob,smith@example,com/$pid"),
+            db.writeLog,
+        )
+    }
+
+    @Test fun confirmSetsServerTime() = runTest {
+        val pid = created(); joinedAsBob(pid)
+        auth.user.value = alice
+        assertTrue(repo.confirm(pid) is Outcome.Success)
+        assertEquals(db.nowMs, db.read("pairs/$pid/meta/confirmedAt"))
+    }
+
+    @Test fun leaveRemovesPairAndOwnPointer() = runTest {
+        val pid = created()
+        assertTrue(repo.leave(pid) is Outcome.Success)
+        assertNull(db.read("pairs/$pid")); assertNull(db.read("userPairs/alice"))
+    }
+
+    @Test fun pairStateWalksTheWholeFlow() = runTest {
+        repo.pairState().test {
+            assertEquals(PairState.Unpaired, awaitItem())
+            val pid = created()
+            assertTrue(expectMostRecentItem() is PairState.Waiting)
+            joinedAsBob(pid)
+            auth.user.value = alice
+            val confirming = expectMostRecentItem() as PairState.Confirming
+            assertEquals("Bob", confirming.partner?.name)
+            assertEquals("Bob.Smith@example.com", confirming.partner?.email)
+            repo.confirm(pid)
+            val paired = expectMostRecentItem() as PairState.Paired
+            assertEquals("alice", paired.myUid); assertEquals("bob", paired.partnerUid); assertEquals("Bob", paired.partner?.name)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun signedOutIsNotSignedIn() = runTest {
+        auth.user.value = null
+        assertEquals(PairState.NotSignedIn, repo.pairState().first())
+    }
+
+    @Test fun stalePointerToDeletedPairIsUnpaired() = runTest {
+        db.set("userPairs/alice", "gone")
+        assertEquals(PairState.Unpaired, repo.pairState().first())
+    }
+
+    @Test fun deniedPairReadIsUnpairedNotACrash() = runTest {
+        db.set("userPairs/alice", "p9")
+        db.set("pairs/p9/meta", mapOf("memberA" to "x", "relationship" to "PARTNER", "createdAt" to 1L))
+        db.failReads("pairs/p9")
+        assertEquals(PairState.Unpaired, repo.pairState().first())
+    }
+
+    @Test fun listenersAreReleased() = runTest {
+        created()
+        repo.pairState().test { awaitItem(); cancelAndIgnoreRemainingEvents() }
+        assertEquals(0, db.activeObservers)
+    }
+}
