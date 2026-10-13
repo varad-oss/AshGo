@@ -567,3 +567,92 @@ Each stage below gets a detailed task plan, appended here, before it starts. Eve
 | **9. Stay connected + notifications + reliability** | `Channels`, `Notifier`, `StayConnectedService` (`specialUse`), `BootReceiver`, `HeartbeatWorker` (15 min) + `onDisconnect` presence, battery writes on 5 % change, dedupe store, Reliability screen, test notification | No notification posted to an unknown channel (unit test over the channel registry); one notification per event; **device:** 24 h survival, reboot start, DND | Battery-optimisation exemption on both phones |
 | **10. Supporting features** | Settings sub-screens, Leave orbit (rules-tested delete), Privacy & Data + `CleanupWorker`, `UpdateChecker` (public releases + SHA-256), FakeCall, Our page (local photos), Help, About/licences, `LegacyImporter` | The importer maps the legacy role correctly (unit); the updater rejects a hash mismatch; cleanup never deletes an active SOS | Make the releases repo public (D-10) |
 | **11. Cutover + hardening** | `MainActivity` → v2; delete v1 screens and services (after a reference check); manifest cleanup (remove the accessibility service, `REQUEST_INSTALL_PACKAGES` kept only for the updater); R8 on with keep rules; `docs/v2/DEVICE_VERIFICATION.md`; release-readiness report; rules phase 2 file ready | Release APK installs over v1 (same signer) and keeps local contacts; lint 0 errors; all tests pass; grep shows no tokens or personal names; the device checklist is run with the owner | Backup DB + rules; deploy phase-1 rules before install; phase-2 after both migrate |
+
+
+---
+
+## Stage 3 — Rules + emulator harness (detailed, written 2026-10-14)
+
+**Inputs:**
+- The owner's deployed rules: root `auth != null`, plus `notifications` world-open (SECURITY S1 confirmed, S10).
+- ARCHITECTURE §5–§6, as amended: `userPairs/{uid}` replaces `users/{uid}`.
+
+**Tooling:** owner-approved 2026-10-14. Packages:
+- `firebase-tools@15.33.0`
+- `@firebase/rules-unit-testing@6.0.0`
+- `firebase@13.0.0`
+
+Install them with `npm install --save-dev` into `firebase/`, and git-ignore `firebase/node_modules`. Tests use Node's built-in `node:test` (no TypeScript toolchain).
+
+**Test command** (from `firebase/`, with the Android Studio JBR as `JAVA_HOME` for the emulator):
+
+```bash
+npx firebase emulators:exec --only database --project demo-ashgo "node --test test/"
+```
+
+The `demo-` project ID guarantees nothing ever talks to the real project.
+
+**Phase-1 rule principles:**
+- No root-level grant.
+- Legacy v1 paths (`chat`, `tracking`, `alerts`, `buzz`, `users`) are enumerated with `auth != null`, so v1 keeps working.
+- `app_config` and `notifications`: read `auth != null`, write `false`. v1 never writes them; the console bypasses rules.
+- Every v2 path is membership-checked, `from`/`at` are validated against `auth.uid` and `now`, and `$other` children are rejected.
+
+### Task 3.1: Harness + legacy phase-1 rules
+**Files:**
+- Create: `firebase/package.json`, `firebase/firebase.json`, `firebase/database.rules.json`, `firebase/test/helpers.mjs`, `firebase/test/legacy.test.mjs`
+- Modify: `.gitignore`
+
+**Tests:**
+- `legacy chat readable/writable by signed-in v1 client`
+- `unauthenticated client cannot read or write legacy paths`
+- `nobody can write notifications` (signed-in and anonymous)
+- `clients cannot write app_config but can read it`
+- `root read is denied`, so pairs never leak through a cascade
+
+**RED:** start with `{"rules": {}}` (deny all). The legacy-readable test must fail.
+
+### Task 3.2: Pairing rules (`userPairs`, `invites`, `pairs/*/meta`, leave)
+**Tests:**
+- create pair as memberA
+- cannot create a pair naming someone else as memberA
+- inviter writes an invite (expires ≤ 24 h)
+- invite with expiry > 24 h rejected
+- invitee with the matching verified email can read the invite
+- a different email cannot read it
+- unverified email cannot join
+- expired invite cannot join
+- matching invite joins as memberB
+- third account cannot join a full pair
+- memberA cannot join their own pair as memberB
+- `userPairs` can only point to a pair you belong to
+- outsider cannot read the pair
+- memberA confirms (`confirmedAt == now`), memberB cannot
+- either member can delete the whole pair (Leave)
+- outsider cannot delete it
+
+### Task 3.3: Pair data rules (profiles, presence, location, trips, chat, media, events, sos)
+**Tests:**
+- member writes own profile, presence and location; cannot write the partner's
+- location out of range rejected
+- client-chosen `at` rejected
+- chat with forged `from` rejected
+- chat update rejected (immutable)
+- sender may delete own chat; partner may delete chat only after 7 days
+- media over 205 000 chars rejected
+- event: partner may set `seenBy/<self>` and `deliveredTo/<self>`; sender may not set its own receipts
+- SOS:
+  - member raises SOS (state active)
+  - partner cannot cancel
+  - sender cancels with `cancelledAt == now`
+  - partner acks (`ackBy/<self> == now`)
+  - sender cannot ack own SOS
+  - partner cannot edit `smsSent`
+  - active SOS cannot be deleted
+- unknown child field rejected
+
+**Exit:**
+- All rules tests pass in the emulator.
+- ARCHITECTURE §6 is updated if any rule deviates.
+- SECURITY_PRIVACY_AUDIT §7 lists the deploy steps for the owner.
+- A fresh reviewer checks the rules, which are security-critical.

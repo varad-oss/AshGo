@@ -108,7 +108,17 @@ Existing installs are signed with this Mac's debug key.
 - **Recommendation:** copy `~/.android/debug.keystore` to a backed-up location, and configure a `release` signing config that uses it. Then ship **non-debuggable**, R8-optimised release builds that install over v1 with no data loss.
 - **Alternative:** generate a new release key. This is cleaner, but every install must be uninstalled once, which loses local data such as emergency contacts.
 
-## D-10 Updates — **Recommended + Owner action**
+## D-10 Updates — **Decided 2026-10-14: (A) public releases repo with APKs only, no token**
+
+**Owner's condition:** "given that my data doesn't get leaked".
+
+**Ordering guarantee:** the releases repo becomes public **only after** rules phase 2 is deployed (legacy paths denied) **and** the legacy data is deleted. Until then, any APK holder could still read v1 data through the legacy `auth != null` paths.
+
+**Interim:** keep the private repo, using a fine-grained, single-repo, Contents-read-only token in `app_config/github_token`.
+
+**v2 flow:** the owner bumps `app_config/latest_version_code` and sets `apk_url` + `sha256` in the console. The app shows the size, downloads, verifies the SHA-256, and hands the file to the system installer. Rules make `app_config` read-only for clients.
+
+Earlier recommendation, kept for the record:
 - **Replace** the token-based auto-download with a manual **Check for update** that queries a **public** releases repo containing only APKs and checksums (no personal content).
 - The app verifies the SHA-256 published in the release notes or an asset, then hands the file to the system installer.
 - **Owner:**

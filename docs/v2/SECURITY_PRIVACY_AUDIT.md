@@ -22,7 +22,7 @@ No secret values are reproduced in this document.
 
 ## 1. Findings ranked
 
-### S1 🔴 The authorization model cannot separate the couple from anyone else (LIKELY)
+### S1 🔴 The authorization model cannot separate the couple from anyone else (CONFIRMED 2026-10-14 from the owner's deployed rules: root `.read`/`.write` = `auth != null`)
 - The app's only authentication is `FirebaseAuth.signInAnonymously()`, and its result is ignored. **[CONFIRMED]**
 - All data lives at fixed global paths (`/chat`, `/tracking`, `/alerts`, `/users/traveler`, …), with no user or pair ID in any path. **[CONFIRMED]**
 - "Traveler" and "Receiver" are a client-side SharedPreferences choice, and `isFromTraveler` is a client-asserted boolean. **[CONFIRMED]**
@@ -31,6 +31,15 @@ No secret values are reproduced in this document.
   - Anyone with an APK copy, or the API key extracted from one, can read live location, chat, photos, emergency state, and the updater token. They can also forge or cancel SOS, impersonate either person in chat, set a fake destination, or wipe data.
   - Reinstalling the app or clearing its data creates a new anonymous UID, and nothing stops it from working. That shows UID is not used for authorization at all.
 - **Fix direction:** add real per-person identity, bind exactly two UIDs into a `pair`, and write rules that check membership. See ARCHITECTURE_PROPOSAL (pending).
+
+### S10 🔴 `notifications` is world-readable and world-writable (CONFIRMED 2026-10-14 from deployed rules)
+- The deployed rules give `notifications` `".read": true, ".write": true`, so anyone on the internet can write there **without the APK or any sign-in**.
+- v1's `TrackingService` and `ReceiverService` show whatever title and message are written to `notifications/traveler|receiver`, and force the alarm stream to maximum volume.
+- **Impact:**
+  - A stranger can push arbitrary text to both phones, at full alarm volume. That is a phishing vector (e.g. "Update here: <link>").
+  - A stranger can fill the 1 GB Spark storage quota, taking the app down.
+- **Nothing in the app writes this node**, and the Firebase console and Admin SDK bypass rules anyway, so closing it breaks nothing.
+- **Immediate fix (owner):** delete the `notifications` block from the rules, or deploy the tested phase-1 rules in `firebase/database.rules.json`.
 
 ### S2 🔴 A GitHub token is distributed through the database (CONFIRMED design, scope UNVERIFIED)
 - `MainActivity` reads `app_config/github_token` and `AutoUpdater` sends it as `Authorization: token …` to download from the private releases repo. **[CONFIRMED]**

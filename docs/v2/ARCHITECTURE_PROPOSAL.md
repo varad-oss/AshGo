@@ -99,7 +99,7 @@ com.varad.unstoppableash
 
 | State | Owner (single source of truth) | Consumers |
 |---|---|---|
-| Signed-in user, pairId | `AuthRepository` + `PairRepository` (`users/{uid}`) | all |
+| Signed-in user, pairId | `AuthRepository` + `PairRepository` (`userPairs/{uid}`) | all |
 | Partner presence | RTDB `presence/{uid}` + `location/{uid}`, interpreted only by `PresenceCalculator` | Home, Map, Chat header, service |
 | My sharing mode | `LocationRepository` (written to presence) | Home, Map, service |
 | Active SOS (mine) | `ActiveSosStore` (local, survives death) + RTDB `sos/{id}`; reduced by `SosStateMachine` | Safety, SosActive, Home |
@@ -111,7 +111,7 @@ com.varad.unstoppableash
 ## 5. Data model
 
 ```
-users/{uid}                 { pairId }
+userPairs/{uid}             pairId (string)   — not under legacy `users/`, which phase 1 keeps open to any signed-in client
 invites/{emailKey}          { pairId, fromUid, fromName, createdAt, expiresAt }
                             emailKey = lowercase(email).replace(".", ",")
 pairs/{pairId}/
@@ -146,7 +146,7 @@ Helper: `isMember = root.child('pairs/'+$pairId+'/meta/memberA').val() === auth.
 
 | Path | Read | Create | Update | Delete |
 |---|---|---|---|---|
-| `users/$uid` | self | self | self | self |
+| `userPairs/$uid` | self | self, value must be a pair the user is a member of | same | self |
 | `invites/$k` | inviter, or the user whose verified email key = `$k` | memberA of `newData.pairId`, with `fromUid == auth.uid`, `expiresAt ≤ now+24h` | ✗ | inviter or invitee |
 | `pairs/$p/meta` | members | creator becomes `memberA`, `memberB` absent | `memberB`: set once, `== auth.uid`, `email_verified`, the invite for `auth.token.email` points to `$p` and is unexpired. `confirmedAt`: memberA only | — |
 | `pairs/$p` (whole) | members | — | — | members (Leave orbit = delete the pair) |
@@ -208,7 +208,7 @@ The stream volume is never modified.
 | Phase | Owner action | App behaviour |
 |---|---|---|
 | 0 | Export the DB JSON and current rules (SECURITY_PRIVACY_AUDIT §7). Back up `~/.android/debug.keystore`. Revoke the GitHub token. | — |
-| 1 | Deploy rules v2-phase-1: the new `users/invites/pairs` rules plus the **unchanged** legacy rules | v1 keeps working |
+| 1 | Deploy rules v2-phase-1: the new `userPairs/invites/pairs` rules plus the legacy paths enumerated one by one (no root-level grant, `notifications` and `app_config` made client read-only) | v1 keeps working |
 | 2 | Both install v2 | Google sign-in: `linkWithCredential` on the anonymous user (`credential-already-in-use` → `signInWithCredential`). Local migration of contacts and voices from `AshGoPrefs`. |
 | 3 | Pairing completes | memberA's device runs `LegacyImporter` once: last 7 days of `/chat` (sender mapped via memberA's legacy role), `/users/*` names and avatars (downscaled), with a recorded `importedAt` |
 | 4 | Deploy rules v2-phase-2 (legacy denied), then delete legacy nodes | — |
