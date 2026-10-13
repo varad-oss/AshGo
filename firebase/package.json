@@ -1,0 +1,14 @@
+{
+  "name": "ashgo-firebase-rules",
+  "private": true,
+  "description": "Realtime Database security rules for AshGo v2 and their emulator tests (local only, demo project).",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only database --project demo-ashgo \"node --test test/\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.33.0"
+  }
+}

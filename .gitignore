@@ -20,3 +20,8 @@ app/google-services.json
 # Owner-maintained list of personal names the LayeringTest keeps out of v2 sources
 app/src/test/resources/forbidden_names.txt
 .superpowers/
+
+# Firebase rules test tooling
+firebase/node_modules/
+firebase/*.log
+firebase/.firebase/

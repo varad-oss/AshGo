@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "chat": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["timestamp"] },
+    "tracking": { ".read": "auth != null", ".write": "auth != null" },
+    "alerts": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["timestamp"] },
+    "buzz": { ".read": "auth != null", ".write": "auth != null" },
+    "users": { ".read": "auth != null", ".write": "auth != null" },
+    "app_config": { ".read": "auth != null", ".write": false },
+    "notifications": { ".read": "auth != null", ".write": false }
+  }
+}
