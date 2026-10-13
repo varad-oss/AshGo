@@ -17,6 +17,8 @@ import com.varad.unstoppableash.data.chat.ChatRepository
 import com.varad.unstoppableash.data.events.EventRepository
 import com.varad.unstoppableash.data.firebase.FirebaseRtdbClient
 import com.varad.unstoppableash.data.firebase.RtdbClient
+import com.varad.unstoppableash.data.media.AndroidPhotoEncoder
+import com.varad.unstoppableash.data.media.PhotoEncoder
 import com.varad.unstoppableash.data.legacy.LegacyLocalMigration
 import com.varad.unstoppableash.data.local.ActiveSosStore
 import com.varad.unstoppableash.data.local.EmergencyContactsStore
@@ -80,6 +82,7 @@ class AppContainer(private val app: Application) {
     val events by lazy { EventRepository(rtdb, clock) }
     val sos by lazy { SosRepository(rtdb, clock) }
     val trips by lazy { TripRepository(rtdb) }
+    val photoEncoder: PhotoEncoder by lazy { AndroidPhotoEncoder(app.contentResolver) }
 
     val contacts by lazy { EmergencyContactsStore(app.contactsStore) }
     val settings by lazy { SettingsStore(app.settingsStore) }

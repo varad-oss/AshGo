@@ -3,6 +3,7 @@ package com.varad.unstoppableash.ui.nav
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
@@ -69,7 +70,10 @@ fun MainScaffold(selected: Tab, unread: Int, onSelect: (Tab) -> Unit, content: @
                 }
             }
         },
-    ) { padding -> content(Modifier.padding(padding)) }
+    ) { padding ->
+        // Consumed so a screen's imePadding() adds only what the keyboard covers beyond the bottom bar.
+        content(Modifier.padding(padding).consumeWindowInsets(padding))
+    }
 }
 
 /** Debug-build placeholder for tabs whose stage hasn't been built — never pretends to work. */

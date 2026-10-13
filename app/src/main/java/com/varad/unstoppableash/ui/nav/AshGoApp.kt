@@ -1,6 +1,16 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.feature.chat.ChatViewModel
+import com.varad.unstoppableash.feature.chat.ChatScreen
+import com.varad.unstoppableash.feature.chat.ChatActions
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -89,6 +99,9 @@ private fun MainShell(container: AppContainer) {
     val settingsVm: SettingsViewModel = viewModel(factory = viewModelFactory {
         initializer { SettingsViewModel(container.pairs, container.presence, container.auth, container.settings) }
     })
+    val chatVm: ChatViewModel = viewModel(factory = viewModelFactory {
+        initializer { ChatViewModel(container.pairs, container.chat, container.events, container.presence, container.photoEncoder, container.rtdb, container.clock) }
+    })
     val homeState by home.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -124,7 +137,34 @@ private fun MainShell(container: AppContainer) {
                 ),
                 padding, // the scaffold's padding already includes the system bars
             )
-            Tab.MAP, Tab.CHAT, Tab.SAFETY -> ComingLater(padding)
+            Tab.CHAT -> ChatTab(chatVm, padding)
+            Tab.MAP, Tab.SAFETY -> ComingLater(padding)
         }
     }
+}
+
+@Composable
+private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    // "Read" means on screen: this tab is showing and the app is in the foreground.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(lifecycleState) { vm.setVisible(lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(vm) { onDispose { vm.setVisible(false) } }
+    // The system photo picker needs no storage permission and grants access to the one photo chosen.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { vm.sendPhoto(it.toString()) } }
+    ChatScreen(
+        state,
+        ChatActions(
+            onSend = vm::send,
+            onRetry = vm::retry,
+            onPickPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onNudge = vm::nudge,
+            onLoadOlder = vm::loadOlder,
+            onClearNotice = vm::clearNotice,
+            onDismissError = vm::dismissError,
+            photo = vm::photo,
+        ),
+        modifier,
+    )
 }

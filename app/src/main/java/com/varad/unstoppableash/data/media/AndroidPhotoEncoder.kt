@@ -4,9 +4,11 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
+import androidx.core.graphics.scale
+import androidx.core.net.toUri
+import androidx.exifinterface.media.ExifInterface
 import com.varad.unstoppableash.domain.media.ImageBudget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,7 +26,7 @@ class AndroidPhotoEncoder(
     override suspend fun encode(uri: String): EncodedPhoto? = withContext(Dispatchers.Default) {
         onWorkThread()
         try {
-            encodeBlocking(Uri.parse(uri))
+            encodeBlocking(uri.toUri())
         } catch (e: Exception) {
             Log.w(TAG, "photo refused: ${e.javaClass.simpleName}") // unreadable, revoked permission…: refuse, never crash
             null
@@ -47,7 +49,7 @@ class AndroidPhotoEncoder(
         } ?: return null
 
         val (w, h) = ImageBudget.scaledSize(decoded.width, decoded.height, ImageBudget.MAX_EDGE_PX)
-        val scaled = if (w == decoded.width && h == decoded.height) decoded else Bitmap.createScaledBitmap(decoded, w, h, true)
+        val scaled = if (w == decoded.width && h == decoded.height) decoded else decoded.scale(w, h)
         val upright = rotate(scaled, rotationOf(uri))
 
         val encoded = HashMap<Int, ByteArray>()
