@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class SettingsUiState(
     val myName: String = "",
@@ -28,6 +29,7 @@ data class SettingsUiState(
     val busy: Boolean = false,
     val failure: FailureReason? = null,
     val signedOut: Boolean = false,
+    val signingOut: Boolean = false,
 )
 
 /** Settings shell for Stage 5: profile summary, appearance, leave orbit, sign out. */
@@ -38,7 +40,7 @@ class SettingsViewModel(
     private val settings: SettingsStore,
 ) : ViewModel() {
 
-    private data class Local(val busy: Boolean = false, val failure: FailureReason? = null)
+    private data class Local(val busy: Boolean = false, val signingOut: Boolean = false, val failure: FailureReason? = null)
     private val local = MutableStateFlow(Local())
     @Volatile private var current: PairState? = null
 
@@ -60,24 +62,27 @@ class SettingsViewModel(
             busy = l.busy,
             failure = l.failure,
             signedOut = user == null,
+            signingOut = l.signingOut,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), SettingsUiState())
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { settings.update { it.copy(themeMode = mode.name) } }
 
     fun leave() {
         val pairId = pairIdOf(current) ?: return
-        act { pairs.leave(pairId) }
+        // Offline the deletes stay queued in the SDK and finish on reconnect; say so rather than spin.
+        act { withTimeoutOrNull(LEAVE_TIMEOUT_MS) { pairs.leave(pairId) } ?: Outcome.Failure(FailureReason.OFFLINE) }
     }
 
+    /** Going offline is a courtesy; signing out must never wait on the network. */
     fun signOut() {
-        val pair = current
-        act {
+        val pairId = pairIdOf(current)
+        local.update { it.copy(signingOut = true, failure = null) }
+        viewModelScope.launch {
             val uid = auth.current()?.uid
-            val pairId = pairIdOf(pair)
-            if (uid != null && pairId != null) presence.goOffline(pairId, uid)
+            if (uid != null && pairId != null) withTimeoutOrNull(OFFLINE_GRACE_MS) { presence.goOffline(pairId, uid) }
             auth.signOut()
-            Outcome.Success(Unit)
+            local.update { it.copy(signingOut = false) }
         }
     }
 
@@ -90,11 +95,16 @@ class SettingsViewModel(
         else -> null
     }
 
+    companion object {
+        const val OFFLINE_GRACE_MS = 3_000L
+        const val LEAVE_TIMEOUT_MS = 10_000L
+    }
+
     private fun act(block: suspend () -> Outcome<*>) {
-        local.update { Local(busy = true) }
+        local.update { it.copy(busy = true, failure = null) }
         viewModelScope.launch {
             val r = block()
-            local.update { Local(failure = (r as? Outcome.Failure)?.reason) }
+            local.update { it.copy(busy = false, failure = (r as? Outcome.Failure)?.reason) }
         }
     }
 }

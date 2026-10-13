@@ -42,4 +42,6 @@ data class HomeUiState(
     val connectionProblem: FailureReason? = null,
     /** A listener was cancelled (e.g. denied); dismissible. */
     val error: FailureReason? = null,
+    /** Server-corrected now, ticking, so ages on screen keep moving. */
+    val nowMs: Long = 0L,
 )

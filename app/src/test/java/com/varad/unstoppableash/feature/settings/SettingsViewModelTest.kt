@@ -10,9 +10,12 @@ import com.varad.unstoppableash.data.pair.PairRepository
 import com.varad.unstoppableash.data.presence.PresenceRepository
 import com.varad.unstoppableash.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import com.varad.unstoppableash.core.result.FailureReason
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -68,5 +71,31 @@ class SettingsViewModelTest {
         assertEquals(false, db.read("pairs/p1/presence/alice/online"))
         assertNull(db.onDisconnectWrites["pairs/p1/presence/alice"])
         assertNull(auth.current())
+    }
+    @Test fun signOutFinishesEvenWhenTheServerIsUnreachable() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.state.first { it.pairId != null }
+        db.serverReachable.value = false
+        vm.signOut()
+        val during = vm.state.first { it.signingOut }
+        assertFalse("leave button doesn't spin for a sign-out", during.busy)
+        testScheduler.advanceTimeBy(SettingsViewModel.OFFLINE_GRACE_MS + 1); testScheduler.runCurrent()
+        vm.state.first { it.signedOut && !it.signingOut }
+        assertNull(auth.current())
+    }
+
+    @Test fun leaveOfflineSaysSoInsteadOfSpinningForever() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} } // a visible screen keeps its state
+        vm.state.first { it.pairId != null }
+        db.serverReachable.value = false
+        vm.leave()
+        vm.state.first { it.busy }
+        testScheduler.advanceTimeBy(SettingsViewModel.LEAVE_TIMEOUT_MS + 1); testScheduler.runCurrent()
+        val s = vm.state.first { !it.busy }
+        assertEquals(FailureReason.OFFLINE, s.failure)
     }
 }

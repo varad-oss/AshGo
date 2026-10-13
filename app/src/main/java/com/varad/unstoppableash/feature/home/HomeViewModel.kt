@@ -24,6 +24,7 @@ import com.varad.unstoppableash.domain.model.SosRecord
 import com.varad.unstoppableash.domain.model.Trip
 import com.varad.unstoppableash.domain.presence.PresenceCalculator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,13 +42,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/**
- * Re-evaluates presence on a timer as well as on new data, so "Live" ages into "Recent" / "Stale"
- * on screen even when the partner's phone goes quiet.
- */
-fun presenceStates(snapshots: Flow<PresenceSnapshot>, clock: Clock, tickMs: Long = 30_000): Flow<PresenceState> =
-    combine(snapshots, ticker(tickMs)) { snapshot, _ -> PresenceCalculator.compute(snapshot, clock.now()) }.distinctUntilChanged()
-
+/** Emits now and then every [periodMs], so things that age on screen keep ageing without new data. */
 private fun ticker(periodMs: Long): Flow<Unit> = flow {
     while (true) {
         emit(Unit)
@@ -68,12 +63,16 @@ class HomeViewModel(
     private val clock: Clock,
 ) : ViewModel() {
 
-    private val action = MutableStateFlow<ActionStatus>(ActionStatus.Idle)
-    private val error = MutableStateFlow<FailureReason?>(null)
+    /** Tagged with the pair it happened in, so nothing follows you into another orbit or account. */
+    private data class Tagged<T>(val pairId: String?, val value: T)
+
+    private val action = MutableStateFlow(Tagged<ActionStatus>(null, ActionStatus.Idle))
+    private val error = MutableStateFlow<Tagged<FailureReason>?>(null)
     @Volatile private var current: PairState.Paired? = null
+    private var clearSaved: Job? = null
 
     init {
-        viewModelScope.launch { rtdb.readFailures.collect { error.value = it } }
+        viewModelScope.launch { rtdb.readFailures.collect { error.value = Tagged(current?.meta?.pairId, it) } }
         // While Home is alive, mark me online. onDisconnect handlers are consumed when the connection
         // drops, so re-register on every reconnect.
         viewModelScope.launch {
@@ -88,47 +87,58 @@ class HomeViewModel(
     private val details: Flow<HomeUiState> = pairs.pairState().flatMapLatest { state ->
         val paired = state as? PairState.Paired
         current = paired
-        if (paired == null) flowOf(HomeUiState(loading = state == null, unpaired = true)) else detailsOf(paired)
+        if (paired == null) flowOf(HomeUiState(loading = false, unpaired = true)) else detailsOf(paired)
     }
 
     val state: StateFlow<HomeUiState> =
         combine(details, action, error, rtdb.connected().onStart { emit(true) }) { d, a, e, connected ->
-            d.copy(action = a, error = e, connectionProblem = if (connected) null else FailureReason.OFFLINE)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+            val pairId = current?.meta?.pairId
+            d.copy(
+                action = a.value.takeIf { a.pairId == pairId } ?: ActionStatus.Idle,
+                error = e?.value?.takeIf { e.pairId == pairId },
+                connectionProblem = if (connected) null else FailureReason.OFFLINE,
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), HomeUiState())
 
+    /**
+     * Only the partner's presence gates "loading"; every other stream starts empty and fills in, so
+     * one slow or denied path can never hide the rest — above all, never a partner SOS.
+     */
     private fun detailsOf(p: PairState.Paired): Flow<HomeUiState> {
         val pid = p.meta.pairId
         val partnerSnapshot = presence.snapshot(pid, p.partnerUid)
         return combine(
             listOf(
-                presenceStates(partnerSnapshot, clock),
-                partnerSnapshot,
-                location.observe(pid, p.partnerUid),
-                presence.snapshot(pid, p.myUid).map { it.sharing ?: SharingMode.OFF },
-                chat.unreadCount(pid, p.myUid),
-                events.events(pid).map { list -> list.lastOrNull { it.from == p.partnerUid && it.type == EventType.CHECKIN } },
-                sos.partnerActiveSos(pid, p.myUid),
-                trips.observe(pid, p.partnerUid),
+                partnerSnapshot.map<PresenceSnapshot, PresenceSnapshot?> { it }.onStart { emit(null) },
+                location.observe(pid, p.partnerUid).onStart { emit(null) },
+                presence.snapshot(pid, p.myUid).map { it.sharing ?: SharingMode.OFF }.onStart { emit(SharingMode.OFF) },
+                chat.unreadCount(pid, p.myUid).onStart { emit(0) },
+                events.events(pid).map { list -> list.lastOrNull { it.from == p.partnerUid && it.type == EventType.CHECKIN } }.onStart { emit(null) },
+                sos.partnerActiveSos(pid, p.myUid).onStart { emit(null) },
+                trips.observe(pid, p.partnerUid).onStart { emit(null) },
+                ticker(NOW_TICK_MS).map { clock.now() }, // re-ages presence and "x min ago" without new data
             ),
         ) { v ->
-            val snapshot = v[1] as PresenceSnapshot
+            val snapshot = v[0] as PresenceSnapshot?
+            val now = v[7] as Long
             HomeUiState(
-                loading = false,
+                loading = snapshot == null,
                 myName = p.me?.name.orEmpty(),
                 myAvatar = p.me?.avatar,
                 partnerName = p.partner?.name.orEmpty(),
                 partnerAvatar = p.partner?.avatar,
                 relationship = p.meta.relationship,
                 greetingEnabled = p.me?.greeting ?: true,
-                partnerPresence = v[0] as PresenceState,
-                partnerBattery = snapshot.battery,
-                partnerCharging = snapshot.charging,
-                partnerLocation = v[2] as LocationFix?,
-                mySharing = v[3] as SharingMode,
-                unread = v[4] as Int,
-                latestPartnerCheckIn = v[5] as OrbitEvent?,
-                partnerSos = v[6] as SosRecord?,
-                partnerTrip = v[7] as Trip?,
+                partnerPresence = snapshot?.let { PresenceCalculator.compute(it, now) } ?: PresenceState.Unknown,
+                partnerBattery = snapshot?.battery,
+                partnerCharging = snapshot?.charging,
+                partnerLocation = v[1] as LocationFix?,
+                mySharing = v[2] as SharingMode,
+                unread = v[3] as Int,
+                latestPartnerCheckIn = v[4] as OrbitEvent?,
+                partnerSos = v[5] as SosRecord?,
+                partnerTrip = v[6] as Trip?,
+                nowMs = now,
             )
         }
     }
@@ -137,17 +147,30 @@ class HomeViewModel(
 
     fun nudge(kind: String) = run(Action.NUDGE) { p -> events.nudge(p.meta.pairId, p.myUid, kind) }
 
-    fun dismissError() { error.value = null }
+    companion object {
+        /** "Saved ✓" is a receipt, not a state: it fades so it never describes an old action. */
+        const val SAVED_VISIBLE_MS = 4_000L
+        private const val NOW_TICK_MS = 30_000L
+    }
 
-    fun clearAction() { action.value = ActionStatus.Idle }
+    fun dismissError() { error.value = null }
 
     private fun run(kind: Action, block: suspend (PairState.Paired) -> Outcome<*>) {
         val paired = current ?: return
+        val pid = paired.meta.pairId
         viewModelScope.launch {
-            action.value = ActionStatus.Sending(kind)
-            action.value = when (val r = block(paired)) {
-                is Outcome.Success -> ActionStatus.Saved(kind)
-                is Outcome.Failure -> ActionStatus.Failed(kind, r.reason)
+            clearSaved?.cancel() // only the fade timer: an earlier write in flight still finishes
+            action.value = Tagged(pid, ActionStatus.Sending(kind))
+            when (val r = block(paired)) {
+                is Outcome.Success -> {
+                    val saved = Tagged<ActionStatus>(pid, ActionStatus.Saved(kind))
+                    action.value = saved
+                    clearSaved = viewModelScope.launch {
+                        delay(SAVED_VISIBLE_MS)
+                        if (action.value == saved) action.value = Tagged(pid, ActionStatus.Idle)
+                    }
+                }
+                is Outcome.Failure -> action.value = Tagged(pid, ActionStatus.Failed(kind, r.reason))
             }
         }
     }

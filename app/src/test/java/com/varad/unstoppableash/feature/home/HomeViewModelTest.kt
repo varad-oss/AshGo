@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -55,22 +56,27 @@ class HomeViewModelTest {
     }
 
     @Test fun presenceAgesWithoutNewData() = runTest(main.dispatcher) {
-        val clock = Clock { base + testScheduler.currentTime }
-        val snapshots = MutableStateFlow(PresenceSnapshot(true, null, null, null, null, SharingMode.LIVE, base, null))
-        val states = mutableListOf<PresenceState>()
-        val job = backgroundScope.launchCollect(presenceStates(snapshots, clock, tickMs = 30_000), states)
-        advanceTimeBy(1)
-        assertTrue(states.last() is PresenceState.Live)
-        advanceTimeBy(2 * 60_000L)
-        assertTrue("re-evaluated without new data", states.last() is PresenceState.Recent)
-        advanceTimeBy(15 * 60_000L)
-        assertTrue(states.last() is PresenceState.Stale)
-        job.cancel()
+        seedPair()
+        db.set("pairs/p1/presence/bob", mapOf("online" to true, "lastSeen" to base, "sharing" to "live"))
+        db.set("pairs/p1/location/bob", mapOf("lat" to 18.5, "lng" to 73.8, "at" to base))
+        val vm = vm(Clock { base + testScheduler.currentTime })
+        backgroundScope.launch { vm.state.collect {} }
+        settle(10)
+        assertTrue(vm.state.value.partnerPresence is PresenceState.Live)
+        settle(2 * 60_000L)
+        assertTrue("re-evaluated without new data", vm.state.value.partnerPresence is PresenceState.Recent)
+        settle(15 * 60_000L)
+        assertTrue(vm.state.value.partnerPresence is PresenceState.Stale)
     }
 
     @Test fun noLocationIsNeverLive() = runTest(main.dispatcher) {
-        val snapshots = MutableStateFlow(PresenceSnapshot(true, base, base, 80, false, SharingMode.LIVE, null, null))
-        assertEquals(PresenceState.Unknown, presenceStates(snapshots, Clock { base }, 30_000).first())
+        seedPair()
+        db.set("pairs/p1/presence/bob", mapOf("online" to true, "lastSeen" to base, "battery" to 80L, "sharing" to "live"))
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle(10)
+        assertFalse(vm.state.value.loading)
+        assertEquals(PresenceState.Unknown, vm.state.value.partnerPresence)
     }
 
     @Test fun homeCombinesEverythingAboutThePartner() = runTest(main.dispatcher) {
@@ -131,7 +137,85 @@ class HomeViewModelTest {
         vm.dismissError()
         vm.state.first { it.error == null }
     }
-}
 
-private fun <T> CoroutineScope.launchCollect(flow: Flow<T>, into: MutableList<T>): Job =
-    launch(start = CoroutineStart.UNDISPATCHED) { flow.collect { into += it } }
+    private fun kotlinx.coroutines.test.TestScope.settle(ms: Long = 1_000) { testScheduler.advanceTimeBy(ms); testScheduler.runCurrent() }
+
+    @Test fun partnerSosShowsEvenWhenAnotherStreamIsDenied() = runTest(main.dispatcher) {
+        seedPair()
+        db.set("pairs/p1/sos/s1", mapOf("from" to "bob", "state" to "active", "at" to base - 2))
+        db.failReads("pairs/p1/trips")
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        val s = vm.state.value
+        assertEquals("s1", s.partnerSos?.id)
+        assertFalse("Home isn't stuck loading on one denied stream", s.loading)
+    }
+
+    @Test fun partnerSosShowsBeforePresenceLoads() = runTest(main.dispatcher) {
+        seedPair()
+        db.set("pairs/p1/sos/s1", mapOf("from" to "bob", "state" to "active", "at" to base - 2))
+        db.failReads("pairs/p1/presence/bob")
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        assertEquals("s1", vm.state.value.partnerSos?.id)
+    }
+
+    @Test fun cachedStateIsDroppedOnceNobodyIsWatching() = runTest(main.dispatcher) {
+        seedPair()
+        val vm = vm()
+        val job = backgroundScope.launch { vm.state.collect {} }
+        settle()
+        assertFalse(vm.state.value.loading)
+        job.cancel()
+        settle(6_000)
+        assertTrue("a returning screen starts from loading, not old data", vm.state.value.loading)
+    }
+
+    @Test fun savedStatusClearsAfterAFewSeconds() = runTest(main.dispatcher) {
+        seedPair()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        vm.checkIn("home_safe", null)
+        settle(100)
+        assertEquals(ActionStatus.Saved(Action.CHECK_IN), vm.state.value.action)
+        settle(HomeViewModel.SAVED_VISIBLE_MS + 100)
+        assertEquals(ActionStatus.Idle, vm.state.value.action)
+    }
+
+    @Test fun errorsAndOutcomesDontFollowYouToANewPair() = runTest(main.dispatcher) {
+        seedPair()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        vm.nudge("thinking_of_you"); settle(100)
+        vm.nudge("call_me"); settle(100)
+        assertTrue(vm.state.value.action is ActionStatus.Failed)
+        db.failReads("pairs/p1/sos"); settle(100)
+        assertEquals(FailureReason.PERMISSION_DENIED, vm.state.value.error)
+
+        db.remove("pairs/p1"); db.clearFailures()
+        db.set("userPairs/alice", "p2")
+        db.set("pairs/p2/meta", mapOf("memberA" to "alice", "memberB" to "carol", "relationship" to "FRIENDS", "createdAt" to 1L, "confirmedAt" to 2L))
+        db.set("pairs/p2/profiles", mapOf("alice" to mapOf("name" to "Alice"), "carol" to mapOf("name" to "Carol")))
+        settle()
+        val s = vm.state.value
+        assertEquals("Carol", s.partnerName)
+        assertEquals(null, s.error)
+        assertEquals(ActionStatus.Idle, s.action)
+    }
+
+    @Test fun nowTicksFromTheServerClock() = runTest(main.dispatcher) {
+        seedPair()
+        val clock = Clock { base + 7_000 + testScheduler.currentTime }
+        val vm = vm(clock)
+        backgroundScope.launch { vm.state.collect {} }
+        settle(10)
+        val first = vm.state.value.nowMs
+        assertTrue(first >= base + 7_000)
+        settle(31_000)
+        assertTrue("now advances on its own", vm.state.value.nowMs >= first + 30_000)
+    }
+}

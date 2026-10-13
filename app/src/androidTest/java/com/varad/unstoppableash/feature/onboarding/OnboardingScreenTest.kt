@@ -1,5 +1,9 @@
 package com.varad.unstoppableash.feature.onboarding
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -20,11 +24,23 @@ class OnboardingScreenTest {
 
     private var signIns = 0
     private var created: String? = null
+    private var cancels = 0
+    private var signOuts = 0
+    private var backs = 0
+    private var confirms = 0
     private fun show(state: OnboardingUiState) = rule.setContent {
         OrbitTheme(ThemeMode.LIGHT) {
-            OnboardingScreen(state, OnboardingActions(onSignIn = { signIns++ }, onCreate = { name, _ -> created = name }))
+            OnboardingScreen(
+                state,
+                OnboardingActions(
+                    onSignIn = { signIns++ }, onCreate = { name, _ -> created = name },
+                    onCancelOrbit = { cancels++ }, onSignOut = { signOuts++ }, onBack = { backs++ }, onConfirm = { confirms++ },
+                ),
+            )
         }
     }
+
+    private fun pressBack() = androidx.test.espresso.Espresso.pressBack()
 
     @Test fun signInOffersGoogle() {
         show(OnboardingUiState(step = OnboardingStep.SIGN_IN, loading = false))
@@ -60,12 +76,46 @@ class OnboardingScreenTest {
         show(
             OnboardingUiState(
                 step = OnboardingStep.CONFIRM_PARTNER, loading = false,
-                partner = Profile("bob", "Bob", null, "bob@example.com", null, true),
+                partner = Profile("bob", "Bob", null, "bob@example.com", null, true), canConfirm = true,
             ),
         )
         rule.onNodeWithText("bob@example.com").assertExists()
         rule.onNodeWithContentDescription("Bob").assertExists()
         rule.onNodeWithText("Yes, that's them").assertExists()
         rule.onNodeWithText("That's not them").assertExists()
+    }
+
+    @Test fun everyPendingStepOffersAWayOut() {
+        var step by mutableStateOf(OnboardingStep.INVITE)
+        rule.setContent { OrbitTheme(ThemeMode.LIGHT) { OnboardingScreen(OnboardingUiState(step = step, loading = false), OnboardingActions(onCancelOrbit = { cancels++ })) } }
+        for (s in listOf(OnboardingStep.INVITE, OnboardingStep.WAITING, OnboardingStep.AWAITING_CONFIRMATION)) {
+            step = s
+            rule.onNodeWithText("Cancel and start over").performScrollTo().performClick()
+        }
+        rule.runOnIdle { assertEquals(3, cancels) }
+    }
+
+    @Test fun choosingCanSwitchAccount() {
+        show(OnboardingUiState(step = OnboardingStep.CHOOSE, loading = false, email = "me@example.com"))
+        rule.onNodeWithText("Use a different Google account").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, signOuts) }
+    }
+
+    @Test fun invitationsCanSwitchAccount() {
+        show(OnboardingUiState(step = OnboardingStep.INVITATIONS, loading = false, email = "me@example.com"))
+        rule.onNodeWithText("Use a different Google account").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, signOuts) }
+    }
+
+    @Test fun systemBackStepsBackFromProfile() {
+        show(OnboardingUiState(step = OnboardingStep.CREATE_PROFILE, loading = false))
+        rule.waitForIdle()
+        pressBack()
+        rule.runOnIdle { assertEquals(1, backs) }
+    }
+
+    @Test fun confirmWaitsUntilWeKnowWhoJoined() {
+        show(OnboardingUiState(step = OnboardingStep.CONFIRM_PARTNER, loading = false, partner = null, canConfirm = false))
+        rule.onNodeWithText("Yes, that's them").assertIsNotEnabled()
     }
 }

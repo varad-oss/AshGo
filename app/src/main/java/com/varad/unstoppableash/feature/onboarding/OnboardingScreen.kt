@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.feature.onboarding
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,8 @@ data class OnboardingActions(
     val onConfirm: () -> Unit = {},
     val onNotThem: () -> Unit = {},
     val onDismissFailure: () -> Unit = {},
+    val onCancelOrbit: () -> Unit = {},
+    val onSignOut: () -> Unit = {},
 )
 
 /** USER_JOURNEYS J1–J3. Stateless: renders [state], reports intent through [actions]. */
@@ -71,6 +74,7 @@ fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modif
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         state.failure?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissFailure, actionLabel = stringResource(R.string.action_dismiss)) }
+        BackHandler(enabled = state.step == OnboardingStep.CREATE_PROFILE || state.step == OnboardingStep.INVITATIONS, onBack = actions.onBack)
         when (state.step) {
             OnboardingStep.SIGN_IN -> SignIn(state, actions)
             OnboardingStep.CHOOSE -> Choose(state, actions)
@@ -82,6 +86,7 @@ fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modif
             OnboardingStep.AWAITING_CONFIRMATION -> Centered {
                 LoadingOrbit(size = LoadingOrbitSize.LARGE)
                 Text(stringResource(R.string.awaiting_confirmation, state.partner?.name.orEmpty()), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                CancelOrbit(state, actions)
             }
             OnboardingStep.DONE -> Centered { LoadingOrbit(size = LoadingOrbitSize.LARGE) }
         }
@@ -102,6 +107,15 @@ private fun Title(text: String) = Text(text, style = MaterialTheme.typography.he
 @Composable
 private fun Body(text: String) = Text(text, style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.textSecondary)
 
+/** D-16: leaving is always possible, at every step before the orbit is confirmed. */
+@Composable
+private fun CancelOrbit(state: OnboardingUiState, actions: OnboardingActions) =
+    OrbitButton(stringResource(R.string.action_cancel_orbit), actions.onCancelOrbit, style = OrbitButtonStyle.Quiet, enabled = !state.busy)
+
+@Composable
+private fun SwitchAccount(state: OnboardingUiState, actions: OnboardingActions) =
+    OrbitButton(stringResource(R.string.action_switch_account), actions.onSignOut, style = OrbitButtonStyle.Quiet, enabled = !state.busy)
+
 @Composable
 private fun SignIn(state: OnboardingUiState, actions: OnboardingActions) = Centered {
     Image(painterResource(R.drawable.ic_orbit_glyph), contentDescription = null, modifier = Modifier.size(72.dp), colorFilter = ColorFilter.tint(Orbit.colors.primary))
@@ -119,6 +133,7 @@ private fun Choose(state: OnboardingUiState, actions: OnboardingActions) {
     state.email?.let { Body(stringResource(R.string.signed_in_as, it)) }
     OrbitButton(stringResource(R.string.choose_create), actions.onChooseCreate, Modifier.fillMaxWidth())
     OrbitButton(stringResource(R.string.choose_join), actions.onChooseJoin, Modifier.fillMaxWidth(), style = OrbitButtonStyle.Secondary)
+    SwitchAccount(state, actions)
 }
 
 @Composable
@@ -164,6 +179,7 @@ private fun InvitePartner(state: OnboardingUiState, actions: OnboardingActions) 
     )
     Body(stringResource(R.string.invite_validity))
     OrbitButton(stringResource(R.string.action_send_invite), { actions.onInvite(email) }, Modifier.fillMaxWidth(), enabled = email.isNotBlank(), loading = state.busy)
+    CancelOrbit(state, actions)
 }
 
 @Composable
@@ -172,6 +188,7 @@ private fun Waiting(state: OnboardingUiState, actions: OnboardingActions) = Cent
     Text(stringResource(R.string.waiting_title, state.sentInviteTo.orEmpty()), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, color = Orbit.colors.text)
     Body(stringResource(R.string.waiting_body))
     OrbitButton(stringResource(R.string.action_invite_again), actions.onInviteAgain, style = OrbitButtonStyle.Quiet)
+    CancelOrbit(state, actions)
 }
 
 @Composable
@@ -197,18 +214,22 @@ private fun Invitations(state: OnboardingUiState, actions: OnboardingActions) {
         }
     }
     OrbitButton(stringResource(R.string.action_back), actions.onBack, style = OrbitButtonStyle.Quiet)
+    SwitchAccount(state, actions)
 }
 
 @Composable
 private fun ConfirmPartner(state: OnboardingUiState, actions: OnboardingActions) = Centered {
     val partner = state.partner
     Title(stringResource(R.string.confirm_title))
-    if (partner != null) {
+    if (partner != null && state.canConfirm) {
         AvatarImage(partner.name, partner.avatar, size = 96.dp)
         Text(partner.name, style = MaterialTheme.typography.titleLarge, color = Orbit.colors.text)
         partner.email?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.textSecondary) }
+    } else {
+        LoadingOrbit(size = LoadingOrbitSize.LARGE)
+        Body(stringResource(R.string.confirm_loading))
     }
     Body(stringResource(R.string.confirm_body))
-    OrbitButton(stringResource(R.string.action_yes_them), actions.onConfirm, Modifier.fillMaxWidth(), loading = state.busy)
-    OrbitButton(stringResource(R.string.action_not_them), actions.onNotThem, style = OrbitButtonStyle.Quiet)
+    OrbitButton(stringResource(R.string.action_yes_them), actions.onConfirm, Modifier.fillMaxWidth(), enabled = state.canConfirm, loading = state.busy)
+    OrbitButton(stringResource(R.string.action_not_them), actions.onNotThem, style = OrbitButtonStyle.Quiet, enabled = !state.busy)
 }

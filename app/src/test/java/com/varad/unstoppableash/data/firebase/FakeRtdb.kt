@@ -4,6 +4,7 @@ import com.varad.unstoppableash.core.result.FailureReason
 import com.varad.unstoppableash.core.result.Outcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -28,9 +29,13 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     private var keyCounter = 0
 
     val connectedState = MutableStateFlow(true)
+    /** When false, writes wait for the server like the real SDK does offline (they never fail, they just don't finish). */
+    val serverReachable = MutableStateFlow(true)
     val offset = MutableStateFlow(0L)
     val onDisconnectWrites = mutableMapOf<String, Map<String, Any?>>()
     val writeLog = mutableListOf<String>()
+    /** Every write handed to the "SDK", including ones still waiting for the server. */
+    val issued = mutableListOf<String>()
     var activeObservers = 0
         private set
 
@@ -84,6 +89,8 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     }
 
     override suspend fun cancelOnDisconnect(path: String): Outcome<Unit> {
+        issued += "cancelOnDisconnect $path"
+        serverReachable.first { it }
         onDisconnectWrites.remove(path)
         return Outcome.Success(Unit)
     }
@@ -94,7 +101,9 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         onDisconnectWrites.forEach { (p, v) -> update(p, v) }
     }
 
-    private inline fun write(log: String, path: String, block: () -> Unit): Outcome<Unit> {
+    private suspend inline fun write(log: String, path: String, block: () -> Unit): Outcome<Unit> {
+        issued += log
+        serverReachable.first { it }
         writeFailures.entries.firstOrNull { path == it.key || path.startsWith(it.key + "/") }?.let {
             return Outcome.Failure(it.value)
         }

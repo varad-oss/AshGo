@@ -27,7 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -73,7 +76,21 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
     var sheet by remember { mutableStateOf<HomeSheet?>(null) }
     Column(modifier.fillMaxSize().background(Orbit.colors.background)) {
         if (state.connectionProblem != null) OfflineBar()
-        if (state.loading) {
+        // Safety first: a partner SOS and a read error show even before everything else has loaded.
+        if (state.partnerSos != null || state.error != null) {
+            Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                state.partnerSos?.let {
+                    Surface(
+                        color = Orbit.colors.sos, contentColor = Orbit.colors.onSos, shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().clickable(onClick = actions.onOpenSafety),
+                    ) {
+                        Text(stringResource(R.string.partner_sos_banner, state.partnerName), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(Spacing.lg))
+                    }
+                }
+                state.error?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissError, actionLabel = stringResource(R.string.action_dismiss)) }
+            }
+        }
+        if (state.loading || state.unpaired) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingOrbit(size = LoadingOrbitSize.LARGE) }
             return@Column
         }
@@ -81,15 +98,6 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            state.partnerSos?.let {
-                Surface(
-                    color = Orbit.colors.sos, contentColor = Orbit.colors.onSos, shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = actions.onOpenSafety),
-                ) {
-                    Text(stringResource(R.string.partner_sos_banner, state.partnerName), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(Spacing.lg))
-                }
-            }
-            state.error?.let { ErrorBanner(failureMessage(it), onRetry = actions.onDismissError, actionLabel = stringResource(R.string.action_dismiss)) }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(greeting(state), style = MaterialTheme.typography.titleLarge, color = Orbit.colors.text, modifier = Modifier.weight(1f))
@@ -121,7 +129,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 val fix = state.partnerLocation
                 if (fix != null && state.partnerPresence !is PresenceState.NotSharing) {
                     OrbitCard(Modifier.fillMaxWidth(), onClick = actions.onOpenMap) {
-                        Text(stringResource(R.string.location_card, shortAgeAgo(System.currentTimeMillis() - fix.at)), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text)
+                        Text(stringResource(R.string.location_card, shortAgeAgo(state.nowMs - fix.at)), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text)
                     }
                 }
             }
@@ -139,7 +147,10 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 OrbitButton(stringResource(R.string.action_trip), actions.onOpenMap, style = OrbitButtonStyle.Secondary)
             }
             actionLine(state.action)?.let { (text, isError) ->
-                Text(text, style = MaterialTheme.typography.bodyMedium, color = if (isError) Orbit.colors.warnInk else Orbit.colors.goodInk)
+                Text(
+                    text, style = MaterialTheme.typography.bodyMedium, color = if (isError) Orbit.colors.warnInk else Orbit.colors.goodInk,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

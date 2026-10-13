@@ -70,6 +70,8 @@ fun AshGoApp(container: AppContainer, requestGoogleIdToken: suspend () -> Outcom
                 onConfirm = onboarding::confirm,
                 onNotThem = onboarding::notThem,
                 onDismissFailure = onboarding::clearFailure,
+                onCancelOrbit = onboarding::cancelOrbit,
+                onSignOut = onboarding::signOut,
             ),
         )
         return

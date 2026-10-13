@@ -9,7 +9,12 @@ import com.varad.unstoppableash.data.pair.PairRepository
 import com.varad.unstoppableash.domain.model.Relationship
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import com.varad.unstoppableash.data.firebase.DbPaths
+import com.varad.unstoppableash.data.firebase.emailKey
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -96,5 +101,73 @@ class OnboardingViewModelTest {
         vm.at(OnboardingStep.CHOOSE); vm.chooseCreate(); vm.at(OnboardingStep.CREATE_PROFILE)
         vm.create("  ", Relationship.PARTNER)
         assertTrue(vm.state.first { it.nameError }.step == OnboardingStep.CREATE_PROFILE)
+    }
+    private suspend fun aliceInvitesBob(): OnboardingViewModel {
+        aliceAuth.user.value = FakeAuthGateway.google("alice")
+        val alice = vm(aliceAuth)
+        alice.at(OnboardingStep.CHOOSE); alice.chooseCreate(); alice.at(OnboardingStep.CREATE_PROFILE)
+        alice.create("Alice", Relationship.PARTNER); alice.at(OnboardingStep.INVITE)
+        alice.invite("bob@example.com"); alice.at(OnboardingStep.WAITING)
+        return alice
+    }
+
+    private fun pairIdOf(uid: String) = db.read("userPairs/$uid") as String?
+
+    @Test fun creatorWhoMeantToJoinCanCancelFromInvite() = runTest(main.dispatcher) {
+        aliceAuth.user.value = FakeAuthGateway.google("alice")
+        val vm = vm(aliceAuth)
+        vm.at(OnboardingStep.CHOOSE); vm.chooseCreate(); vm.at(OnboardingStep.CREATE_PROFILE)
+        vm.create("Alice", Relationship.PARTNER); vm.at(OnboardingStep.INVITE)
+        val pid = pairIdOf("alice")!!
+        vm.cancelOrbit()
+        vm.at(OnboardingStep.CHOOSE)
+        assertNull(db.read("pairs/$pid")); assertNull(pairIdOf("alice"))
+        vm.chooseJoin()
+        vm.at(OnboardingStep.INVITATIONS)
+    }
+
+    @Test fun cancellingWhileWaitingAlsoWithdrawsTheInvite() = runTest(main.dispatcher) {
+        val alice = aliceInvitesBob()
+        val pid = pairIdOf("alice")!!
+        assertNotNull(db.read(DbPaths.invite(emailKey("bob@example.com"), pid)))
+        alice.cancelOrbit()
+        alice.at(OnboardingStep.CHOOSE)
+        assertNull(db.read(DbPaths.invite(emailKey("bob@example.com"), pid)))
+    }
+
+    @Test fun joinerCanGiveUpWaitingForConfirmation() = runTest(main.dispatcher) {
+        val alice = aliceInvitesBob()
+        val bob = vm(bobAuth)
+        bob.at(OnboardingStep.CHOOSE); bob.chooseJoin()
+        bob.join(bob.state.first { it.invites.isNotEmpty() }.invites.single(), "Bob")
+        bob.at(OnboardingStep.AWAITING_CONFIRMATION)
+        bob.cancelOrbit()
+        bob.at(OnboardingStep.CHOOSE)
+        alice.at(OnboardingStep.CHOOSE)
+    }
+
+    @Test fun signOutBeforePairingStartsAfresh() = runTest(main.dispatcher) {
+        aliceAuth.user.value = FakeAuthGateway.google("alice")
+        val vm = vm(aliceAuth)
+        vm.at(OnboardingStep.CHOOSE); vm.chooseJoin(); vm.at(OnboardingStep.INVITATIONS)
+        vm.signOut()
+        vm.at(OnboardingStep.SIGN_IN)
+        vm.signIn("carol")
+        assertEquals("carol@example.com", vm.at(OnboardingStep.CHOOSE).email)
+    }
+
+    @Test fun cannotConfirmSomeoneWhoseIdentityHasNotLoaded() = runTest(main.dispatcher) {
+        aliceAuth.user.value = FakeAuthGateway.google("alice")
+        db.set("userPairs/alice", "p1")
+        db.set("pairs/p1/meta", mapOf("memberA" to "alice", "memberB" to "bob", "relationship" to "PARTNER", "createdAt" to 1L))
+        db.set("pairs/p1/profiles/alice", mapOf("name" to "Alice", "email" to "alice@example.com"))
+        val vm = vm(aliceAuth)
+        val s = vm.at(OnboardingStep.CONFIRM_PARTNER)
+        assertFalse(s.canConfirm)
+        vm.confirm()
+        vm.at(OnboardingStep.CONFIRM_PARTNER)
+        assertNull("nobody confirmed an unknown joiner", db.read("pairs/p1/meta/confirmedAt"))
+        db.set("pairs/p1/profiles/bob", mapOf("name" to "Bob", "email" to "bob@example.com"))
+        assertTrue(vm.state.first { it.partner?.email != null }.canConfirm)
     }
 }

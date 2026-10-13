@@ -1,6 +1,7 @@
 package com.varad.unstoppableash.feature.onboarding
 
 import android.app.Activity
+import androidx.credentials.Credential
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -9,6 +10,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.core.result.FailureReason
 import com.varad.unstoppableash.core.result.Outcome
@@ -26,11 +28,7 @@ object GoogleSignIn {
             val credential = CredentialManager.create(activity)
                 .getCredential(activity, GetCredentialRequest.Builder().addCredentialOption(option).build())
                 .credential
-            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                Outcome.Success(GoogleIdTokenCredential.createFrom(credential.data).idToken)
-            } else {
-                Outcome.Failure(FailureReason.UNKNOWN, "unexpected credential type")
-            }
+            tokenFrom(credential)
         } catch (e: GetCredentialCancellationException) {
             Outcome.Failure(FailureReason.UNKNOWN, CANCELLED)
         } catch (e: NoCredentialException) {
@@ -39,4 +37,15 @@ object GoogleSignIn {
             Outcome.Failure(FailureReason.UNKNOWN, e.message)
         }
     }
+
+    internal fun tokenFrom(credential: Credential): Outcome<String> =
+        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            try {
+                Outcome.Success(GoogleIdTokenCredential.createFrom(credential.data).idToken)
+            } catch (e: GoogleIdTokenParsingException) {
+                Outcome.Failure(FailureReason.UNKNOWN, "unreadable Google credential")
+            }
+        } else {
+            Outcome.Failure(FailureReason.UNKNOWN, "unexpected credential type")
+        }
 }

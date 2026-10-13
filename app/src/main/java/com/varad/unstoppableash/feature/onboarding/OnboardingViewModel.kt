@@ -33,6 +33,8 @@ data class OnboardingUiState(
     val nameError: Boolean = false,
     val emailError: Boolean = false,
     val failure: FailureReason? = null,
+    /** Only once we can show who joined: confirming a stranger is what D-16 exists to prevent. */
+    val canConfirm: Boolean = false,
 )
 
 /**
@@ -57,6 +59,18 @@ class OnboardingViewModel(
 
     private val local = MutableStateFlow(Local())
     @Volatile private var pair: PairState? = null
+
+    init {
+        // The orbit vanished under us (the other person cancelled, or "That's not them"): start from the top.
+        viewModelScope.launch {
+            var had = false
+            pairs.pairState().collect { p ->
+                val has = p is PairState.Waiting || p is PairState.Confirming || p is PairState.Paired
+                if (had && !has) local.update { Local(failure = it.failure) }
+                had = has
+            }
+        }
+    }
 
     val state: StateFlow<OnboardingUiState> =
         combine(auth.currentUser, pairs.pairState(), pairs.myInvites(), local) { user, p, invites, l ->
@@ -84,8 +98,9 @@ class OnboardingViewModel(
                 nameError = l.nameError,
                 emailError = l.emailError,
                 failure = l.failure,
+                canConfirm = (p as? PairState.Confirming)?.partner?.email != null,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OnboardingUiState())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), OnboardingUiState())
 
     fun signIn(googleIdToken: String) = act { auth.signInWithGoogleIdToken(googleIdToken) }
 
@@ -116,6 +131,7 @@ class OnboardingViewModel(
 
     fun confirm() {
         val p = pair as? PairState.Confirming ?: return
+        if (p.partner?.email == null) return
         act { pairs.confirm(p.meta.pairId) }
     }
 
@@ -123,6 +139,27 @@ class OnboardingViewModel(
     fun notThem() {
         val p = pair as? PairState.Confirming ?: return
         act(onSuccess = { Local() }) { pairs.leave(p.meta.pairId) }
+    }
+
+    /** Leaving is always possible (D-16): undo a create, or stop waiting, from any step before DONE. */
+    fun cancelOrbit() {
+        val pairId = when (val p = pair) {
+            is PairState.Waiting -> p.meta.pairId
+            is PairState.Confirming -> p.meta.pairId
+            else -> return
+        }
+        val invited = local.value.sentInviteTo
+        act(onSuccess = { Local() }) {
+            // Best effort: the invite is useless once the pair is gone (rules check memberA), this just tidies it.
+            if (invited != null) pairs.withdrawInvite(invited, pairId)
+            pairs.leave(pairId)
+        }
+    }
+
+    /** Wrong Google account: start over with another one. */
+    fun signOut() = act(onSuccess = { Local() }) {
+        auth.signOut()
+        Outcome.Success(Unit)
     }
 
     private fun nameIsUsable(typed: String): Boolean {

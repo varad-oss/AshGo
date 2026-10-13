@@ -13,6 +13,10 @@ import com.varad.unstoppableash.domain.time.Durations.DAY
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import kotlinx.coroutines.launch
+import org.junit.Assert.assertNotNull
+import com.varad.unstoppableash.data.firebase.DbPaths
+import com.varad.unstoppableash.data.firebase.emailKey
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,6 +93,25 @@ class PairRepositoryTest {
         val pid = created()
         assertTrue(repo.leave(pid) is Outcome.Success)
         assertNull(db.read("pairs/$pid")); assertNull(db.read("userPairs/alice"))
+    }
+
+    @Test fun leaveOfflineHandsEveryDeleteToTheSdkAtOnce() = runTest {
+        val pid = created()
+        db.serverReachable.value = false
+        val job = launch { repo.leave(pid) }
+        testScheduler.runCurrent()
+        // Offline the SDK queues writes; a caller that gives up waiting must not leave half of them unsent.
+        assertTrue(db.issued.contains("remove pairs/$pid"))
+        assertTrue(db.issued.contains("remove userPairs/alice"))
+        job.cancel()
+    }
+
+    @Test fun withdrawInviteRemovesIt() = runTest {
+        val pid = created()
+        repo.invite("Bob.Smith@example.com", "Alice")
+        assertNotNull(db.read(DbPaths.invite(emailKey("bob.smith@example.com"), pid)))
+        assertTrue(repo.withdrawInvite("Bob.Smith@example.com", pid) is Outcome.Success)
+        assertNull(db.read(DbPaths.invite(emailKey("bob.smith@example.com"), pid)))
     }
 
     @Test fun pairStateWalksTheWholeFlow() = runTest {

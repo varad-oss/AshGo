@@ -1,5 +1,8 @@
 package com.varad.unstoppableash.data.pair
 
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
 import com.varad.unstoppableash.core.result.FailureReason
 import com.varad.unstoppableash.core.result.Outcome
 import com.varad.unstoppableash.core.result.then
@@ -131,10 +134,21 @@ class PairRepository(
      * first, otherwise a later disconnect would recreate presence under the deleted pair (review I3).
      * "That's not them" is also a leave.
      */
-    suspend fun leave(pairId: String): Outcome<Unit> {
-        val user = auth.current() ?: return Outcome.Failure(FailureReason.NOT_SIGNED_IN)
-        db.cancelOnDisconnect(DbPaths.presence(pairId, user.uid))
-        return db.remove(DbPaths.pair(pairId)).then { db.remove(DbPaths.userPair(user.uid)) }
+    /** The inviter takes an unused invite back (spec §9: "the inviter can cancel"). */
+    suspend fun withdrawInvite(email: String, pairId: String): Outcome<Unit> =
+        db.remove(DbPaths.invite(emailKey(email), pairId))
+
+    /**
+     * Every delete is handed to the SDK before any is awaited: offline, the SDK queues writes, so a
+     * caller that stops waiting (a timeout) still leaves completely once the connection returns.
+     */
+    suspend fun leave(pairId: String): Outcome<Unit> = coroutineScope {
+        val user = auth.current() ?: return@coroutineScope Outcome.Failure(FailureReason.NOT_SIGNED_IN)
+        val cancel = async(start = CoroutineStart.UNDISPATCHED) { db.cancelOnDisconnect(DbPaths.presence(pairId, user.uid)) }
+        val pair = async(start = CoroutineStart.UNDISPATCHED) { db.remove(DbPaths.pair(pairId)) }
+        val pointer = async(start = CoroutineStart.UNDISPATCHED) { db.remove(DbPaths.userPair(user.uid)) }
+        cancel.await()
+        pair.await().then { pointer.await() }
     }
 
     private suspend fun existingPairAsCreator(uid: String): String? {

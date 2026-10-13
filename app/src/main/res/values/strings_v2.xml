@@ -102,6 +102,9 @@
     <string name="confirm_body">Only confirm if you recognise this person and their email. Nothing private is shared until you do.</string>
     <string name="action_yes_them">Yes, that\'s them</string>
     <string name="action_not_them">That\'s not them</string>
+    <string name="action_cancel_orbit">Cancel and start over</string>
+    <string name="action_switch_account">Use a different Google account</string>
+    <string name="confirm_loading">Loading who joined…</string>
     <string name="awaiting_confirmation">Waiting for %1$s to confirm it\'s you</string>
 
     <!-- ===== Home (Stage 5) ===== -->

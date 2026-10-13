@@ -5,6 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -59,7 +63,7 @@ class HomeScreenTest {
     }
 
     @Test fun locationCardShowsWhenThereIsALocation() {
-        show(base.copy(partnerPresence = PresenceState.Live(1000), partnerLocation = LocationFix(1.0, 2.0, null, System.currentTimeMillis())))
+        show(base.copy(partnerPresence = PresenceState.Live(1000), partnerLocation = LocationFix(1.0, 2.0, null, 1_000L), nowMs = 61_000L))
         rule.onNodeWithText("open map", substring = true).assertExists()
     }
 
@@ -84,5 +88,30 @@ class HomeScreenTest {
         show(base.copy(partnerPresence = PresenceState.Stale(3_600_000), partnerBattery = 9), fontScale = 2f)
         rule.onNodeWithText("Bob").assertExists()
         rule.onNodeWithText("Check in").assertExists()
+    }
+
+    private val sos = SosRecord("s1", "bob", SosRecordState.ACTIVE, 1L, null, null, null, null, null, null, null, null, emptyMap(), emptyMap())
+
+    @Test fun partnerSosIsShownEvenWhileLoading() {
+        show(base.copy(loading = true, partnerSos = sos))
+        rule.onNodeWithText("Bob needs help", substring = true).assertExists()
+    }
+
+    @Test fun unpairedLooksLikeLoadingNotAnEmptyHome() {
+        show(base.copy(unpaired = true))
+        rule.onAllNodes(hasText("Bob", substring = true)).assertCountEquals(0)
+        rule.onAllNodes(hasText("Check in")).assertCountEquals(0)
+    }
+
+    @Test fun actionOutcomeIsAnnouncedPolitely() {
+        show(base.copy(action = ActionStatus.Failed(Action.CHECK_IN, FailureReason.OFFLINE)))
+        rule.onNodeWithText("You're offline", substring = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+    }
+
+    @Test fun locationAgeUsesTheStateClock() {
+        val at = 1_000_000_000L
+        show(base.copy(partnerPresence = PresenceState.Paused(at), partnerLocation = LocationFix(1.0, 2.0, null, at), nowMs = at + 5 * 60_000))
+        rule.onNodeWithText("Last location 5 min ago", substring = true).assertExists()
     }
 }

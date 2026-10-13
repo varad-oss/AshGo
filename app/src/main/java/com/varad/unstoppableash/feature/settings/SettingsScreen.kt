@@ -72,7 +72,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
         if (state.pairId != null) {
             OrbitButton(stringResource(R.string.settings_leave), { confirmLeave = true }, style = OrbitButtonStyle.Secondary, loading = state.busy)
         }
-        OrbitButton(stringResource(R.string.settings_sign_out), actions.onSignOut, style = OrbitButtonStyle.Quiet)
+        OrbitButton(stringResource(R.string.settings_sign_out), actions.onSignOut, style = OrbitButtonStyle.Quiet, loading = state.signingOut)
     }
     if (confirmLeave) {
         OrbitDialog(
