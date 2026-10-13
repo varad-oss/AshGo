@@ -64,7 +64,7 @@ Every row below assumes these **evidence types** apply:
 | O-8 | Redesign | Raise is impossible without a ≥ 3 s continuous hold (D-6). A second raise during an active SOS is a no-op. SMS is dispatched once per contact via the fake sender. Each contact row reflects its sent/delivered/failed callback. Cancel records the actor and server time. Status is consistent on both phones. | [unit] [rules] [UI] [device: SMS to an owner-controlled number] |
 | O-20 | Add | Only invite holders can join, and only within 10 min. A pair can never exceed 2 members. Non-members are denied read and write on every pair path. Orbit words match on both devices. | [rules] [unit] [device] |
 | O-21 | Add | After "Leave", the leaver loses access (rules) and shared nodes are deleted. The partner sees "Orbit ended". | [rules] [UI] |
-| O-7 | Add | Pausing writes `sharing=paused` **and** clears precise coordinates (the owner's choice; default keeps a coarse "last seen area" off). The partner sees Paused, and no signal-lost alert fires. | [unit] [UI] |
+| O-7 | Add | Pausing writes `sharing=paused` and keeps the last point (D-14), rendered faded with "Paused · last seen <time>". The partner sees Paused, and no signal-lost alert fires. | [unit] [UI] |
 | O-6 | Add | Battery % and charging state are included at most once per 5 % change. A low-battery hint appears at < 15 %. | [unit] |
 | O-24 | Add | The cadence policy returns the documented interval per state; the location request is updated on state change. | [unit] [device: battery over 24 h] |
 | O-15 | Replace | The updater fetches only from an allow-listed public URL. A SHA-256 mismatch aborts and deletes the file. No token exists anywhere (grep test in CI). | [unit] [device] |

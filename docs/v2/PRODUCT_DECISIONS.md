@@ -135,7 +135,9 @@ Options:
 - Manual DI via an `AppContainer`. Hilt is rejected as unnecessary weight for about 20 classes.
 - Pure-Kotlin domain logic (presence, SOS reducer, cadence, cleanup selector, arrival detector) so it is unit-testable on the JVM.
 
-## D-14 Retention defaults — **Recommended (Q-4 to confirm)**
+## D-14 Retention defaults — **Decided 2026-10-13**
+
+**Owner chose (B) for pause:** the last precise point is **kept**. It is shown faded, labelled "Paused · last seen 6:40 pm", with no "Live" styling and no freshness alarms. Leaving the orbit still deletes it. The other defaults were accepted without objection.
 
 | Data | Retention |
 |---|---|
@@ -144,7 +146,7 @@ Options:
 | Check-ins and nudges | 7 days |
 | SOS events | 30 days, or until resolved and then 30 days |
 | Location | latest point only |
-| Location when paused | optionally cleared |
+| Location when paused | kept as the last point, shown as paused with its age (owner decision) |
 | Trips | deleted 24 h after they end |
 | Profiles | until the member leaves |
 
@@ -166,7 +168,7 @@ Cleanup runs at most once a day from either phone, using server-time cutoffs.
 - ~~**Q-1:** Identity~~: **Answered: C, Google Sign-In** (see D-1).
 - **Q-2:** Make the main repo private, or keep it public and scrub personal media?
 - ~~**Q-3:** SOS activation~~: **Answered: B, hold 3 s and send immediately** (see D-6).
-- **Q-4:** Are the retention defaults in D-14 acceptable? In particular, should precise location be cleared when sharing pauses?
+- ~~**Q-4:** Retention~~: **Answered: defaults accepted; keep the last point on pause, shown as paused** (see D-14).
 - **Q-5:** Should the partner be told automatically when a trip starts (the Google Safety Check makes this optional; we default to *on* for Partner and Family, *off* for Friends)?
 - **Q-6:** Is the owner willing to verify Cloudflare's no-card free plan, so a later push relay can be considered? (Not needed for v2.0.)
 
