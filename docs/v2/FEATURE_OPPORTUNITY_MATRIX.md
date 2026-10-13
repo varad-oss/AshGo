@@ -27,7 +27,7 @@ Scores rank the work; they do not decide it. Where judgement overrides the numbe
 | O-8/9/12/13 | SOS state machine, symmetric, receipts, partner takeover | 5 | 1 | 5 | 5 | 4 | 5 | 4 | 2 | 5 | 4 | 4 | **83** | ✓ (carrier cost disclosed) | **P0** |
 | O-5 | Overdue escalation, asking the person first | 5 | 2 | 5 | 5 | 3 | 5 | 4 | 2 | 4 | 4 | 4 | **82** | ✓ | **P1**: depends on Trips, and exact-alarm behaviour needs device verification |
 | O-16 | Reliability check screen | 4 | 3 | 4 | 4 | 5 | 3 | 5 | 3 | 5 | 5 | 3 | **80** | ✓ | **P0** |
-| O-20 | Secure pairing + orbit words | 5 | 1 | 4 | 5 | 4 | 3 | 5 | 2 | 5 | 4 | 4 | **79** | ✓ | **P0**: everything else is unsafe without it |
+| O-20 | Secure pairing (Google + email invite) | 5 | 1 | 4 | 5 | 4 | 3 | 5 | 2 | 5 | 4 | 4 | **79** | ✓ | **P0**: everything else is unsafe without it |
 | O-7 | Time-boxed sharing / pause | 3 | 4 | 4 | 3 | 4 | 4 | 5 | 4 | 5 | 5 | 5 | **79** | ✓ | **P0**: folded into the presence work, since pause is part of truthful state |
 | O-4 | Trips (destination, expect-by, note) | 4 | 4 | 5 | 4 | 3 | 4 | 4 | 2 | 3 | 4 | 4 | **77** | ✓ | **P1** |
 | O-15 | Safe manual updater, no token | 4 | 1 | 3 | 5 | 4 | 3 | 5 | 4 | 5 | 4 | 4 | **76** | ✓ | **P0**: removes the S2 exposure |
@@ -62,7 +62,7 @@ Every row below assumes these **evidence types** apply:
 | O-14 | Add | `presenceOf(snapshot, serverNow)` returns the correct state for a table of ≥ 15 cases, including no data, paused, and clock skew. The UI never renders "Live" unless the state is Live. | [unit] [UI] |
 | O-1 | Add | One tap creates exactly one event (idempotent client ID). The sender's UI moves *Sending → Saved → Seen* only on the corresponding backend facts. Offline shows "Waiting for connection". | [unit] [rules] [UI] |
 | O-8 | Redesign | Raise is impossible without a ≥ 3 s continuous hold (D-6). A second raise during an active SOS is a no-op. SMS is dispatched once per contact via the fake sender. Each contact row reflects its sent/delivered/failed callback. Cancel records the actor and server time. Status is consistent on both phones. | [unit] [rules] [UI] [device: SMS to an owner-controlled number] |
-| O-20 | Add | Only invite holders can join, and only within 10 min. A pair can never exceed 2 members. Non-members are denied read and write on every pair path. Orbit words match on both devices. | [rules] [unit] [device] |
+| O-20 | Add | Only the invited, Google-verified email can join, and only before the invite expires (24 h). A pair can never exceed 2 members. Non-members are denied read and write on every pair path. Both sides confirm the other's avatar and email (D-1). | [rules] [unit] [device] |
 | O-21 | Add | After "Leave", the leaver loses access (rules) and shared nodes are deleted. The partner sees "Orbit ended". | [rules] [UI] |
 | O-7 | Add | Pausing writes `sharing=paused` and keeps the last point (D-14), rendered faded with "Paused · last seen <time>". The partner sees Paused, and no signal-lost alert fires. | [unit] [UI] |
 | O-6 | Add | Battery % and charging state are included at most once per 5 % change. A low-battery hint appears at < 15 %. | [unit] |

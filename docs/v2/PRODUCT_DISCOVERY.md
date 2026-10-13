@@ -218,7 +218,7 @@ Format: **Problem → Feature → Use (steps) → Why better → MVP → Depende
 
 ### Category 6 — Privacy, consent, control
 
-**O-20. Secure pairing with safety words** (P0 core)
+**O-20. Secure pairing with safety words** (P0 core) — *superseded by D-1: Google Sign-In + email invite + mutual avatar/email confirmation. The original idea is kept below for the record.*
 - **Feature:**
   1. Person A taps "Create our orbit" and gets a one-time invite (a 10-character code plus QR, expires in 10 min).
   2. Person B scans or types the code.
