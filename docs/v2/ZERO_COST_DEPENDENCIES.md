@@ -43,6 +43,26 @@ Last verified: 2026-10-13. Re-verify pricing before each release.
 | Firebase Emulator Suite (`firebase-tools`) | MIT (CLI), emulators free | Rules tests, local only | Free, no project billing | **Adopt** for rules tests |
 | Custom vector illustrations (orbit, heart, route) | Original work in this repo | Brand accents | Free | Create in-house |
 
+### Pinned versions (Task 0.1, 2026-10-13)
+
+| Item | Version | Licence |
+|---|---|---|
+| Kotlin + Compose compiler plugin | 2.4.21 (was 2.2.10) | Apache-2.0 |
+| Compose BOM | 2026.09.00 | Apache-2.0 |
+| Firebase BoM (auth, database) | 35.0.0 | Apache-2.0 |
+| AndroidX Core / Activity / Lifecycle / Navigation | 1.19.1 / 1.13.0 / 2.11.0 / 2.10.2 | Apache-2.0 |
+| DataStore Preferences / WorkManager | 1.2.1 / 2.12.0 | Apache-2.0 |
+| Credentials (+ play-services-auth) / googleid | 1.6.0 / 1.2.1 | Apache-2.0 |
+| Play services location | 21.4.0 | Android SDK terms (free) |
+| kotlinx-coroutines (play-services, test) | 1.11.0 | Apache-2.0 |
+| osmdroid-android | 6.1.18 (upstream archived) | Apache-2.0 |
+| coil-compose | 2.6.0 (v1 only; removed at cutover) | Apache-2.0 |
+| google-services Gradle plugin | 4.5.0 | Apache-2.0 |
+
+Removed: `firebase-analytics`, `firebase-storage`.
+
+The Kotlin upgrade was required because Firebase BoM 35 and `googleid` 1.2.1 ship Kotlin 2.4 metadata, which Kotlin 2.2 cannot read.
+
 ## 3. The push-notification constraint (most important cost finding)
 
 Without a server, one phone **cannot** send an FCM push to the other. Options:
