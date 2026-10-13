@@ -87,4 +87,16 @@ class ChatRepositoryTest {
         db.set("pairs/p1/profiles/alice/lastReadAt", 30L)
         assertEquals(0, chat.unreadCount(p, "alice").first())
     }
+
+    @Test fun partnersReadMarkerIsObservable() = runTest {
+        assertEquals(null, chat.lastReadAt(p, "bob").first())
+        db.set("pairs/p1/profiles/bob/lastReadAt", 42L)
+        assertEquals(42L, chat.lastReadAt(p, "bob").first())
+    }
+
+    @Test fun aLargerLimitReachesOlderMessages() = runTest {
+        repeat(5) { i -> db.set("pairs/p1/chat/m$i", mapOf("from" to "bob", "text" to "t$i", "at" to (i + 1).toLong())) }
+        assertEquals(listOf("m3", "m4"), chat.messages(p, limit = 2).first().map { it.id })
+        assertEquals(listOf("m1", "m2", "m3", "m4"), chat.messages(p, limit = 4).first().map { it.id })
+    }
 }

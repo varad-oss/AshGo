@@ -54,11 +54,15 @@ class ChatRepository(private val db: RtdbClient) {
     suspend fun markRead(pairId: String, uid: String): Outcome<Unit> =
         db.set(DbPaths.profile(pairId, uid) + "/lastReadAt", db.serverTimestamp)
 
+    /** Written only by that person's own phone, so it is the honest source of "Seen". */
+    fun lastReadAt(pairId: String, uid: String): Flow<Long?> =
+        db.observe(DbPaths.profile(pairId, uid) + "/lastReadAt").map { (it as? Number)?.toLong() }.resilient()
+
     fun unreadCount(pairId: String, myUid: String): Flow<Int> = combine(
         messages(pairId),
-        db.observe(DbPaths.profile(pairId, myUid) + "/lastReadAt").resilient(),
+        lastReadAt(pairId, myUid),
     ) { messages, lastRead ->
-        val since = (lastRead as? Number)?.toLong() ?: 0L
+        val since = lastRead ?: 0L
         messages.count { it.from != myUid && it.at > since }
     }
 
