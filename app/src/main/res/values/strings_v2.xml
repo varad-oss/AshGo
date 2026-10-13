@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ages: short form is visible, long form is spoken by TalkBack -->
+    <string name="age_just_now">just now</string>
+    <string name="age_ago">%1$s ago</string>
+    <string name="age_short_minutes">%1$d min</string>
+    <string name="age_short_hours">%1$d h</string>
+    <string name="age_short_days">%1$d d</string>
+    <plurals name="age_long_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="age_long_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="age_long_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+
+    <!-- Presence, visible -->
+    <string name="presence_live">Live · %1$s</string>
+    <string name="presence_recent">%1$s</string>
+    <string name="presence_stale">Last update %1$s</string>
+    <string name="presence_paused">Paused</string>
+    <string name="presence_paused_last_seen">Paused · last seen %1$s</string>
+    <string name="presence_offline_since">Offline since %1$s</string>
+    <string name="presence_not_sharing">Not sharing location</string>
+    <string name="presence_unknown">No update yet</string>
+
+    <!-- Presence, spoken. %1$s = person, %2$s = age or time -->
+    <string name="presence_cd_live">%1$s: live, %2$s</string>
+    <string name="presence_cd_recent">%1$s: updated %2$s</string>
+    <string name="presence_cd_stale">%1$s: stale, last update %2$s</string>
+    <string name="presence_cd_paused">%1$s: sharing paused</string>
+    <string name="presence_cd_paused_last_seen">%1$s: sharing paused, last seen %2$s</string>
+    <string name="presence_cd_offline">%1$s: offline since %2$s</string>
+    <string name="presence_cd_not_sharing">%1$s: not sharing location</string>
+    <string name="presence_cd_unknown">%1$s: no update yet</string>
+    <string name="presence_ring_cd">You and %1$s. %2$s</string>
+
+    <!-- Receipts -->
+    <string name="receipt_queued">waiting to send</string>
+    <string name="receipt_pending">sending</string>
+    <string name="receipt_done">done</string>
+    <string name="receipt_failed">failed</string>
+    <string name="receipt_unknown">not confirmed yet</string>
+    <string name="receipt_cd">%1$s: %2$s</string>
+    <string name="receipt_cd_time">%1$s: %2$s at %3$s</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- System states -->
+    <string name="loading">Loading</string>
+    <string name="offline_bar">No connection · showing what we last knew</string>
+    <string name="offline_bar_cd">No connection, showing last known information</string>
+    <string name="text_field_counter">%1$d/%2$d</string>
+    <string name="action_close">Close</string>
+
+    <!-- SOS hold button -->
+    <string name="hold_released_early">Hold for the full time to send</string>
+    <string name="hold_progress_cd">%1$d of %2$d seconds</string>
+
+    <!-- Debug design catalog -->
+    <string name="catalog_title">Little Orbit components</string>
+    <string name="catalog_dark">Dark</string>
+    <string name="catalog_font_scale">Font scale %1$s×</string>
+    <string name="catalog_sample_name">Sam</string>
+    <string name="catalog_empty_title">Say hi 💌</string>
+    <string name="catalog_empty_body">Your messages with Sam will appear here.</string>
+    <string name="catalog_error">Couldn\'t load messages.</string>
+    <string name="catalog_field_label">Check-in note</string>
+    <string name="catalog_primary">Check in</string>
+    <string name="catalog_secondary">Start trip</string>
+    <string name="catalog_quiet">Not now</string>
+    <string name="catalog_receipt_saved">Saved to AshGo</string>
+    <string name="catalog_receipt_partner">Delivered to Sam\'s phone</string>
+    <string name="catalog_receipt_sms">SMS to contact 1</string>
+    <string name="catalog_receipt_seen">Sam has seen it</string>
+    <string name="catalog_hold">Hold for 3 seconds to send SOS</string>
+</resources>
