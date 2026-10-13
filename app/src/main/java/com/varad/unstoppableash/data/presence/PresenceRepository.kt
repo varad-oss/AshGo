@@ -23,6 +23,9 @@ class PresenceRepository(private val db: RtdbClient) {
     private var lastBattery: Int? = null
     private var lastCharging: Boolean? = null
 
+    /** Presence + location facts for any member of the pair (partner or me). */
+    fun snapshot(pairId: String, uid: String): Flow<PresenceSnapshot> = partnerSnapshot(pairId, uid)
+
     fun partnerSnapshot(pairId: String, partnerUid: String): Flow<PresenceSnapshot> = combine(
         db.observe(DbPaths.presence(pairId, partnerUid)).resilient(),
         db.observe(DbPaths.location(pairId, partnerUid)).resilient(),
