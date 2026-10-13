@@ -13,16 +13,42 @@ import org.junit.Test
 
 class SosRepositoryTest {
     private val db = FakeRtdb(nowMs = 500_000L)
-    private val sos = SosRepository(db)
+    private val sos = SosRepository(db, com.varad.unstoppableash.core.time.Clock { db.nowMs })
     private val p = "p1"
 
-    @Test fun raiseWritesActiveSosWithKnownLocation() = runTest {
+    @Test fun raiseWritesCoreRecordThenLocation() = runTest {
         val id = sos.newSosId(p)
         assertTrue(sos.raise(p, "alice", id, LocationFix(18.5, 73.8, 12f, 480_000L), battery = 41) is Outcome.Success)
+        assertEquals(listOf("set pairs/p1/sos/$id", "update pairs/p1/sos/$id [acc, lat, lng, locAt]"), db.writeLog.filter { "sos" in it })
         assertEquals(
-            mapOf("from" to "alice", "state" to "active", "at" to 500_000L, "lat" to 18.5, "lng" to 73.8, "locAt" to 480_000L, "acc" to 12.0, "battery" to 41L),
+            mapOf("from" to "alice", "state" to "active", "at" to 500_000L, "battery" to 41L, "lat" to 18.5, "lng" to 73.8, "locAt" to 480_000L, "acc" to 12.0),
             db.read("pairs/p1/sos/$id"),
         )
+    }
+
+    @Test fun futureDatedFixIsClampedToNow() = runTest {
+        sos.raise(p, "alice", "s1", LocationFix(1.0, 2.0, null, 560_000L), battery = null)
+        assertEquals(500_000L, db.read("pairs/p1/sos/s1/locAt"))
+    }
+
+    @Test fun raiseRetriedWithSameIdSucceedsWithoutRewriting() = runTest {
+        db.createOnly("pairs/[^/]+/sos/[^/]+")
+        assertTrue(sos.raise(p, "alice", "s1", null, null) is Outcome.Success)
+        assertTrue(sos.raise(p, "alice", "s1", null, null) is Outcome.Success)
+        assertEquals(1, db.writeLog.count { it == "set pairs/p1/sos/s1" })
+    }
+
+    @Test fun cancellingTwiceSucceedsOnce() = runTest {
+        sos.raise(p, "alice", "s1", null, null)
+        assertTrue(sos.cancel(p, "s1") is Outcome.Success)
+        assertTrue(sos.cancel(p, "s1") is Outcome.Success)
+        assertEquals(1, db.writeLog.count { it.startsWith("update pairs/p1/sos/s1 [cancelledAt") })
+    }
+
+    @Test fun partnerSosStillFoundBehindManyOfMine() = runTest {
+        db.set("pairs/p1/sos/b", mapOf("from" to "bob", "state" to "active", "at" to 10L))
+        for (i in 1..8) db.set("pairs/p1/sos/a$i", mapOf("from" to "alice", "state" to "cancelled", "at" to 10L + i, "cancelledAt" to 20L + i))
+        assertEquals("b", sos.partnerActiveSos(p, "alice").first()?.id)
     }
 
     @Test fun raiseWithoutLocationOmitsIt() = runTest {
@@ -34,7 +60,7 @@ class SosRepositoryTest {
         sos.raise(p, "alice", "s1", null, null)
         db.writeLog.clear()
         sos.cancel(p, "s1")
-        assertEquals(listOf("update pairs/p1/sos/s1 [cancelledAt, state]"), db.writeLog)
+        assertEquals(listOf("update pairs/p1/sos/s1 [cancelledAt, state]"), db.writeLog.filter { it.startsWith("update") })
         assertEquals("cancelled", db.read("pairs/p1/sos/s1/state")); assertEquals(500_000L, db.read("pairs/p1/sos/s1/cancelledAt"))
     }
 

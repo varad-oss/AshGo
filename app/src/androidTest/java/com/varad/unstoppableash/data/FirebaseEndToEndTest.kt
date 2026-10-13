@@ -61,7 +61,7 @@ class FirebaseEndToEndTest {
         assertTrue("$name signs in as a Google user", user.isGoogle)
         val rtdb = FirebaseRtdbClient(db)
         val clock = Clock { System.currentTimeMillis() }
-        return Member(user.uid, PairRepository(rtdb, gateway, clock), ChatRepository(rtdb), SosRepository(rtdb), rtdb)
+        return Member(user.uid, PairRepository(rtdb, gateway, clock), ChatRepository(rtdb), SosRepository(rtdb, clock), rtdb)
     }
 
     private suspend fun <T> Flow<T>.await(predicate: (T) -> Boolean): T = withTimeout(15_000) { first(predicate) }
@@ -99,6 +99,16 @@ class FirebaseEndToEndTest {
         assertEquals(FailureReason.PERMISSION_DENIED, (alice.sos.cancel(pairId, sosId) as Outcome.Failure).reason)
         assertTrue(bob.sos.cancel(pairId, sosId) is Outcome.Success)
         alice.sos.partnerActiveSos(pairId, alice.uid).await { it == null }
+
+        // Review C2/I2: a fast phone clock must not block the SOS; retries and double cancels succeed.
+        val sos2 = bob.sos.newSosId(pairId)
+        val futureFix = com.varad.unstoppableash.domain.model.LocationFix(18.52, 73.85, 15f, System.currentTimeMillis() + 60_000)
+        assertTrue(bob.sos.raise(pairId, bob.uid, sos2, futureFix, battery = 39) is Outcome.Success)
+        assertTrue(bob.sos.raise(pairId, bob.uid, sos2, futureFix, battery = 39) is Outcome.Success)
+        val withLocation = alice.sos.partnerActiveSos(pairId, alice.uid).await { it?.id == sos2 && it.lat != null }!!
+        assertEquals(18.52, withLocation.lat!!, 0.0001)
+        assertTrue(bob.sos.cancel(pairId, sos2) is Outcome.Success)
+        assertTrue(bob.sos.cancel(pairId, sos2) is Outcome.Success)
 
         // Outsider: can't read or write anything in the pair.
         assertEquals(FailureReason.PERMISSION_DENIED, (carol.rtdb.get(DbPaths.chat(pairId)) as Outcome.Failure).reason)

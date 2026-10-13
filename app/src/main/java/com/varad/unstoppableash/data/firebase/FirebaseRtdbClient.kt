@@ -8,9 +8,11 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import com.varad.unstoppableash.core.result.FailureReason
 import com.varad.unstoppableash.core.result.Outcome
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
@@ -44,20 +46,30 @@ class FirebaseRtdbClient(private val db: FirebaseDatabase) : RtdbClient {
     override suspend fun onDisconnectUpdate(path: String, values: Map<String, Any?>): Outcome<Unit> =
         attempt { db.getReference(path).onDisconnect().updateChildren(values).await(); Unit }
 
+    override suspend fun cancelOnDisconnect(path: String): Outcome<Unit> =
+        attempt { db.getReference(path).onDisconnect().cancel().await(); Unit }
+
+    private val failures = kotlinx.coroutines.flow.MutableSharedFlow<FailureReason>(extraBufferCapacity = 16)
+    override val readFailures: Flow<FailureReason> = failures
+
     override fun serverTimeOffset(): Flow<Long> = observe(DbPaths.SERVER_TIME_OFFSET).map { (it as? Number)?.toLong() ?: 0L }
 
     private fun listen(query: Query): Flow<Any?> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) { trySend(plain(snapshot)) }
-            override fun onCancelled(error: DatabaseError) { close(RtdbException(reasonOf(error.code), error.message)) }
+            override fun onCancelled(error: DatabaseError) {
+                val reason = reasonOf(error.code)
+                failures.tryEmit(reason)
+                close(RtdbException(reason, error.message))
+            }
         }
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }
+    }.conflate() // full snapshots: only the newest matters, never a stale backlog
 
     private suspend fun <T> attempt(block: suspend () -> T): Outcome<T> = try {
         Outcome.Success(block())
-    } catch (e: kotlinx.coroutines.CancellationException) {
+    } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         Outcome.Failure(failureReasonOf(e), e.message)

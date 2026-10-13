@@ -24,7 +24,7 @@ data class Settings(
 class SettingsStore(private val store: DataStore<Preferences>) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    val settings: Flow<Settings> = store.data.map { decode(it[KEY]) }
+    val settings: Flow<Settings> = store.data.safeData().map { decode(it[KEY]) }
 
     suspend fun update(transform: (Settings) -> Settings) {
         store.edit { prefs -> prefs[KEY] = json.encodeToString(transform(decode(prefs[KEY]))) }

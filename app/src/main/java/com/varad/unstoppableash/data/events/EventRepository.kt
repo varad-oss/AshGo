@@ -7,12 +7,13 @@ import com.varad.unstoppableash.core.time.Clock
 import com.varad.unstoppableash.data.firebase.DbPaths
 import com.varad.unstoppableash.data.firebase.Receipt
 import com.varad.unstoppableash.data.firebase.RtdbClient
+import com.varad.unstoppableash.data.firebase.orIfTrue
+import com.varad.unstoppableash.data.firebase.resilient
 import com.varad.unstoppableash.data.firebase.long
 import com.varad.unstoppableash.data.firebase.string
 import com.varad.unstoppableash.domain.model.EventType
 import com.varad.unstoppableash.domain.model.OrbitEvent
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 /** Check-ins (O-1) and nudges (O-3). "Seen" is only ever written by the partner's phone. */
@@ -20,7 +21,7 @@ class EventRepository(private val db: RtdbClient, private val clock: Clock) {
     private var lastNudgeAt: Long? = null
 
     fun events(pairId: String, limit: Int = 50): Flow<List<OrbitEvent>> =
-        db.observeLast(DbPaths.events(pairId), limit, orderByChild = "at").map(::eventsOf).catch { emit(emptyList()) }
+        db.observeLast(DbPaths.events(pairId), limit, orderByChild = "at").map(::eventsOf).resilient()
 
     suspend fun checkIn(pairId: String, uid: String, kind: String, text: String?): Outcome<String> =
         create(pairId, uid, "checkin", kind, text)
@@ -39,7 +40,8 @@ class EventRepository(private val db: RtdbClient, private val clock: Clock) {
 
     private suspend fun receipt(pairId: String, e: OrbitEvent, myUid: String, kind: Receipt, existing: Map<String, Long>): Outcome<Unit> {
         if (e.from == myUid || myUid in existing) return Outcome.Success(Unit)
-        return db.set(DbPaths.eventReceipt(pairId, e.id, kind, myUid), db.serverTimestamp)
+        val path = DbPaths.eventReceipt(pairId, e.id, kind, myUid)
+        return db.set(path, db.serverTimestamp).orIfTrue { (db.get(path) as? Outcome.Success)?.value != null }
     }
 
     private suspend fun create(pairId: String, uid: String, type: String, kind: String, text: String?): Outcome<String> {

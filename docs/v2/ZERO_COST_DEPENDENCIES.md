@@ -30,14 +30,16 @@ Last verified: 2026-10-13. Re-verify pricing before each release.
 |---|---|---|---|---|
 | AndroidX (Compose, Material3, Activity, Lifecycle, Navigation, Core) | Apache-2.0 | UI and architecture | Free | Keep, update versions |
 | `lifecycle-viewmodel-compose`, `lifecycle-runtime-compose` | Apache-2.0 | ViewModels, `collectAsStateWithLifecycle` | Free | **Add** |
-| AndroidX WorkManager | Apache-2.0 | Daily cleanup, heartbeat | Free | **Add** (proposed) |
-| AndroidX DataStore | Apache-2.0 | Typed local settings | Free | **Add** (proposed) |
+| AndroidX WorkManager 2.12.0 | Apache-2.0 | Daily cleanup, heartbeat | Free | Added (dependency; used from Stage 9) |
+| AndroidX DataStore Preferences 1.2.1 | Apache-2.0 | Typed local settings and stores | Free | Added (Stage 4) |
 | Firebase Android SDK (BoM) | Apache-2.0 | Database, Auth | Free SDK | Keep, update |
 | Google Play services location | Proprietary SDK, free to use (Android SDK terms) | Fused location | Free | Keep |
 | osmdroid 6.1.18 | Apache-2.0 | Map | Free; **archived upstream 2024-11-20** | Keep for v2.0; revisit (D-7) |
 | Coil | Apache-2.0 | Image loading | Free | Keep only if needed for Base64 bitmaps; otherwise remove |
 | kotlinx-coroutines | Apache-2.0 | Concurrency | Free | Keep |
-| JUnit 4, kotlinx-coroutines-test, Turbine (proposed) | EPL-1.0 / Apache-2.0 / Apache-2.0 | Tests | Free | Add test-only |
+| JUnit 4, kotlinx-coroutines-test 1.11.0, Turbine 1.2.1 | EPL-1.0 / Apache-2.0 / Apache-2.0 | Tests | Free | Added (test-only) |
+| kotlinx-serialization-json 1.11.0 + `org.jetbrains.kotlin.plugin.serialization` 2.4.21 | Apache-2.0 | Local stores (contacts, settings, in-flight SOS) and v1 contact migration | Free | Added (Stage 4) |
+| firebase-tools 15.33.0, @firebase/rules-unit-testing 6.0.0, firebase 13.0.0 (npm, `firebase/` only) | MIT / Apache-2.0 / Apache-2.0 | Local emulator rules and end-to-end tests; never shipped in the app | Free; no project billing (demo project) | Added (Stage 3) |
 | **Nunito** typeface | SIL OFL 1.1 (OFL.txt shipped at `assets/licenses/OFL.txt`) | Brand type | Free; bundling permitted; the font can't be sold on its own | **Adopted 2026-10-14.** Variable font `fonts/variable/Nunito[wght].ttf` from github.com/googlefonts/nunito (276 932 B, SHA-256 `bb55a5ca…1e85207`) bundled as `res/font/nunito_variable.ttf`; one file serves weights 400/600/700/800. No runtime fetching. |
 | Material Symbols / Icons | Apache-2.0 | Icons | Free | Keep. Prefer specific icons over the 30 MB extended set once R8 is enabled. |
 | Firebase Emulator Suite (`firebase-tools`) | MIT (CLI), emulators free | Rules tests, local only | Free, no project billing | **Adopt** for rules tests |

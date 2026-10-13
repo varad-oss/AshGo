@@ -3,11 +3,11 @@ package com.varad.unstoppableash.data.location
 import com.varad.unstoppableash.core.result.Outcome
 import com.varad.unstoppableash.data.firebase.DbPaths
 import com.varad.unstoppableash.data.firebase.RtdbClient
+import com.varad.unstoppableash.data.firebase.resilient
 import com.varad.unstoppableash.data.firebase.double
 import com.varad.unstoppableash.data.firebase.long
 import com.varad.unstoppableash.domain.model.LocationFix
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 /** Latest-point-only location (D-14). Time is always the server's. */
@@ -25,7 +25,7 @@ class LocationRepository(private val db: RtdbClient) {
     }
 
     fun observe(pairId: String, uid: String): Flow<LocationFix?> =
-        db.observe(DbPaths.location(pairId, uid)).map(::fix).catch { emit(null) }
+        db.observe(DbPaths.location(pairId, uid)).map(::fix).resilient()
 
     companion object {
         internal fun fix(value: Any?): LocationFix? {

@@ -3,6 +3,7 @@ package com.varad.unstoppableash.data.trips
 import com.varad.unstoppableash.core.result.Outcome
 import com.varad.unstoppableash.data.firebase.DbPaths
 import com.varad.unstoppableash.data.firebase.RtdbClient
+import com.varad.unstoppableash.data.firebase.resilient
 import com.varad.unstoppableash.data.firebase.bool
 import com.varad.unstoppableash.data.firebase.double
 import com.varad.unstoppableash.data.firebase.long
@@ -11,7 +12,6 @@ import com.varad.unstoppableash.domain.model.Trip
 import com.varad.unstoppableash.domain.model.TripDestination
 import com.varad.unstoppableash.domain.model.TripState
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 /** A member may only write their own trip (rules); the partner observes it. */
@@ -36,7 +36,7 @@ class TripRepository(private val db: RtdbClient) {
         db.update(DbPaths.trip(pairId, uid), mapOf("state" to "overdue"))
 
     fun observe(pairId: String, uid: String): Flow<Trip?> =
-        db.observe(DbPaths.trip(pairId, uid)).map(::tripOf).catch { emit(null) }
+        db.observe(DbPaths.trip(pairId, uid)).map(::tripOf).resilient()
 
     private suspend fun finish(pairId: String, uid: String, state: String): Outcome<Unit> =
         db.update(DbPaths.trip(pairId, uid), mapOf("state" to state, "endedAt" to db.serverTimestamp))

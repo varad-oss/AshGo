@@ -11,12 +11,11 @@ import com.varad.unstoppableash.domain.model.SosState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /** Persists this phone's SOS state so a crash or process death mid-emergency loses nothing. */
 class ActiveSosStore(private val store: DataStore<Preferences>) {
 
-    val state: Flow<SosState> = store.data.map { decode(it[KEY]) }
+    val state: Flow<SosState> = store.data.safeData().map { decode(it[KEY]) }
 
     suspend fun save(state: SosState) {
         store.edit { prefs -> if (state == SosState.Idle) prefs.remove(KEY) else prefs[KEY] = encode(state) }
@@ -36,7 +35,7 @@ class ActiveSosStore(private val store: DataStore<Preferences>) {
         val sms: Map<String, Receipt> = emptyMap(),
     )
 
-    private fun encode(s: SosState): String = Json.encodeToString(
+    private fun encode(s: SosState): String = LenientJson.encodeToString(
         when (s) {
             is SosState.Active -> Dto("active", s.sosId, s.raisedAt, s.backend.name, s.serverAt, s.deliveredToPartnerAt, s.partnerAckAt, sms = receipts(s.sms))
             is SosState.Cancelled -> Dto("cancelled", s.sosId, cancelledAt = s.cancelledAt, sms = receipts(s.sms))
@@ -45,7 +44,7 @@ class ActiveSosStore(private val store: DataStore<Preferences>) {
     )
 
     private fun decode(json: String?): SosState {
-        val d = json?.let { runCatching { Json.decodeFromString<Dto>(it) }.getOrNull() } ?: return SosState.Idle
+        val d = json?.let { runCatching { LenientJson.decodeFromString<Dto>(it) }.getOrNull() } ?: return SosState.Idle
         val sms = d.sms.mapNotNull { (k, v) -> runCatching { k to SmsReceipt(SmsStatus.valueOf(v.status), v.failure) }.getOrNull() }.toMap()
         return when (d.kind) {
             "active" -> SosState.Active(

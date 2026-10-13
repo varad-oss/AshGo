@@ -360,7 +360,7 @@
             },
             "locAt": {
               ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && root.child('pairs').child($pairId).child('sos').child($id).child('from').val() === auth.uid",
-              ".validate": "newData.isNumber() && newData.val() <= now"
+              ".validate": "newData.isNumber() && newData.val() <= now + 300000"
             },
             "acc": {
               ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && root.child('pairs').child($pairId).child('sos').child($id).child('from').val() === auth.uid",

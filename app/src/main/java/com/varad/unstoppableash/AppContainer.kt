@@ -2,6 +2,8 @@ package com.varad.unstoppableash
 
 import android.app.Application
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -26,9 +28,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-private val Context.contactsStore by preferencesDataStore(name = "v2_emergency_contacts")
-private val Context.settingsStore by preferencesDataStore(name = "v2_settings")
-private val Context.activeSosStore by preferencesDataStore(name = "v2_active_sos")
+// A corrupt file is replaced with empty preferences instead of crashing every read.
+private fun resetOnCorruption() = ReplaceFileCorruptionHandler { emptyPreferences() }
+private val Context.contactsStore by preferencesDataStore(name = "v2_emergency_contacts", corruptionHandler = resetOnCorruption())
+private val Context.settingsStore by preferencesDataStore(name = "v2_settings", corruptionHandler = resetOnCorruption())
+private val Context.activeSosStore by preferencesDataStore(name = "v2_active_sos", corruptionHandler = resetOnCorruption())
 
 /**
  * Manual dependency wiring (ARCHITECTURE_PROPOSAL D-13). Everything is lazy so the v1 app, which
@@ -46,7 +50,7 @@ class AppContainer(private val app: Application) {
     val location by lazy { LocationRepository(rtdb) }
     val chat by lazy { ChatRepository(rtdb) }
     val events by lazy { EventRepository(rtdb, clock) }
-    val sos by lazy { SosRepository(rtdb) }
+    val sos by lazy { SosRepository(rtdb, clock) }
     val trips by lazy { TripRepository(rtdb) }
 
     val contacts by lazy { EmergencyContactsStore(app.contactsStore) }

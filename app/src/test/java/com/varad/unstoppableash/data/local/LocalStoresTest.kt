@@ -56,6 +56,22 @@ class LocalStoresTest {
         assertEquals(SosState.Idle, s.state.first())
     }
 
+    @Test fun corruptContactsAreNeverOverwritten() = runTest {
+        val ds = store("contacts3")
+        val key = androidx.datastore.preferences.core.stringPreferencesKey("emergency_contacts_json")
+        ds.updateData { it.toMutablePreferences().apply { this[key] = "[{broken" } }
+        val s = EmergencyContactsStore(ds)
+        assertEquals(false, s.add("Mum", "+911"))
+        assertEquals("[{broken", ds.data.first()[key])
+    }
+
+    @Test fun activeSosToleratesUnknownFields() = runTest {
+        val ds = store("sos2")
+        val key = androidx.datastore.preferences.core.stringPreferencesKey("active_sos_json")
+        ds.updateData { it.toMutablePreferences().apply { this[key] = """{"kind":"active","sosId":"s9","raisedAt":5,"futureField":true}""" } }
+        assertEquals("s9", (ActiveSosStore(ds).state.first() as SosState.Active).sosId)
+    }
+
     @Test fun settingsDefaultsAndUpdates() = runTest {
         val s = SettingsStore(store("settings"))
         assertEquals(Settings(), s.settings.first())

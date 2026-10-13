@@ -21,7 +21,10 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     private var root: Map<String, Any?> = emptyMap()
     private val version = MutableStateFlow(0L)
     private val writeFailures = mutableMapOf<String, FailureReason>()
-    private val readFailures = mutableSetOf<String>()
+    private val readFailurePaths = mutableSetOf<String>()
+    private val createOnly = mutableListOf<Regex>()
+    private val failureEvents = kotlinx.coroutines.flow.MutableSharedFlow<FailureReason>(extraBufferCapacity = 16)
+    override val readFailures: Flow<FailureReason> = failureEvents
     private var keyCounter = 0
 
     val connectedState = MutableStateFlow(true)
@@ -33,14 +36,17 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
 
     fun failWrites(pathPrefix: String, reason: FailureReason) { writeFailures[pathPrefix] = reason }
     /** Observing under [pathPrefix] terminates with [RtdbException] (as rules denying a read do). */
-    fun failReads(pathPrefix: String) { readFailures += pathPrefix }
-    fun clearFailures() { writeFailures.clear(); readFailures.clear() }
+    fun failReads(pathPrefix: String) { readFailurePaths += pathPrefix; version.value++ }
+    fun clearFailures() { writeFailures.clear(); readFailurePaths.clear(); version.value++ }
+    /** Mimics rules like memberB / SOS / chat that only allow creating, never overwriting. */
+    fun createOnly(pathPattern: String) { createOnly += Regex(pathPattern) }
     fun read(path: String): Any? = readAt(root, segments(path))
 
     override fun observe(path: String): Flow<Any?> = counted(version.map { checkRead(path); read(path) })
 
     override fun observeLast(path: String, limit: Int, orderByChild: String?): Flow<Any?> = counted(
         version.map {
+            checkRead(path)
             val children = (read(path) as? Map<*, *>)?.entries?.map { it.key as String to it.value } ?: return@map null
             val sorted = if (orderByChild == null) children.sortedBy { it.first }
             else children.sortedBy { ((it.second as? Map<*, *>)?.get(orderByChild) as? Number)?.toLong() ?: Long.MIN_VALUE }
@@ -50,7 +56,12 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
 
     override suspend fun get(path: String): Outcome<Any?> = Outcome.Success(read(path))
 
-    override suspend fun set(path: String, value: Any?): Outcome<Unit> = write("set $path", path) {
+    override suspend fun set(path: String, value: Any?): Outcome<Unit> {
+        if (createOnly.any { it.matches(path) } && read(path) != null) return Outcome.Failure(FailureReason.PERMISSION_DENIED, "exists")
+        return setUnchecked(path, value)
+    }
+
+    private suspend fun setUnchecked(path: String, value: Any?): Outcome<Unit> = write("set $path", path) {
         root = writeAt(root, segments(path), resolve(value))
     }
 
@@ -72,6 +83,11 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         return Outcome.Success(Unit)
     }
 
+    override suspend fun cancelOnDisconnect(path: String): Outcome<Unit> {
+        onDisconnectWrites.remove(path)
+        return Outcome.Success(Unit)
+    }
+
     /** Simulates the connection dropping: applies queued onDisconnect writes. */
     suspend fun disconnect() {
         connectedState.value = false
@@ -89,7 +105,10 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     }
 
     private fun checkRead(path: String) {
-        if (readFailures.any { path == it || path.startsWith("$it/") }) throw RtdbException(FailureReason.PERMISSION_DENIED, "denied")
+        if (readFailurePaths.any { path == it || path.startsWith("$it/") }) {
+            failureEvents.tryEmit(FailureReason.PERMISSION_DENIED)
+            throw RtdbException(FailureReason.PERMISSION_DENIED, "denied")
+        }
     }
 
     private fun counted(source: Flow<Any?>): Flow<Any?> = flow {

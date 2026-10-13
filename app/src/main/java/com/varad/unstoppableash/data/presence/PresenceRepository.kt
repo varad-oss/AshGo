@@ -4,6 +4,7 @@ import com.varad.unstoppableash.core.result.Outcome
 import com.varad.unstoppableash.core.result.then
 import com.varad.unstoppableash.data.firebase.DbPaths
 import com.varad.unstoppableash.data.firebase.RtdbClient
+import com.varad.unstoppableash.data.firebase.resilient
 import com.varad.unstoppableash.data.firebase.bool
 import com.varad.unstoppableash.data.firebase.int
 import com.varad.unstoppableash.data.firebase.long
@@ -11,7 +12,6 @@ import com.varad.unstoppableash.data.location.LocationRepository
 import com.varad.unstoppableash.domain.model.PresenceSnapshot
 import com.varad.unstoppableash.domain.model.SharingMode
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlin.math.abs
 
@@ -24,8 +24,8 @@ class PresenceRepository(private val db: RtdbClient) {
     private var lastCharging: Boolean? = null
 
     fun partnerSnapshot(pairId: String, partnerUid: String): Flow<PresenceSnapshot> = combine(
-        db.observe(DbPaths.presence(pairId, partnerUid)).catch { emit(null) },
-        db.observe(DbPaths.location(pairId, partnerUid)).catch { emit(null) },
+        db.observe(DbPaths.presence(pairId, partnerUid)).resilient(),
+        db.observe(DbPaths.location(pairId, partnerUid)).resilient(),
     ) { presence, location ->
         val p = presence as? Map<*, *> ?: emptyMap<Any, Any>()
         val fix = LocationRepository.fix(location)

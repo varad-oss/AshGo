@@ -34,9 +34,9 @@ class PairRepositoryTest {
         assertTrue(repo.join(invite, "Bob") is Outcome.Success)
     }
 
-    @Test fun createPairWritesMetaThenProfileThenPointer() = runTest {
+    @Test fun createPairWritesMetaThenPointerThenProfile() = runTest {
         val pid = created()
-        assertEquals(listOf("set pairs/$pid/meta", "set pairs/$pid/profiles/alice", "set userPairs/alice"), db.writeLog)
+        assertEquals(listOf("set pairs/$pid/meta", "set userPairs/alice", "set pairs/$pid/profiles/alice"), db.writeLog)
         assertEquals(mapOf("memberA" to "alice", "relationship" to "PARTNER", "createdAt" to db.nowMs), db.read("pairs/$pid/meta"))
         assertEquals(mapOf("name" to "Alice", "email" to "alice@example.com", "greeting" to true), db.read("pairs/$pid/profiles/alice"))
         assertEquals(pid, db.read("userPairs/alice"))
@@ -73,7 +73,7 @@ class PairRepositoryTest {
         val pid = created(); db.writeLog.clear()
         joinedAsBob(pid)
         assertEquals(
-            listOf("set invites/bob,smith@example,com/$pid", "set pairs/$pid/meta/memberB", "set pairs/$pid/profiles/bob", "set userPairs/bob", "remove invites/bob,smith@example,com/$pid"),
+            listOf("set invites/bob,smith@example,com/$pid", "set pairs/$pid/meta/memberB", "set userPairs/bob", "set pairs/$pid/profiles/bob", "remove invites/bob,smith@example,com/$pid"),
             db.writeLog,
         )
     }
@@ -106,6 +106,48 @@ class PairRepositoryTest {
             assertEquals("alice", paired.myUid); assertEquals("bob", paired.partnerUid); assertEquals("Bob", paired.partner?.name)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test fun joinResumesAfterAPartialFailure() = runTest {
+        db.createOnly("pairs/[^/]+/meta/memberB")
+        val pid = created()
+        repo.invite("Bob.Smith@example.com", "Alice")
+        auth.user.value = bob
+        val invite = repo.myInvites().first().single()
+        db.failWrites("userPairs/bob", FailureReason.OFFLINE)
+        assertTrue(repo.join(invite, "Bob") is Outcome.Failure)
+        db.clearFailures()
+        assertTrue(repo.join(invite, "Bob") is Outcome.Success)
+        assertEquals(1, db.writeLog.count { it == "set pairs/$pid/meta/memberB" })
+        assertEquals(pid, db.read("userPairs/bob"))
+    }
+
+    @Test fun createPairResumesInsteadOfOrphaning() = runTest {
+        db.failWrites("pairs", FailureReason.OFFLINE)
+        db.clearFailures()
+        db.failWrites("userPairs/alice", FailureReason.OFFLINE)
+        assertTrue(repo.createPair(Relationship.PARTNER, "Alice") is Outcome.Failure)
+        db.clearFailures()
+        val first = db.writeLog.count { it.endsWith("/meta") }
+        val pid = created()
+        assertEquals(pid, db.read("userPairs/alice"))
+        val metas = (db.read("pairs") as Map<*, *>).keys
+        assertEquals("no orphan pair left behind", 1, metas.size)
+        assertTrue(first <= 1)
+    }
+
+    @Test fun blankNameWithoutGoogleNameIsRejectedBeforeWriting() = runTest {
+        auth.user.value = alice.copy(displayName = null)
+        assertEquals(FailureReason.INVALID, (repo.createPair(Relationship.PARTNER, "   ") as Outcome.Failure).reason)
+        assertTrue(db.writeLog.isEmpty())
+    }
+
+    @Test fun leaveCancelsThePresenceDisconnectHandler() = runTest {
+        val pid = created()
+        com.varad.unstoppableash.data.presence.PresenceRepository(db).goOnline(pid, "alice")
+        repo.leave(pid)
+        db.disconnect()
+        assertNull("no presence residue after leaving", db.read("pairs/$pid"))
     }
 
     @Test fun signedOutIsNotSignedIn() = runTest {

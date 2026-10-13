@@ -26,6 +26,8 @@ class FirebaseAuthGateway(private val auth: FirebaseAuth) : AuthGateway {
         // a fresh Google session also guarantees the token's sign_in_provider is google.com.
         val result = auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
         result.user?.toAuthUser()?.let { Outcome.Success(it) } ?: Outcome.Failure(FailureReason.UNKNOWN)
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
     } catch (e: FirebaseNetworkException) {
         Outcome.Failure(FailureReason.OFFLINE, e.message)
     } catch (e: Exception) {

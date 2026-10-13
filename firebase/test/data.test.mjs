@@ -151,6 +151,12 @@ test('partner acks with server time; sender cannot ack own SOS', async () => {
   await assertFails(set(ref(b, pp(`sos/s1/ackBy/${A}`)), now()));
 });
 
+test('SOS location time tolerates a few minutes of phone-clock skew, not more', async () => {
+  await assertSucceeds(raise(a, A));
+  await assertSucceeds(update(ref(a, pp('sos/s1')), { lat: 1, lng: 2, locAt: Date.now() + 60_000 }));
+  await assertFails(update(ref(a, pp('sos/s1')), { lat: 1, lng: 2, locAt: Date.now() + 10 * 60_000 }));
+});
+
 test('only the sender updates SMS counts and location', async () => {
   await assertSucceeds(raise(a, A));
   await assertSucceeds(update(ref(a, pp('sos/s1')), { smsSent: 2, smsFailed: 1 }));

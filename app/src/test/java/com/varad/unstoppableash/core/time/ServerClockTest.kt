@@ -14,6 +14,12 @@ class ServerClockTest {
         assertEquals(1_000L, clock.now())
     }
 
+    @Test fun offsetErrorDoesNotCrashAndKeepsLastOffset() = runTest(UnconfinedTestDispatcher()) {
+        val offsets = kotlinx.coroutines.flow.flow { emit(100L); throw IllegalStateException("listener cancelled") }
+        val clock = ServerClock(offsets, backgroundScope) { 1_000L }
+        assertEquals(1_100L, clock.now())
+    }
+
     @Test fun appliesLatestOffset() = runTest(UnconfinedTestDispatcher()) {
         val offsets = MutableStateFlow(0L)
         val clock = ServerClock(offsets, backgroundScope) { 1_000L }
