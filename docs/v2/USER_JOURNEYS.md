@@ -106,7 +106,7 @@ Covered by J2.4–5: both see the other's Google avatar and email before the pai
 | A toast says "SOS TRIGGERED" regardless. SMS is sent only if sharing is on, possibly with 0,0 coordinates, and probably fails because of UCS-2 length. | No SMS permission | Explicit "SMS off" row, plus Call buttons. |
 | | No location | SMS says "Location unavailable". |
 | | No internet | SMS still goes; the AshGo row shows "Waiting for connection". |
-| | Accidental press | The countdown with Cancel. |
+| | Accidental press | A tap never sends; it needs a 3 s hold. Hold "I'm safe" to cancel, with an optional false-alarm SMS to already-texted contacts. |
 
 ## J11. Pause, change device, leave
 - **Pause:** "Pause sharing for 1 h / until I turn it back on". B sees **Paused**. No alarms fire.

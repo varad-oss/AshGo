@@ -101,7 +101,7 @@ Text chat works with photos disabled. Cloud Storage is rejected (Blaze-only).
 - **Revisit** MapLibre + OpenFreeMap in v2.1 (upstream archived, and the vector look would match the brand better).
 
 ## D-8 Volume-key accessibility SOS — **Recommended: remove**
-It collides with normal volume use, is blocked by restricted settings on sideloaded installs, and requests over-broad accessibility events. It is replaced by the Quick Settings tile, the safe widget, and the notification action, all routed through the countdown.
+It collides with normal volume use, is blocked by restricted settings on sideloaded installs, and requests over-broad accessibility events. It is replaced by the Quick Settings tile, the safe widget, and the notification action, all routed through the SOS hold screen.
 
 ## D-9 Signing continuity — **Owner action + Recommended**
 Existing installs are signed with this Mac's debug key.
