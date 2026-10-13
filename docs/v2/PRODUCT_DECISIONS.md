@@ -9,7 +9,29 @@ Nothing here is final until the owner reviews it. Decisions marked Recommended a
 
 ---
 
-## D-1 Identity and pairing model — **Recommended: (A), open question Q-1**
+## D-1 Identity and pairing model — **Decided 2026-10-13: (C) Google Sign-In**
+
+**Owner chose C.** Consequences:
+- **Identity:** a Firebase Auth Google provider via AndroidX Credential Manager + `googleid` (Apache-2.0, free; Google sign-in is a "non-phone" provider and free on Spark).
+- **Recovery:** signing in with the same Google account on a new phone restores the same UID and access, with no partner approval needed.
+- **Pairing proposal:** invite **by email** instead of by code.
+  1. A enters B's Google email.
+  2. The invite is stored under a hash of that email.
+  3. Rules allow joining only when `auth.token.email` matches **and** `auth.token.email_verified == true`, and the pair has fewer than 2 members.
+
+  This removes guessable codes entirely. A short "Is this you, B?" confirmation (avatar + email shown on both sides) replaces orbit words. A QR code remains an optional convenience.
+- **Migration:** on the first v2 launch, call `linkWithCredential` on the existing anonymous user, so the UID is preserved where possible. If the Google account is already linked elsewhere, sign in instead and re-import.
+- **Owner setup (one-time, free):**
+  1. Firebase console → Authentication → enable the **Google** provider.
+  2. Project settings → Android app `com.varad.unstoppableash` → add the signing certificate fingerprints:
+     - SHA-1 `43:16:66:AE:F0:61:DD:BF:09:CB:39:8F:8A:4F:51:B6:CC:80:ED:FC`
+     - SHA-256 `89:93:8A:55:…:53:9A:56`
+
+     These belong to this Mac's debug key, which also signed the shipped APK. Verified with `apksigner`. They are public certificate fingerprints, not secrets.
+  3. Re-download `google-services.json`; it must then contain an `oauth_client` of type 3, the web client ID.
+- **Privacy note:** each member's Google email and display name become visible to their partner, and are stored in the pair's profile only with consent at pairing.
+
+### Original comparison (kept for the record)
 
 | Option | How | Pros | Cons | ₹0 |
 |---|---|---|---|---|
@@ -133,7 +155,7 @@ Cleanup runs at most once a day from either phone, using server-time cutoffs.
 | Bundled personal photos and voice recording | Replaced by on-device "Our page" and user-chosen fake-call audio. |
 
 ## Open questions for the owner
-- **Q-1 (blocking for architecture):** Identity: A (no accounts, partner-approved recovery), B (email/password) or C (Google Sign-In)? *Recommendation: A.*
+- ~~**Q-1:** Identity~~: **Answered: C, Google Sign-In** (see D-1).
 - **Q-2:** Make the main repo private, or keep it public and scrub personal media?
 - **Q-3:** SOS activation: hold 3 s **plus** a 5 s cancellable countdown, or hold only?
 - **Q-4:** Are the retention defaults in D-14 acceptable? In particular, should precise location be cleared when sharing pauses?

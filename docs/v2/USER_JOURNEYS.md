@@ -22,23 +22,24 @@ People are called **A** (sets up the orbit) and **B** (joins). Either one can be
 |---|---|---|
 | Five permissions requested at once, then "Traveler or Receiver?" | Users deny everything and features silently fail. | Just-in-time permissions (O-25); a Reliability screen shows what is off. |
 
-## J2. Create or join a private orbit
-1. A taps **Create our orbit**, sets their name and an optional avatar, and picks a relationship label (Partner / Family / Best friends / Trusted person).
-2. A sees a QR code plus a 10-character code: "Valid for 10 minutes · single use".
-3. B taps **Join an orbit** and scans or types the code.
-4. **Both** screens show the same four orbit words (e.g. 🌙 maple · ⭐ river · 🍓 cloud · 🪐 pebble). Each taps **They match**.
-5. The orbit is sealed. Home shows the partner with "Connected just now".
+## J2. Create or join a private orbit (Google Sign-In, per D-1)
+1. Each person taps **Continue with Google** and picks an account from the system sheet.
+2. A taps **Create our orbit**, sets a display name and an optional avatar (defaults to the Google photo, downscaled), and picks a relationship label (Partner / Family / Best friends / Trusted person).
+3. A enters B's Gmail address: "Invite valid for 24 hours".
+4. B signs in with **that** Google account and sees "A invited you to their orbit" with A's name, avatar and email. B taps **Join**.
+5. A sees "B joined" with B's avatar and email, and taps **Yes, that's them**. The orbit is sealed, and Home shows the partner with "Connected just now".
 
 | Today | Friction / failure | Mitigation |
 |---|---|---|
-| None. Any install sees all data. | The code expires before use. | One-tap "new code". |
-| | Wrong person joins (a shared screenshot). | Orbit words don't match, so tap "They don't match" → the pair is dissolved and the invite revoked. |
+| None. Any install sees all data. | B signs in with a different Google account. | "No invite for this account". The app shows the signed-in email and offers to switch account. |
+| | Typo in the email. | The invite never matches anyone. A can cancel or edit it at any time. |
+| | Wrong person joins | Only possible with the invited, verified Google email (enforced by the rules). A can still tap "That's not them", which removes them and revokes the invite. |
 | | No internet. | "We need a connection to create your orbit." Nothing is half-created. |
-| | A third phone tries to join. | Rules reject it: "This orbit is already complete." |
+| | A third account tries to join. | Rules reject it: "This orbit is already complete." |
 
 ## J3. Verify the right person joined
-Covered by orbit words (J2.4).
-- **Later:** Settings → Orbit shows the partner's name, when they joined, and their device's last connection. The orbit words can be re-checked at any time.
+Covered by J2.4–5: both see the other's Google avatar and email before the pair is sealed.
+- **Later:** Settings → Orbit shows the partner's name, email, when they joined, and their last connection.
 
 ## J4. Configure sharing and permissions (just in time)
 
@@ -109,7 +110,7 @@ Covered by orbit words (J2.4).
 
 ## J11. Pause, change device, leave
 - **Pause:** "Pause sharing for 1 h / until I turn it back on". B sees **Paused**. No alarms fire.
-- **Change device:** on the new phone, tap **Join an orbit** → B's app shows "A wants to join from a new device. Approve?" → orbit words → the old device is removed. *(This depends on the D-1 identity decision.)*
+- **Change device:** install AshGo on the new phone → **Continue with Google** with the same account → the orbit is restored (same UID). B gets a quiet notice: "A signed in on a new phone". Local-only data (emergency contacts, fake-call audio) must be re-added; the app says so before you leave the old phone.
 - **Leave:** Settings → Orbit → Leave. The confirmation lists exactly what will be deleted. The partner sees "Orbit ended".
 
 ## J12. Recovering from errors
