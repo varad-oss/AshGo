@@ -28,7 +28,7 @@ sealed interface TimelineItem {
         val showTime: Boolean,
     ) : TimelineItem { override val key = "m:$id" }
 
-    data class EventChip(val event: OrbitEvent) : TimelineItem { override val key = "e:${event.id}" }
+    data class EventChip(val event: OrbitEvent, val mine: Boolean) : TimelineItem { override val key = "e:${event.id}" }
 }
 
 fun buildTimeline(
@@ -49,7 +49,7 @@ fun buildTimeline(
                 else -> BubbleStatus.SENT
             }
             m.at to TimelineItem.Bubble(m.id, mine, m.text, m.mediaId, m.at, status, showTime = true)
-        } + events.map { it.at to TimelineItem.EventChip(it) }
+        } + events.map { it.at to TimelineItem.EventChip(it, mine = it.from == myUid) }
     // My unconfirmed sends always sit at the end, in the order I wrote them, so they never jump around.
     val pending = outbox.filter { it.id !in onServer }.sortedBy { it.createdAt }.map { o ->
         o.createdAt to TimelineItem.Bubble(
