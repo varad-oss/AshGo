@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.data.pair
 
+import com.varad.unstoppableash.data.firebase.long
 import com.varad.unstoppableash.domain.model.Invite
 import com.varad.unstoppableash.domain.model.PairMeta
 import com.varad.unstoppableash.domain.model.Profile
@@ -47,5 +48,4 @@ internal object PairMappers {
             )
         }.orEmpty()
 
-    private fun Map<*, *>.long(key: String): Long? = (this[key] as? Number)?.toLong()?.takeIf { it > 0 }
 }
