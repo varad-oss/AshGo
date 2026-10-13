@@ -120,7 +120,7 @@ private fun MainShell(container: AppContainer) {
                     onNudge = home::nudge,
                     onDismissError = home::dismissError,
                 ),
-                padding.safeDrawingPadding(),
+                padding, // the scaffold's padding already includes the system bars
             )
             Tab.MAP, Tab.CHAT, Tab.SAFETY -> ComingLater(padding)
         }
