@@ -32,7 +32,11 @@ No secret values are reproduced in this document.
   - Reinstalling the app or clearing its data creates a new anonymous UID, and nothing stops it from working. That shows UID is not used for authorization at all.
 - **Fix direction:** add real per-person identity, bind exactly two UIDs into a `pair`, and write rules that check membership. See ARCHITECTURE_PROPOSAL (pending).
 
-### S10 🔴 `notifications` is world-readable and world-writable (CONFIRMED 2026-10-14 from deployed rules)
+### S10 ✅ CLOSED 2026-10-14 — `notifications` was world-readable and world-writable
+
+**Closed:** the owner deployed the phase-1 rules. A read-only probe then got HTTP 401 for an unauthenticated read **and** write of `notifications` (both were open before).
+
+**Original finding:**
 - The deployed rules give `notifications` `".read": true, ".write": true`, so anyone on the internet can write there **without the APK or any sign-in**.
 - v1's `TrackingService` and `ReceiverService` show whatever title and message are written to `notifications/traveler|receiver`, and force the alarm stream to maximum volume.
 - **Impact:**

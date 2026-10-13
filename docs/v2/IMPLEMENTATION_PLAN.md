@@ -769,3 +769,93 @@ The `demo-` project ID guarantees nothing ever talks to the real project.
 - all unit, rules and connected tests pass
 - lint has no new issues
 - a fresh review of the stage
+
+
+---
+
+## Stage 5 — Onboarding, navigation shell, Home (detailed, written 2026-10-14)
+
+**Production state:** phase-1 rules deployed by the owner. Probe: unauthenticated read and write of `notifications` → 401.
+
+**Approach:**
+- Screens are **stateless**, taking a `UiState` plus callbacks, and are tested with Compose UI tests using hand-built states.
+- ViewModels are tested on the JVM with `FakeRtdb` / `FakeAuthGateway` and a test main dispatcher.
+- v2 is reachable only through a **debug-only launcher activity** (`V2Activity`, registered in `src/debug/AndroidManifest.xml`). The v1 `MainActivity` stays the release launcher until Stage 11.
+
+**Dev loop on the emulator:**
+- In debug builds, `V2Activity` accepts `--ez useEmulators true`. It then points Firebase at `10.0.2.2` and offers a "Dev sign-in" (an Auth-emulator fake Google token), so the full flow can be exercised and screenshotted without real accounts.
+- Real Credential Manager sign-in is the production path; the owner checks it once on a device.
+
+### Task 5.1 — Presence ticker + Home state
+**Files:** `feature/home/HomeUiState.kt`, `feature/home/HomeViewModel.kt`, `feature/home/PresenceTicker.kt`.
+
+**Tests (JVM):**
+- Presence is re-evaluated every 30 s without a new snapshot (Live → Recent after 2 min)
+- No partner location → never Live
+- Home combines:
+  - the partner's name and avatar
+  - the partner's presence and battery
+  - my sharing mode
+  - unread count
+  - the partner's latest check-in
+  - the partner's active SOS
+  - the partner's trip
+- Check-in and nudge results surface as `Sending → Saved | Failed(reason)`
+- `RATE_LIMITED` surfaces as its own message
+- `readFailures` raises `offline/error` banners
+
+### Task 5.2 — Onboarding state machine
+**Files:** `feature/onboarding/OnboardingViewModel.kt`, `OnboardingUiState.kt`.
+
+**Steps:** `SignIn → Choose → CreateProfile → InvitePartner → Waiting → ConfirmPartner (memberA) / WaitingForConfirmation (memberB) → Done`, and `Choose → Invitations → Join`.
+
+**Tests (JVM):**
+- Step derivation from `PairState` + invites
+- Name and email validation messages
+- "That's not them" leaves
+- Failures keep the user on the same step with the reason
+
+### Task 5.3 — Onboarding screens
+**Files:** `feature/onboarding/*Screen.kt`, `strings_v2.xml`.
+
+**UI tests:**
+- Continue-with-Google button present
+- Create disabled until a name is entered
+- Invalid email shows an error
+- Invitation shows the inviter's **email** (D-16)
+- Confirm screen shows the partner's avatar and email
+
+### Task 5.4 — Home screen + check-in sheet
+**Files:** `feature/home/HomeScreen.kt`, `CheckInSheet.kt`.
+
+**UI tests:**
+- Every presence state renders, and "Live" appears only for Live
+- No location → no map preview
+- The SOS row exists, a tap doesn't send, and it's separated from the actions
+- The partner-SOS banner appears when an SOS is active
+- The unread badge shows
+- `OfflineBar` shows on failures
+- Layout works at 2.0× font
+
+### Task 5.5 — Navigation shell, V2Activity, sign-in glue, settings shell
+**Files:**
+- `ui/nav/AshGoNavHost.kt`, `ui/nav/Destinations.kt`
+- `feature/settings/SettingsScreen.kt` (profile summary, theme, Leave orbit, Sign out)
+- `feature/onboarding/GoogleSignIn.kt` (Credential Manager)
+- `V2Activity.kt` (main source, edge-to-edge, status-bar icons follow the theme)
+- `src/debug/AndroidManifest.xml` launcher entry
+- `data/dev/DevFirebase.kt` (debug-only emulator wiring)
+
+**Tests:**
+- Nav: signed-out → onboarding
+- Paired → Home with the 4 tabs
+- Not-yet-built tabs show a clear "Coming in a later stage" state (debug build only)
+
+### Task 5.6 — Manual verification on the emulator (recorded)
+Run the full flow against the emulators:
+1. Dev sign-in as A
+2. Create the orbit, invite B
+3. Seed B joining via an admin script
+4. Confirm, then view Home with seeded presence
+
+Screenshots go in the stage report. A fresh review of the stage follows.
