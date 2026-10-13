@@ -39,13 +39,14 @@ fun StatusPill(name: String, state: PresenceState, modifier: Modifier = Modifier
             .clip(CircleShape)
             .background(container)
             .then(
-                if (v.dashed) Modifier.drawBehind {
+                if (v.border == PillBorder.NONE) Modifier else Modifier.drawBehind {
+                    val dash = if (v.border == PillBorder.DASHED) PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null
                     drawRoundRect(
                         color = v.ink,
                         cornerRadius = CornerRadius(size.height / 2),
-                        style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))),
+                        style = Stroke(width = 1.dp.toPx(), pathEffect = dash),
                     )
-                } else Modifier,
+                },
             )
             .padding(horizontal = Spacing.md, vertical = 6.dp)
             .clearAndSetSemantics {

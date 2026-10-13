@@ -7,7 +7,8 @@ import androidx.compose.ui.res.stringResource
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.domain.time.AgeUnit
 import com.varad.unstoppableash.domain.time.formatAge
-import java.util.Date
+import android.text.format.DateUtils
+import java.time.ZoneId
 
 /** "4 min ago" / "just now" — visible form. */
 @Composable
@@ -35,7 +36,14 @@ fun longAgeAgo(ageMs: Long): String {
     return stringResource(R.string.age_ago, unit)
 }
 
-/** Wall-clock time in the user's 12/24 h preference, e.g. "6:40 PM". */
+/** "6:40 PM" today, "Fri 6:40 PM" this week, "Oct 3, 6:40 PM" otherwise — never implies today when it isn't. */
 @Composable
-fun timeOfDay(epochMs: Long): String =
-    android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(epochMs))
+fun lastSeenText(epochMs: Long): String {
+    val context = LocalContext.current
+    val flags = when (lastSeenFormat(epochMs, System.currentTimeMillis(), ZoneId.systemDefault())) {
+        LastSeenFormat.TIME_ONLY -> DateUtils.FORMAT_SHOW_TIME
+        LastSeenFormat.WEEKDAY_TIME -> DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_ABBREV_WEEKDAY
+        LastSeenFormat.DATE_TIME -> DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH
+    }
+    return DateUtils.formatDateTime(context, epochMs, flags)
+}

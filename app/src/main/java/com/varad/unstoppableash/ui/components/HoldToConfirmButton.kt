@@ -21,7 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
@@ -35,8 +35,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -50,6 +55,7 @@ import com.varad.unstoppableash.R
 import com.varad.unstoppableash.ui.theme.Orbit
 import com.varad.unstoppableash.ui.theme.Spacing
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -83,10 +89,14 @@ fun HoldToConfirmButton(
     enabled: Boolean = true,
     visibleText: String = label,
 ) {
+    require(holdMillis > 0) { "holdMillis must be positive" }
     val confirm by rememberUpdatedState(onConfirmed)
+    val currentEnabled by rememberUpdatedState(enabled)
     val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
     var holding by remember { mutableStateOf(false) }
+    var elapsedSeconds by remember { mutableIntStateOf(0) }
+    val totalSeconds = ((holdMillis + 999) / 1_000).toInt()
+    val progressText = pluralStringResource(R.plurals.hold_progress, totalSeconds, elapsedSeconds, totalSeconds)
     var progress by remember { mutableFloatStateOf(0f) }
     var releasedEarly by remember { mutableStateOf(false) }
 
@@ -105,9 +115,10 @@ fun HoldToConfirmButton(
                 .clip(CircleShape)
                 .background(colors.container)
                 .alpha(if (enabled) 1f else 0.38f)
-                .semantics {
+                .clearAndSetSemantics {
                     role = Role.Button
                     contentDescription = label
+                    if (holding) stateDescription = progressText
                     if (enabled) {
                         customActions = listOf(CustomAccessibilityAction(label) { confirm(); true })
                     } else {
@@ -116,26 +127,39 @@ fun HoldToConfirmButton(
                 }
                 .pointerInput(enabled, holdMillis) {
                     if (!enabled) return@pointerInput
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        releasedEarly = false
-                        holding = true
-                        var confirmed = false
-                        val timer: Job = scope.launch {
-                            val wholeSeconds = (holdMillis / 1_000).toInt()
-                            repeat((wholeSeconds - 1).coerceAtLeast(0)) {
-                                delay(1_000)
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    // The timer is a child of this block's scope, so any restart (key change,
+                    // disable, leaving composition) cancels it together with the gesture.
+                    coroutineScope {
+                        val gestureScope = this
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            releasedEarly = false
+                            holding = true
+                            elapsedSeconds = 0
+                            var confirmed = false
+                            val timer: Job = gestureScope.launch {
+                                val ticks = ((holdMillis - 1) / 1_000).toInt()
+                                repeat(ticks) {
+                                    delay(1_000)
+                                    elapsedSeconds = it + 1
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                delay(holdMillis - ticks * 1_000L)
+                                if (currentEnabled) {
+                                    confirmed = true
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    confirm()
+                                }
                             }
-                            delay(holdMillis - (wholeSeconds - 1).coerceAtLeast(0) * 1_000L)
-                            confirmed = true
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            confirm()
+                            try {
+                                waitForUpOrCancellation()
+                            } finally {
+                                timer.cancel()
+                                holding = false
+                                elapsedSeconds = 0
+                            }
+                            releasedEarly = !confirmed
                         }
-                        waitForUpOrCancellation()
-                        timer.cancel()
-                        holding = false
-                        releasedEarly = !confirmed
                     }
                 },
             contentAlignment = Alignment.Center,
@@ -150,7 +174,8 @@ fun HoldToConfirmButton(
                 color = colors.content,
                 style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(Spacing.lg),
+                // Decorative: the circle's contentDescription already says it, so no second focus stop.
+                modifier = Modifier.padding(Spacing.lg).clearAndSetSemantics {},
             )
         }
         if (releasedEarly) {
@@ -158,6 +183,7 @@ fun HoldToConfirmButton(
                 stringResource(R.string.hold_released_early),
                 color = Orbit.colors.textSecondary,
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
     }

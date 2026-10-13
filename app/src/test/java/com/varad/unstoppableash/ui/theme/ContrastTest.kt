@@ -37,6 +37,7 @@ class ContrastTest {
         assertReadable("text/lavender", text, lavender)
         assertReadable("goodInk/goodBg", goodInk, goodBg)
         assertReadable("warnInk/warnBg", warnInk, warnBg)
+        assertReadable("goodInk/surfaceWarm (Recent pill)", goodInk, surfaceWarm)
         assertReadable("onSos/sos", onSos, sos)
         assertReadable("sosText/background", sosText, background)
     }
@@ -53,6 +54,7 @@ class ContrastTest {
         assertReadable("text/lavender", text, lavender)
         assertReadable("goodInk/goodBg", goodInk, goodBg)
         assertReadable("warnInk/warnBg", warnInk, warnBg)
+        assertReadable("goodInk/surfaceWarm (Recent pill)", goodInk, surfaceWarm)
         assertReadable("onSos/sos", onSos, sos)
         assertReadable("sosText/background", sosText, background)
     }
