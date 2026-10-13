@@ -4,6 +4,9 @@ import android.app.Application
 import com.google.firebase.database.FirebaseDatabase
 
 class AshGoApplication : Application() {
+    /** v2 dependencies; lazy so v1 behaviour is unchanged until v2 code uses it. */
+    val container: AppContainer by lazy { AppContainer(this) }
+
     override fun onCreate() {
         super.onCreate()
         try {
