@@ -53,6 +53,16 @@ Companion docs:
 | `warnInk` | `#F4C27A` | 10.88:1 |
 | `sos` button | `#D32F2F` with white text | 4.98:1 |
 | `sosText` | `#FFB4AB` | 10.48:1 |
+| `surfaceWarm` | `#32262F` | text on it 12.12:1 |
+| `blush` (my bubble) | `#4A2B3B` | text on it 10.37:1 |
+| `lavender` (partner bubble, paused chip) | `#3B2F4D` | text on it 10.37:1 |
+| `goodBg` / `goodInk` | `#1F3527` / `#9FD3B0` | 7.78:1 |
+| `warnBg` / `warnInk` | `#3D2E14` / `#F4C27A` | 8.03:1 |
+| `outline` | text @ 12 % | — |
+
+In dark mode `lavender` is a container colour; text on it uses `text`. The light `#D9C8F2` accent from the conversation is not a separate token.
+Light `sosText` (SOS-coloured text on cream) is `#B3261E`, 6.19:1.
+All pairs are enforced by `ContrastTest` (JVM).
 
 Contrast was computed with the WCAG 2.x relative-luminance formula. All text pairs are ≥ 4.5:1.
 
