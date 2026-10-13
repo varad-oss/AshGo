@@ -180,6 +180,7 @@ Helper: `isMember = root.child('pairs/'+$pairId+'/meta/memberA').val() === auth.
 | `LocationShareService` | `location` | user toggles sharing / starts a trip (visible activity) | pause/off; `sharingUntil` reached; trip end + idle policy |
 | Overdue prompt | exact alarm (`SCHEDULE_EXACT_ALARM`, fallback inexact + partner-side evaluation) | trip with `expectBy` | trip ends |
 | Cleanup, heartbeat backstop | WorkManager periodic (24 h; 15 min) | app start | — |
+| Arrival | `ArrivalDetector`: 2 consecutive fixes within max(100 m, accuracy); fixes with accuracy worse than 200 m are ignored | `LocationShareService` during a trip | trip ends |
 | SMS | `SmsManager.divideMessage` + `sendMultipartTextMessage` with sent/delivered `PendingIntent`s → `SmsResultReceiver` → `ActiveSosStore` | SOS raise / retry / false-alarm (confirmed) | — |
 
 **Notification channels** (created in `AshGoApplication.onCreate`, idempotent):

@@ -191,6 +191,7 @@ States: no network (blocking message, nothing half-created); "no invite for this
 ### Trip sheet
 - **Fields:** destination (saved places / map pick / none), expect-by time picker, note (≤ 80), "Tell {partner} I've started" toggle (default on).
 - **Buttons:** Start → becomes I'm here / End trip / +15 min.
+- **Arrival rule:** two consecutive fixes within max(100 m, accuracy). Fixes with accuracy worse than 200 m are ignored for arrival.
 
 ### Chat
 - **Header:** avatar, name, StatusPill.
