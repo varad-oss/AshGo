@@ -163,3 +163,37 @@ npx firebase-tools database:get / --project <your-project-id> --shallow
 ```
 
 To view the deployed rules: Firebase console → Realtime Database → **Rules** tab. Copy the JSON into `firebase/database.rules.current.json` (git-ignored) so v2 can test against it.
+
+
+## 8. Deploying the phase-1 rules (owner, 2026-10-14)
+
+`firebase/database.rules.json` is safe to deploy **now**, while v1 is still installed.
+
+**What it keeps working:**
+- Every path v1 reads or writes: `chat`, `tracking/*`, `alerts`, `buzz/*`, `users/*` stay `auth != null`.
+- `app_config` and `notifications` stay readable.
+
+**What it closes:**
+- **S10:** nobody can write `notifications` any more.
+- Clients can no longer write `app_config`.
+- There is no root-level grant, so the new `pairs/*` data can never leak through a cascade.
+
+**What it adds:**
+- `.indexOn: timestamp` for v1's cleanup queries.
+- The v2 pairing and pair-data rules, which are unused until v2 ships.
+
+**Steps:**
+1. **Back up first:** Firebase console → Realtime Database → ⋮ → *Export JSON*. Also copy the current Rules text somewhere safe.
+2. **Deploy**, either way:
+   - **Console:** Realtime Database → **Rules** → paste the full contents of `firebase/database.rules.json` → **Publish**.
+   - **CLI**, from `firebase/`: run the command below.
+
+     ```bash
+     npx firebase deploy --only database --project <your-project-id>
+     ```
+
+     This needs `npx firebase login`.
+3. **Check:** open the app on both phones and confirm that chat, location, Thunder and SOS still behave as before.
+4. **Rollback:** paste the old rules back.
+
+**Still exposed after phase 1 (S1):** any signed-in client can still read the legacy v1 paths. That ends only with phase 2, after both phones run v2. **Keep the releases repo private until then** (D-10).

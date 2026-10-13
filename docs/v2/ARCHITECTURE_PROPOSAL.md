@@ -152,11 +152,13 @@ Helper: `isMember = root.child('pairs/'+$pairId+'/meta/memberA').val() === auth.
 | `pairs/$p` (whole) | members | — | — | members (Leave orbit = delete the pair) |
 | `profiles/$uid`, `presence/$uid`, `location/$uid`, `trips/$uid` | members | `$uid == auth.uid` | same | same |
 | `chat/$id`, `media/$id` | members | `from == auth.uid`, `at == now`, size limits | ✗ (immutable) | sender, or anyone when `at < now − retention` (cleanup) |
-| `events/$id` | members | `from == auth.uid`, `at == now` | only `deliveredTo/$uid`, `seenBy/$uid` where `$uid == auth.uid ≠ from` | as chat |
+| `events/$id` | members | `from == auth.uid`, `at == now`; no receipts at creation | only `deliveredTo/$uid`, `seenBy/$uid` where `$uid == auth.uid ≠ from`, on an event that already exists, value `== now`, set once | as chat |
 | `sos/$id` | members | `from == auth.uid`, `state == 'active'`, `at == now` | `state → cancelled` + `cancelledAt == now` only by `from`; `smsSent/smsFailed` only by `from`; `deliveredTo/ackBy/$uid` only by that `$uid` | `from` only, and only when `state == 'cancelled'` and `cancelledAt < now − 30d` |
 | legacy `/chat`, `/tracking`, `/alerts`, `/buzz`, `/users`, `/app_config`, `/notifications` | phase 1: unchanged (owner's current rules); phase 2: ✗ | | | |
 
-**Rules tests** (`firebase/rules.test.ts`, `@firebase/rules-unit-testing` against the Database emulator) must cover:
+**Implemented** in `firebase/database.rules.json` (phase 1), with 45 emulator tests in `firebase/test/*.test.mjs`. Run them with `cd firebase && npm test`, with `JAVA_HOME` set to a JDK. Receipts (`deliveredTo`/`seenBy`/`ackBy`) can only be added to an already-existing event or SOS, so a sender can't pre-fill "seen" with `serverTimestamp()`.
+
+**Rules tests** (originally planned as `firebase/rules.test.ts`, `@firebase/rules-unit-testing` against the Database emulator) must cover:
 - an outsider is denied every read and write
 - a third joiner is denied
 - an expired invite is rejected
