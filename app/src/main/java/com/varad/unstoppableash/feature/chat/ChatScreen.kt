@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -185,9 +186,10 @@ private fun Timeline(state: ChatUiState, actions: ChatActions, onOpenPhoto: (Ima
     LazyColumn(
         state = listState,
         reverseLayout = true,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("chat-timeline"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        // spacedBy() alone is top-aligned even in a reversed list; Bottom keeps a short chat resting on the composer.
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.Bottom),
     ) {
         items(newestFirst, key = { it.key }) { item ->
             when (item) {

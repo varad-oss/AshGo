@@ -21,6 +21,9 @@ import com.varad.unstoppableash.ui.theme.OrbitTheme
 import com.varad.unstoppableash.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -95,5 +98,13 @@ class ChatScreenTest {
     @Test fun rateLimitedNudgeSaysSo() {
         show(base.copy(notice = ChatNotice.Failed(FailureReason.RATE_LIMITED)))
         rule.onNodeWithText("Give it a moment before nudging again").assertExists()
+    }
+
+    @Test fun aShortConversationRestsOnTheComposer() {
+        show(base.copy(items = listOf(TimelineItem.DaySeparator(LocalDate.of(2026, 10, 14)), bubble("a", false, "first", BubbleStatus.NONE), bubble("b", true, "newest", BubbleStatus.SENT))))
+        val list = rule.onNodeWithTag("chat-timeline").fetchSemanticsNode().boundsInRoot
+        val newest = rule.onNodeWithText("newest").fetchSemanticsNode().boundsInRoot
+        val gap = with(rule.density) { (list.bottom - newest.bottom).toDp() }
+        assertTrue("newest message sits at the bottom, gap was $gap", gap < 64.dp)
     }
 }
