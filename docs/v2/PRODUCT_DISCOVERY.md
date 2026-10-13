@@ -140,7 +140,7 @@ Format: **Problem → Feature → Use (steps) → Why better → MVP → Depende
 **O-8. SOS state machine with honest delivery receipts** (P0 core)
 - **Problem:** P2, P8.
 - **Feature:**
-  - Hold for 3 s with a visible ring countdown, then a 5 s "Sending in 5… Cancel" window. (Skippable; see open question Q-3.)
+  - Hold for 3 s with a filling ring and haptic ticks, then send immediately (owner decision D-6). The post-send screen leads with a hold-to-confirm "I'm safe: cancel SOS".
   - Raised: write the pair SOS event, send SMS from **this** phone (multipart, GSM-7 text, the location's age), and show per-channel status rows: *AshGo partner: delivered ✓ / not yet* · *SMS Mum: sent ✓ delivered ✓* · *SMS Priya: failed ✗ (no signal), retry*.
   - Cancel requires a deliberate hold and is recorded with who and when.
 - **MVP:** as above, with no automatic retries beyond one; manual retry buttons.
@@ -153,7 +153,7 @@ Format: **Problem → Feature → Use (steps) → Why better → MVP → Depende
 **O-9. SOS from either person** (symmetry): the partner can also raise SOS. Included in O-8.
 
 **O-10. Fast but safe entry points**
-- **Feature:** a Quick Settings tile and a home-screen widget, both opening the countdown activity (which also shows over the lock screen); a long-press app-shortcut "SOS". Remove the volume-key accessibility hack [C].
+- **Feature:** a Quick Settings tile and a home-screen widget, both opening the full-screen SOS hold screen (which also shows over the lock screen); a long-press app-shortcut "SOS". Remove the volume-key accessibility hack [C].
 - **₹0:** ✓
 - **Complexity:** S–M.
 - **Risk:** opening an activity over the lock screen needs `showWhenLocked`, to be verified on a device.

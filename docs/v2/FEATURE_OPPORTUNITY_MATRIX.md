@@ -34,7 +34,7 @@ Scores rank the work; they do not decide it. Where judgement overrides the numbe
 | O-6 | Battery + connectivity context | 3 | 4 | 4 | 3 | 4 | 4 | 3 | 5 | 5 | 5 | 5 | **76** | ✓ | **P0**: part of the presence payload; trivial to add |
 | O-24 | Adaptive location cadence | 3 | 5 | 4 | 2 | 4 | 3 | 4 | 4 | 5 | 5 | 5 | **74** | ✓ | **P0** |
 | O-3 | Nudge (Thunder reborn) | 2 | 5 | 4 | 2 | 4 | 4 | 4 | 4 | 5 | 5 | 5 | **73** | ✓ | **P1**: emotionally central to the couple, so it ships in the same release as P0 if time allows |
-| O-10 | QS tile + safe widget + lock-screen countdown | 4 | 1 | 4 | 4 | 3 | 5 | 4 | 3 | 5 | 4 | 3 | **73** | ✓ | **P1**. The safe-widget part is **P0**, because the current widget is unsafe. |
+| O-10 | QS tile + safe widget + lock-screen hold screen | 4 | 1 | 4 | 4 | 3 | 5 | 4 | 3 | 5 | 4 | 3 | **73** | ✓ | **P1**. The safe-widget part is **P0**, because the current widget is unsafe. |
 | O-25 | Just-in-time permissions | 3 | 2 | 4 | 3 | 4 | 3 | 5 | 4 | 5 | 5 | 4 | **72** | ✓ | **P0** |
 | O-2 | Status line | 2 | 4 | 4 | 2 | 4 | 4 | 4 | 5 | 5 | 5 | 5 | **72** | ✓ | **P1** |
 | O-21 | Leave orbit / unlink | 3 | 1 | 3 | 4 | 4 | 3 | 5 | 3 | 5 | 5 | 4 | **70** | ✓ | **P0**: required for honest consent |
@@ -61,7 +61,7 @@ Every row below assumes these **evidence types** apply:
 | B-1 | Add | Every notification posts to a channel created at app start. Channels: `sos` (high, alarm-style), `checkins`, `chat`, `nudges`, `presence` (default), `service` (low). Unit-testable channel registry. A logcat check on the emulator shows no "No Channel found". | [unit] [device] |
 | O-14 | Add | `presenceOf(snapshot, serverNow)` returns the correct state for a table of ≥ 15 cases, including no data, paused, and clock skew. The UI never renders "Live" unless the state is Live. | [unit] [UI] |
 | O-1 | Add | One tap creates exactly one event (idempotent client ID). The sender's UI moves *Sending → Saved → Seen* only on the corresponding backend facts. Offline shows "Waiting for connection". | [unit] [rules] [UI] |
-| O-8 | Redesign | Raise is impossible without a ≥ 3 s hold **and** the countdown elapsing (or, per Q-3, hold only). A second raise during an active SOS is a no-op. SMS is dispatched once per contact via the fake sender. Each contact row reflects its sent/delivered/failed callback. Cancel records the actor and server time. Status is consistent on both phones. | [unit] [rules] [UI] [device: SMS to an owner-controlled number] |
+| O-8 | Redesign | Raise is impossible without a ≥ 3 s continuous hold (D-6). A second raise during an active SOS is a no-op. SMS is dispatched once per contact via the fake sender. Each contact row reflects its sent/delivered/failed callback. Cancel records the actor and server time. Status is consistent on both phones. | [unit] [rules] [UI] [device: SMS to an owner-controlled number] |
 | O-20 | Add | Only invite holders can join, and only within 10 min. A pair can never exceed 2 members. Non-members are denied read and write on every pair path. Orbit words match on both devices. | [rules] [unit] [device] |
 | O-21 | Add | After "Leave", the leaver loses access (rules) and shared nodes are deleted. The partner sees "Orbit ended". | [rules] [UI] |
 | O-7 | Add | Pausing writes `sharing=paused` **and** clears precise coordinates (the owner's choice; default keeps a coarse "last seen area" off). The partner sees Paused, and no signal-lost alert fires. | [unit] [UI] |
@@ -72,7 +72,7 @@ Every row below assumes these **evidence types** apply:
 | O-25 | Add | A fresh install requests no permission before the user opens the feature that needs it. Denial leaves the other features working. | [UI] [device] |
 | O-22 | Add | The cleanup selector (pure function) excludes unresolved SOS events and items newer than the cutoff. It runs at most once per 24 h per device. | [unit] [rules] |
 | O-17 | Add | No real name, nickname or gendered pronoun exists in shared code or strings (grep check). Relationship label switches the microcopy set. | [unit] [UI] |
-| O-10 (widget) | Redesign | A widget tap opens the countdown; nothing is written before it elapses. Cancel writes nothing. | [UI] [device] |
+| O-10 (widget) | Redesign | A widget tap opens the SOS hold screen; nothing is written unless a 3 s hold completes. | [UI] [device] |
 | Volume-key SOS | **Remove** | Service and manifest entries removed. Release notes explain why and what replaces it. | build + lint |
 | Admin custom notifications | **Remove** | Listeners and paths removed. | build |
 | Firebase Analytics / Storage SDKs | **Remove** | Not on the runtime classpath; APK size reduced. | build |
