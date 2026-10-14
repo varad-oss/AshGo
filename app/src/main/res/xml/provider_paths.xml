@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only the update downloads folder (cacheDir/updates) is ever shared, and only with the system installer. -->
 <paths>
-    <external-path name="external_files" path="." />
-    <external-files-path name="external_files_dir" path="." />
-    <external-cache-path name="external_cache_dir" path="." />
-    <cache-path name="cache_dir" path="." />
-    <files-path name="internal_files_dir" path="." />
+    <cache-path name="updates" path="updates/" />
 </paths>

@@ -15,8 +15,8 @@ android {
         applicationId = "com.varad.unstoppableash"
         minSdk = 26
         targetSdk = 34
-        versionCode = 45
-        versionName = "1.3.32"
+        versionCode = 46
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -27,7 +27,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = false
             optimization {
-                enable = false
+                enable = true
+                keepRules {
+                    files.add(file("proguard-rules.pro"))
+                }
             }
         }
     }

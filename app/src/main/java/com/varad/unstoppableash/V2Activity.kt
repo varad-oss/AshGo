@@ -22,8 +22,7 @@ import com.varad.unstoppableash.ui.theme.OrbitTheme
 import com.varad.unstoppableash.ui.theme.ThemeMode
 
 /**
- * v2 entry point. Until the Stage 11 cutover it is registered only in the debug manifest; v1's
- * MainActivity stays the release launcher.
+ * The app's entry point. The launcher entry (also reachable as the v1 `.MainActivity` alias, so existing shortcuts keep working).
  */
 class V2Activity : ComponentActivity() {
     /** Where a notification tap asked to go; consumed once by the app. */

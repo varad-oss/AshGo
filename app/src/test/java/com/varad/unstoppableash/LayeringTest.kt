@@ -7,8 +7,7 @@ import java.io.File
 
 /**
  * Guards the v2 layering rules (ARCHITECTURE_PROPOSAL §3) and keeps personal
- * names out of v2 sources. v1 files are exempt until the Stage 11 cutover
- * deletes them.
+ * names out of every production source.
  */
 class LayeringTest {
 
@@ -22,17 +21,8 @@ class LayeringTest {
         .flatMap { set -> listOf("java", "kotlin").map { File(set, "$it/com/varad/unstoppableash") } }
         .filter { it.isDirectory }
 
-    /** v1 sources that predate the layering rules; removed at cutover. Paths relative to the package root. */
-    private val legacyFiles = setOf(
-        "ui/AboutScreen.kt",
-        "ui/AppDrawer.kt",
-        "ui/HelpScreen.kt",
-        "ui/ReceiverScreen.kt",
-        "ui/TravelerChatScreen.kt",
-        "ui/theme/Color.kt",
-        "ui/theme/Theme.kt",
-        "ui/theme/Type.kt",
-    )
+    /** v1 sources were removed at the Stage 11 cutover; nothing is exempt any more. */
+    private val legacyFiles = emptySet<String>()
 
     private fun kotlinFilesUnder(vararg packages: String): List<Pair<File, String>> =
         sourceRoots.flatMap { root ->
