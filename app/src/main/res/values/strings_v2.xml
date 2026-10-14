@@ -466,4 +466,28 @@
     <string name="about_body">A small, private space for two people to look out for each other.</string>
     <string name="about_licences_title">Open-source licences</string>
     <string name="about_licences_body">Nunito — SIL Open Font License 1.1\nosmdroid — Apache License 2.0\nMap data © OpenStreetMap contributors, ODbL\nAndroidX, Jetpack Compose, Firebase SDKs, Kotlin — Apache License 2.0</string>
+
+    <!-- Stage 10.4 fake call -->
+    <string name="fake_call_title">Fake call</string>
+    <string name="fake_call_intro">A believable incoming call, to give you a reason to step away. It stays on this phone.</string>
+    <string name="fake_call_caller">Caller name</string>
+    <string name="fake_call_default_caller">Unknown</string>
+    <string name="fake_call_voice">Voice on the line</string>
+    <string name="fake_call_builtin">Built-in recording</string>
+    <string name="fake_call_add_voice">Add a recording</string>
+    <string name="fake_call_add_failed">That recording couldn\'t be read (or is over 15 MB).</string>
+    <string name="fake_call_voice_private">Recordings are copied into AshGo on this phone and never uploaded.</string>
+    <string name="fake_call_when">Ring</string>
+    <string name="fake_call_now">Now</string>
+    <string name="fake_call_10s">In 10 s</string>
+    <string name="fake_call_1m">In 1 min</string>
+    <string name="fake_call_start">Start fake call</string>
+    <string name="fake_call_waiting">Ringing in %1$d s</string>
+    <string name="fake_call_waiting_hint">Keep AshGo open; the call screen appears here.</string>
+    <string name="fake_call_incoming">Incoming call</string>
+    <string name="fake_call_accept">Accept</string>
+    <string name="fake_call_decline">Decline</string>
+    <string name="fake_call_end">End</string>
+    <string name="fake_call_open">Fake call</string>
+    <string name="fake_call_open_body">Get a believable call to step away</string>
 </resources>

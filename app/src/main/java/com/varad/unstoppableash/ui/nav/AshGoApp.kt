@@ -77,6 +77,13 @@ import com.varad.unstoppableash.feature.settings.SettingsActions
 import com.varad.unstoppableash.feature.settings.SettingsScreen
 import com.varad.unstoppableash.feature.settings.SettingsViewModel
 import com.varad.unstoppableash.feature.settings.SettingsPage
+import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
+import com.varad.unstoppableash.feature.fakecall.CallPhase
+import com.varad.unstoppableash.feature.fakecall.FakeCallActions
+import com.varad.unstoppableash.feature.fakecall.FakeCallScreen
+import com.varad.unstoppableash.feature.fakecall.FakeCallViewModel
+import android.os.SystemClock
+import com.varad.unstoppableash.R
 import com.varad.unstoppableash.feature.settings.PrivacyScreen
 import com.varad.unstoppableash.feature.settings.UpdatesScreen
 import com.varad.unstoppableash.feature.settings.UpdatesViewModel
@@ -165,6 +172,12 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
     var showContacts by rememberSaveable { mutableStateOf(false) }
     var showPartnerSos by rememberSaveable { mutableStateOf(false) }
     var showReliability by rememberSaveable { mutableStateOf(false) }
+    var showFakeCall by rememberSaveable { mutableStateOf(false) }
+
+    if (showFakeCall) {
+        FakeCallOverlay(container, onBack = { showFakeCall = false })
+        return
+    }
 
     if (showReliability) {
         BackHandler { showReliability = false }
@@ -240,7 +253,7 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
                 padding, // the scaffold's padding already includes the system bars
             )
             Tab.CHAT -> ChatTab(chatVm, padding)
-            Tab.SAFETY -> SafetyTab(safetyVm, onOpenContacts = { showContacts = true }, padding)
+            Tab.SAFETY -> SafetyTab(safetyVm, onOpenContacts = { showContacts = true }, padding, onOpenFakeCall = { showFakeCall = true })
             Tab.MAP -> MapTab(container, onGetHelp = { tab = Tab.SAFETY }, padding)
         }
     }
@@ -363,6 +376,36 @@ private fun SettingsOverlay(container: AppContainer, vm: SettingsViewModel, onBa
 }
 
 @Composable
+private fun FakeCallOverlay(container: AppContainer, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val vm: FakeCallViewModel = viewModel(factory = viewModelFactory {
+        initializer { FakeCallViewModel(container.fakeCallVoices, AndroidFakeCallAudio(context), SystemClock::elapsedRealtime) }
+    })
+    val s by vm.state.collectAsStateWithLifecycle()
+    BackHandler {
+        when (s.phase) {
+            CallPhase.Setup -> onBack()
+            is CallPhase.Waiting -> vm.cancel()
+            CallPhase.Ringing -> vm.decline()
+            is CallPhase.InCall -> vm.end()
+        }
+    }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { vm.addVoice(s.caller.ifBlank { context.getString(R.string.fake_call_voice) + " " + (s.voices.size + 1) }, it.toString()) }
+    }
+    FakeCallScreen(
+        s,
+        FakeCallActions(
+            onBack = onBack, onCaller = vm::setCaller, onSelectVoice = vm::selectVoice, onAddVoice = { pick.launch("audio/*") },
+            onRemoveVoice = vm::removeVoice, onDelay = vm::setDelay, onStart = { vm.schedule() }, onCancel = vm::cancel,
+            onAccept = vm::accept, onDecline = vm::decline, onEnd = vm::end,
+        ),
+        SystemClock::elapsedRealtime,
+        if (s.phase is CallPhase.Setup || s.phase is CallPhase.Waiting) Modifier.safeDrawingPadding() else Modifier,
+    )
+}
+
+@Composable
 private fun ReliabilityOverlay(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: ReliabilityViewModel = viewModel(factory = viewModelFactory {
@@ -396,7 +439,7 @@ private fun dial(context: Context, number: String) {
 }
 
 @Composable
-internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier: Modifier, requireUnlock: ((() -> Unit) -> Unit)? = null) {
+internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier: Modifier, requireUnlock: ((() -> Unit) -> Unit)? = null, onOpenFakeCall: () -> Unit = {}) {
     val context = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     // Permissions can change in Android settings while we're away; re-read them whenever we come back.
@@ -417,6 +460,7 @@ internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier
             onDone = vm::done,
             onCall = { dial(context, it) },
             onOpenContacts = onOpenContacts,
+            onOpenFakeCall = onOpenFakeCall,
             onPickPartnerNumber = { pickPartner.launch(Unit) },
             onRequestSms = { askSms.launch(Manifest.permission.SEND_SMS) },
             onRequestLocation = { askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },

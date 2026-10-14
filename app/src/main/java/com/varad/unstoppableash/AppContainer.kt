@@ -1,5 +1,8 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.feature.fakecall.FakeCallVoiceStore
+import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
+import kotlinx.coroutines.withContext
 import com.varad.unstoppableash.domain.media.ImageBudget
 import com.varad.unstoppableash.service.cleanup.Cleanup
 import com.varad.unstoppableash.data.update.Updater
@@ -45,6 +48,7 @@ import kotlinx.coroutines.SupervisorJob
 private fun resetOnCorruption() = ReplaceFileCorruptionHandler { emptyPreferences() }
 private val Context.contactsStore by preferencesDataStore(name = "v2_emergency_contacts", corruptionHandler = resetOnCorruption())
 private val Context.settingsStore by preferencesDataStore(name = "v2_settings", corruptionHandler = resetOnCorruption())
+private val Context.fakeCallStore by preferencesDataStore(name = "v2_fake_call_voices", corruptionHandler = resetOnCorruption())
 private val Context.activeSosStore by preferencesDataStore(name = "v2_active_sos", corruptionHandler = resetOnCorruption())
 
 /**
@@ -118,6 +122,9 @@ class AppContainer(private val app: Application) {
 
     val contacts by lazy { EmergencyContactsStore(app.contactsStore) }
     val settings by lazy { SettingsStore(app.settingsStore) }
+    val fakeCallVoices by lazy {
+        FakeCallVoiceStore(app.fakeCallStore, copyIn = { src, id -> withContext(Dispatchers.IO) { AndroidFakeCallAudio.copyIn(app, src, id) } }, deleteFile = { withContext(Dispatchers.IO) { AndroidFakeCallAudio.delete(it) } })
+    }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 
     /** Copies v1's on-phone emergency contacts into the v2 store, once. */
@@ -126,6 +133,7 @@ class AppContainer(private val app: Application) {
         contacts.importLegacyOnce {
             LegacyLocalMigration.contacts(prefs.getString("emergency_contacts_v2", null), prefs.getString("emergency_contacts", null))
         }
+        fakeCallVoices.importLegacyOnce { LegacyLocalMigration.voices(prefs.getString("custom_fake_calls", null)) }
     }
 
     private companion object {

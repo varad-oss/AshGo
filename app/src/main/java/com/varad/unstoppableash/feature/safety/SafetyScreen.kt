@@ -64,6 +64,7 @@ data class SafetyActions(
     /** Opens the dialer with this number; AshGo never places a call itself. */
     val onCall: (String) -> Unit = {},
     val onOpenContacts: () -> Unit = {},
+    val onOpenFakeCall: () -> Unit = {},
     val onPickPartnerNumber: () -> Unit = {},
     val onRequestSms: () -> Unit = {},
     val onRequestLocation: () -> Unit = {},
@@ -135,6 +136,10 @@ private fun IdlePanel(state: SafetyUiState, actions: SafetyActions) {
         OrbitCard(Modifier.fillMaxWidth(), onClick = actions.onOpenContacts) {
             Text(stringResource(R.string.emergency_contacts), style = MaterialTheme.typography.titleMedium, color = Orbit.colors.text)
             Text(pluralStringResource(R.plurals.emergency_contacts_count, state.contacts.size, state.contacts.size), style = MaterialTheme.typography.bodyMedium, color = Orbit.colors.textSecondary)
+        }
+        OrbitCard(Modifier.fillMaxWidth(), onClick = actions.onOpenFakeCall) {
+            Text(stringResource(R.string.fake_call_open), style = MaterialTheme.typography.titleMedium, color = Orbit.colors.text)
+            Text(stringResource(R.string.fake_call_open_body), style = MaterialTheme.typography.bodyMedium, color = Orbit.colors.textSecondary)
         }
     }
 }
