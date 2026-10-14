@@ -25,7 +25,7 @@ sealed interface CallPhase {
 /** Ringtone and the "voice on the line"; Android's is [AndroidFakeCallAudio]. */
 interface FakeCallAudio {
     fun ring()
-    /** Null plays the built-in recording. */
+    /** Null is a silent line. */
     fun play(voice: FakeCallVoice?)
     fun stop()
 }
@@ -33,7 +33,7 @@ interface FakeCallAudio {
 data class FakeCallUiState(
     val caller: String = "",
     val voices: List<FakeCallVoice> = emptyList(),
-    /** Null is the built-in recording. */
+    /** Null is a silent line. */
     val selectedVoiceId: String? = null,
     val delay: CallDelay = CallDelay.TEN_SECONDS,
     val phase: CallPhase = CallPhase.Setup,

@@ -473,7 +473,7 @@
     <string name="fake_call_caller">Caller name</string>
     <string name="fake_call_default_caller">Unknown</string>
     <string name="fake_call_voice">Voice on the line</string>
-    <string name="fake_call_builtin">Built-in recording</string>
+    <string name="fake_call_builtin">Silent line (you do the talking)</string>
     <string name="fake_call_add_voice">Add a recording</string>
     <string name="fake_call_add_failed">That recording couldn\'t be read (or is over 15 MB).</string>
     <string name="fake_call_voice_private">Recordings are copied into AshGo on this phone and never uploaded.</string>

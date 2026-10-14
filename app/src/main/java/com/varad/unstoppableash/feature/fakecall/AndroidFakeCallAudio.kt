@@ -10,11 +10,10 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.net.toUri
-import com.varad.unstoppableash.R
 import com.varad.unstoppableash.domain.model.FakeCallVoice
 import java.io.File
 
-/** The phone's own ringtone, then the recording on the earpiece like a real call (USAGE_VOICE_COMMUNICATION). */
+/** The phone's own ringtone, then the chosen recording on the earpiece like a real call (USAGE_VOICE_COMMUNICATION). */
 class AndroidFakeCallAudio(context: Context) : FakeCallAudio {
     private val app = context.applicationContext
     private val audioManager = app.getSystemService(AudioManager::class.java)
@@ -32,18 +31,16 @@ class AndroidFakeCallAudio(context: Context) : FakeCallAudio {
         }
     }
 
+    /** Null is a silent line: the call screen and timer run, nothing plays (AshGo bundles no recordings). */
     override fun play(voice: FakeCallVoice?) {
         stop()
+        if (voice == null) return
         previousMode = audioManager.mode
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         player = runCatching {
             MediaPlayer().apply {
                 setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-                if (voice == null) {
-                    app.resources.openRawResourceFd(R.raw.varad_fake_call).use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
-                } else {
-                    setDataSource(app, voice.uri.toUri())
-                }
+                setDataSource(app, voice.uri.toUri())
                 prepare()
                 start()
             }

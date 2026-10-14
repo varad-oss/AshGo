@@ -27,10 +27,10 @@ class FakeCallScreenTest {
         rule.runOnIdle { assertEquals(listOf("decline", "accept"), log) }
     }
 
-    @Test fun setupOffersTheBuiltInVoiceAndStarts() {
+    @Test fun setupOffersASilentLineAndStarts() {
         var started = 0
         rule.setContent { OrbitTheme(ThemeMode.LIGHT) { FakeCallScreen(FakeCallUiState(), FakeCallActions(onStart = { started++ }), uptime = { 0L }) } }
-        rule.onNodeWithText("Built-in recording").assertExists()
+        rule.onNodeWithText("Silent line (you do the talking)").assertExists()
         rule.onNodeWithText("Start fake call").performClick()
         rule.runOnIdle { assertEquals(1, started) }
     }
