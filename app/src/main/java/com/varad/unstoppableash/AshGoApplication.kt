@@ -9,6 +9,7 @@ class AshGoApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        DevBackend.applyStored(this) { container } // debug builds only; release never creates the container here
         try {
             FirebaseDatabase.getInstance().setPersistenceEnabled(true)
         } catch (e: Exception) {

@@ -21,6 +21,17 @@ internal object DevBackend {
         if (activity.intent.hasExtra(EXTRA_USE_EMULATORS)) {
             prefs.edit { putBoolean(KEY, activity.intent.getBooleanExtra(EXTRA_USE_EMULATORS, false)) }
         }
-        if (prefs.getBoolean(KEY, false) && !container.usesEmulators) runCatching { container.useLocalEmulators() }
+        applyStored(activity) { container }
+    }
+
+    /**
+     * At process start, before any component (boot receiver, worker, service) touches the backend — otherwise a
+     * process started by the system would quietly use production while the dev session uses the emulators.
+     */
+    fun applyStored(context: Context, container: () -> AppContainer) {
+        if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) return
+        if (!context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY, false)) return
+        val c = container()
+        if (!c.usesEmulators) runCatching { c.useLocalEmulators() }
     }
 }
