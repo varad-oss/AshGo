@@ -77,11 +77,11 @@
     <string name="profile_title">About you</string>
     <string name="profile_name_label">Your name</string>
     <string name="profile_name_error">Add a name your partner will recognise</string>
-    <string name="relationship_label">You two are</string>
+    <string name="relationship_label">You are…</string>
     <string name="relationship_partner">Varad</string>
-    <string name="relationship_family">Family</string>
-    <string name="relationship_friends">Best friends</string>
-    <string name="relationship_trusted">Trusted people</string>
+    <string name="relationship_family">Parent</string>
+    <string name="relationship_friends">Best friend</string>
+    <string name="relationship_trusted">Trusted person</string>
     <string name="action_create">Create</string>
     <string name="action_back">Back</string>
     <string name="invite_title">Invite them</string>

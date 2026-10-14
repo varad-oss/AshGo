@@ -11,7 +11,8 @@ before(async () => { env = await makeEnv(); });
 after(async () => { await env.cleanup(); });
 beforeEach(async () => {
   await env.clearDatabase();
-  await seed(env, pp('meta'), { memberA: A, memberB: B, relationship: 'PARTNER', createdAt: Date.now() - DAY, confirmedAt: Date.now() - DAY });
+  // alice joined (memberB): she is the one who shares location, takes trips and raises SOS (roles).
+  await seed(env, pp('meta'), { memberA: B, memberB: A, relationship: 'PARTNER', createdAt: Date.now() - DAY, confirmedAt: Date.now() - DAY });
   a = user(env, A); b = user(env, B); c = user(env, C);
 });
 

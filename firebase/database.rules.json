@@ -168,7 +168,7 @@
         },
         "location": {
           "$uid": {
-            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && auth.uid === $uid",
+            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && auth.uid === $uid && (!newData.exists() || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid)",
             ".validate": "newData.hasChildren(['lat', 'lng', 'at'])",
             "lat": {
               ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
@@ -190,7 +190,7 @@
         },
         "trips": {
           "$uid": {
-            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && auth.uid === $uid",
+            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && auth.uid === $uid && (!newData.exists() || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid)",
             ".validate": "newData.hasChildren(['state', 'startedAt', 'notifyPartner'])",
             "state": {
               ".validate": "newData.val() === 'active' || newData.val() === 'arrived' || newData.val() === 'ended' || newData.val() === 'overdue'"
@@ -334,7 +334,7 @@
             "at"
           ],
           "$id": {
-            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && ((!data.exists() && newData.child('from').val() === auth.uid) || (!newData.exists() && data.child('from').val() === auth.uid && data.child('state').val() === 'cancelled' && data.child('cancelledAt').val() < now - 2592000000))",
+            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && ((!data.exists() && newData.child('from').val() === auth.uid && root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) || (!newData.exists() && data.child('from').val() === auth.uid && data.child('state').val() === 'cancelled' && data.child('cancelledAt').val() < now - 2592000000))",
             ".validate": "newData.hasChildren(['from', 'state', 'at'])",
             "from": {
               ".validate": "(data.exists() && data.val() === newData.val()) || (!data.exists() && newData.val() === auth.uid)"
@@ -397,6 +397,35 @@
             }
           },
           ".read": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && root.child('pairs').child($pairId).child('meta').child('confirmedAt').exists()"
+        },
+        "wall": {
+          ".read": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid)",
+          "$id": {
+            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && ((!data.exists() && newData.exists()) || !newData.exists())",
+            ".validate": "newData.hasChildren(['from', 'at'])",
+            "from": {
+              ".validate": "newData.isString() && newData.val() === auth.uid"
+            },
+            "at": {
+              ".validate": "newData.val() === now"
+            },
+            "w": {
+              ".validate": "newData.isNumber()"
+            },
+            "h": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "wallData": {
+          "$id": {
+            ".read": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid)",
+            ".write": "auth != null && (root.child('pairs').child($pairId).child('meta').child('memberA').val() === auth.uid || root.child('pairs').child($pairId).child('meta').child('memberB').val() === auth.uid) && ((!data.exists() && newData.exists()) || !newData.exists())",
+            ".validate": "newData.isString() && newData.val().length <= 210000"
+          }
         },
         "$other": {
           ".validate": false

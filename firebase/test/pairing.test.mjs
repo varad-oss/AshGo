@@ -195,11 +195,12 @@ test('leaving is always possible, even during the partner\'s active SOS (decided
 
 test('joiner cannot read the inviter\'s private data until the inviter confirms', async () => {
   const { a, b } = await fullPair();
-  await assertSucceeds(set(ref(a, `pairs/${P}/location/${A}`), { lat: 1, lng: 2, at: serverTimestamp() }));
+  // The creator never shares location (roles), so their presence stands in as private data.
+  await assertSucceeds(set(ref(a, `pairs/${P}/presence/${A}`), { online: true, lastSeen: serverTimestamp() }));
   for (const node of ['location', 'presence', 'trips', 'chat', 'media', 'events', 'sos']) {
     await assertFails(get(ref(b, `pairs/${P}/${node}`)));
   }
   await assertSucceeds(get(ref(b, `pairs/${P}/profiles`)));
   await assertSucceeds(set(ref(a, `pairs/${P}/meta/confirmedAt`), serverTimestamp()));
-  await assertSucceeds(get(ref(b, `pairs/${P}/location`)));
+  await assertSucceeds(get(ref(b, `pairs/${P}/presence`)));
 });
