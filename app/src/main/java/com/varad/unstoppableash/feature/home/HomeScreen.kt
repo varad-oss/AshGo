@@ -45,6 +45,7 @@ import com.varad.unstoppableash.domain.copy.greetingSlot
 import com.varad.unstoppableash.domain.model.PresenceState
 import com.varad.unstoppableash.domain.model.SharingMode
 import com.varad.unstoppableash.domain.model.TripState
+import com.varad.unstoppableash.feature.map.PartnerOverdueCard
 import com.varad.unstoppableash.ui.components.AvatarImage
 import com.varad.unstoppableash.ui.components.ErrorBanner
 import com.varad.unstoppableash.ui.components.LoadingOrbit
@@ -116,6 +117,10 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 battery(state)?.let { (text, low) ->
                     Text(text, style = MaterialTheme.typography.bodyMedium, color = if (low) Orbit.colors.warnInk else Orbit.colors.textSecondary)
                 }
+            }
+
+            state.partnerOverdueMs?.let { overdue ->
+                PartnerOverdueCard(state.partnerName, overdue, state.partnerLocation, state.nowMs, onGetHelp = actions.onOpenSafety)
             }
 
             val trip = state.partnerTrip

@@ -231,4 +231,15 @@ class HomeViewModelTest {
         settle()
         assertTrue(vm.state.value.mySosActive)
     }
+
+    @Test fun aPartnerTripPastItsGraceShowsAsOverdue() = runTest(main.dispatcher) {
+        seedPair()
+        db.set("pairs/p1/trips/bob", mapOf("state" to "active", "startedAt" to base - 7_200_000, "notifyPartner" to true, "expectBy" to base - 5 * 60_000))
+        val vm = vm(Clock { base + testScheduler.currentTime })
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        assertEquals("inside the 10 min grace the traveller is asked first", null, vm.state.value.partnerOverdueMs)
+        settle(6 * 60_000L)
+        assertTrue((vm.state.value.partnerOverdueMs ?: 0) >= 11 * 60_000L)
+    }
 }

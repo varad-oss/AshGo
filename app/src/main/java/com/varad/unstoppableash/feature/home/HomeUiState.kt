@@ -46,4 +46,6 @@ data class HomeUiState(
     val nowMs: Long = 0L,
     /** My own SOS is running (from SosController on this phone). */
     val mySosActive: Boolean = false,
+    /** How long the partner's trip is past its deadline + grace (OverdueEvaluator ALERT_PARTNER); null otherwise. */
+    val partnerOverdueMs: Long? = null,
 )

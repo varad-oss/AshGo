@@ -127,4 +127,11 @@ class HomeScreenTest {
         rule.onNodeWithContentDescription("Your SOS is active. Opens the Safety screen.").performClick()
         rule.runOnIdle { assertEquals(1, safetyOpened) }
     }
+
+    @Test fun anOverduePartnerIsShownAndHelpGoesToSafety() {
+        show(base.copy(partnerOverdueMs = 25 * 60_000L))
+        rule.onNodeWithText("Bob's trip is 25 min overdue").assertExists()
+        rule.onNodeWithText("Raise SOS for them").performClick()
+        rule.runOnIdle { assertEquals(1, safetyOpened) }
+    }
 }

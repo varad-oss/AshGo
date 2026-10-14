@@ -24,6 +24,8 @@ import com.varad.unstoppableash.domain.model.SosRecord
 import com.varad.unstoppableash.domain.model.SosState
 import com.varad.unstoppableash.domain.model.Trip
 import com.varad.unstoppableash.domain.presence.PresenceCalculator
+import com.varad.unstoppableash.domain.trips.OverdueEvaluator
+import com.varad.unstoppableash.domain.trips.OverduePhase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -142,6 +144,8 @@ class HomeViewModel(
                 partnerSos = v[5] as SosRecord?,
                 partnerTrip = v[6] as Trip?,
                 nowMs = now,
+                partnerOverdueMs = (v[6] as Trip?)?.takeIf { OverdueEvaluator.evaluate(it.snapshot, now) == OverduePhase.ALERT_PARTNER }
+                    ?.let { t -> now - (t.extendedTo ?: t.expectBy ?: now) },
             )
         }
     }
