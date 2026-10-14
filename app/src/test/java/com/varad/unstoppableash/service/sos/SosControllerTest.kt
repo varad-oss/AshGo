@@ -65,7 +65,7 @@ class SosControllerTest {
         val clock = Clock { db.nowMs }
         return SosController(
             scope = backgroundScope, pairs = PairRepository(db, auth, clock), sos = SosRepository(db, clock), contacts = contacts,
-            store = store, sms = sms, location = { fix }, clock = clock, battery = { 57 },
+            store = store, sms = sms, locator = { fix }, clock = clock, battery = { 57 },
         ).also { it.start(); settle() }
     }
 

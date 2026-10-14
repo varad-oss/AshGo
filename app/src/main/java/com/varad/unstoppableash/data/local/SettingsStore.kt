@@ -19,6 +19,8 @@ data class Settings(
     val notifyCheckins: Boolean = true,
     val notifyPresence: Boolean = true,
     val lastNotified: Map<String, String> = emptyMap(),
+    /** For "Call {partner}". Kept on this phone only — profiles carry no phone numbers (Stage 7 ruling). */
+    val partnerPhone: String? = null,
 )
 
 class SettingsStore(private val store: DataStore<Preferences>) {

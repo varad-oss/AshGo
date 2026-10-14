@@ -34,6 +34,25 @@ import java.util.UUID
 
 enum class RaiseResult { RAISED, ALREADY_ACTIVE }
 
+/** What this phone knows about its own location for the current SOS. */
+sealed interface SosLocation {
+    data object Locating : SosLocation
+    data class Known(val fix: LocationFix) : SosLocation
+    data object Unavailable : SosLocation
+}
+
+/** The SOS operations screens use; [SosController] is the real one. */
+interface SosControl {
+    val state: StateFlow<SosState>
+    val location: StateFlow<SosLocation>
+    suspend fun raise(): RaiseResult
+    fun cancel()
+    fun retryFailedSms()
+    suspend fun falseAlarmRecipients(): List<EmergencyContact>
+    fun sendFalseAlarm()
+    fun dismiss()
+}
+
 /**
  * Runs an SOS from this phone (D-6, J10). App-scoped, so it outlives every screen, and persisted through
  * [ActiveSosStore], so it survives process death. Every fact on screen comes from [SosStateMachine]; this class
@@ -47,13 +66,15 @@ class SosController(
     private val contacts: EmergencyContactsStore,
     private val store: ActiveSosStore,
     private val sms: SmsDispatcher,
-    private val location: LocationSource,
+    private val locator: LocationSource,
     private val clock: Clock,
     private val battery: () -> Int?,
     private val fallbackName: () -> String? = { null },
-) {
+) : SosControl {
     private val _state = MutableStateFlow<SosState>(SosState.Idle)
-    val state: StateFlow<SosState> = _state.asStateFlow()
+    override val state: StateFlow<SosState> = _state.asStateFlow()
+    private val _location = MutableStateFlow<SosLocation>(SosLocation.Unavailable)
+    override val location: StateFlow<SosLocation> = _location.asStateFlow()
 
     private val mutex = Mutex()
     private val raiseLock = Mutex()
@@ -81,29 +102,29 @@ class SosController(
     }
 
     /** Two quick holds (or the tile and the app at once) still make one SOS. */
-    suspend fun raise(): RaiseResult = raiseLock.withLock {
+    override suspend fun raise(): RaiseResult = raiseLock.withLock {
         val targets = contacts.contacts.first().map { SmsTarget(it.id) }
         val pairId = paired()?.meta?.pairId
         if (_state.value is SosState.Active) return@withLock RaiseResult.ALREADY_ACTIVE
         val id = pairId?.let { sos.newSosId(it) } ?: "local-${UUID.randomUUID()}"
-        fixes[id] = scope.async { location.current() } // started now, shared by the record and every SMS
+        fixes[id] = locate() // started now, shared by the record and every SMS
         dispatch(SosAction.Raise(id, clock.now(), targets))
         RaiseResult.RAISED
     }
 
-    fun cancel() = withActive { dispatch(SosAction.Cancel(it.sosId, clock.now())) }
+    override fun cancel() = withActive { dispatch(SosAction.Cancel(it.sosId, clock.now())) }
 
-    fun retryFailedSms() = withActive { dispatch(SosAction.RetryFailedSms(it.sosId)) }
+    override fun retryFailedSms() = withActive { dispatch(SosAction.RetryFailedSms(it.sosId)) }
 
     /** Contacts who actually got the SOS text: the only ones a "false alarm" text is offered for. */
-    suspend fun falseAlarmRecipients(): List<EmergencyContact> {
+    override suspend fun falseAlarmRecipients(): List<EmergencyContact> {
         val s = _state.value as? SosState.Cancelled ?: return emptyList()
         val texted = s.sms.filterValues { it.status == SmsStatus.SENT || it.status == SmsStatus.DELIVERED }.keys
         return contacts.contacts.first().filter { it.id in texted }
     }
 
     /** Only after the person confirmed on screen (it costs money). Results are not tracked against the SOS. */
-    fun sendFalseAlarm() {
+    override fun sendFalseAlarm() {
         val s = _state.value as? SosState.Cancelled ?: return
         scope.launch {
             if (!sms.canSend()) return@launch
@@ -113,7 +134,7 @@ class SosController(
     }
 
     /** Leaves the "Cancelled" summary. An active SOS can only end through [cancel]. */
-    fun dismiss() {
+    override fun dismiss() {
         scope.launch { dispatch(SosAction.Reset) }
     }
 
@@ -206,7 +227,14 @@ class SosController(
         sos.updateSmsCounts(p.meta.pairId, s.sosId, sent, failed)
     }
 
-    private fun fixOf(id: String): Deferred<LocationFix?> = synchronized(fixes) { fixes.getOrPut(id) { scope.async { location.current() } } }
+    private fun fixOf(id: String): Deferred<LocationFix?> = synchronized(fixes) { fixes.getOrPut(id) { locate() } }
+
+    private fun locate(): Deferred<LocationFix?> {
+        _location.value = SosLocation.Locating
+        return scope.async {
+            locator.current().also { _location.value = it?.let(SosLocation::Known) ?: SosLocation.Unavailable }
+        }
+    }
 
     private fun isActive(id: String) = (_state.value as? SosState.Active)?.sosId == id
 
