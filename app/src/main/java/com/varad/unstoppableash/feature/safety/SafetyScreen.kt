@@ -25,7 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.varad.unstoppableash.R
@@ -33,6 +35,7 @@ import com.varad.unstoppableash.domain.model.BackendStatus
 import com.varad.unstoppableash.domain.model.SmsReceipt
 import com.varad.unstoppableash.domain.model.SmsStatus
 import com.varad.unstoppableash.domain.model.SosState
+import com.varad.unstoppableash.service.sos.FalseAlarm
 import com.varad.unstoppableash.service.sos.SosLocation
 import com.varad.unstoppableash.ui.components.HoldDefaults
 import com.varad.unstoppableash.ui.components.HoldToConfirmButton
@@ -64,11 +67,29 @@ data class SafetyActions(
     val onPickPartnerNumber: () -> Unit = {},
     val onRequestSms: () -> Unit = {},
     val onRequestLocation: () -> Unit = {},
+    /**
+     * Over the lock screen: runs the action only after the person unlocks. Raising never needs this; calling
+     * off an SOS or texting "false alarm" does, so someone else holding the locked phone can't (review 7 I5).
+     */
+    val requireUnlock: ((() -> Unit) -> Unit)? = null,
 )
 
 /** REDESIGN_SPEC §Safety and §SosActive. Neutral copy only (spec §7): no hearts, no relationship tone. */
 @Composable
-fun SafetyScreen(state: SafetyUiState, actions: SafetyActions, modifier: Modifier = Modifier) {
+fun SafetyScreen(state: SafetyUiState, givenActions: SafetyActions, modifier: Modifier = Modifier) {
+    val guard = givenActions.requireUnlock
+    val actions = if (guard == null) givenActions else givenActions.copy(
+        onCancel = { guard(givenActions.onCancel) },
+        onOfferFalseAlarm = { guard(givenActions.onOfferFalseAlarm) },
+        onConfirmFalseAlarm = { guard(givenActions.onConfirmFalseAlarm) },
+    )
+    // Locked: who your contacts are is nobody else's business.
+    val shown = if (guard == null) state else state.copy(contacts = state.contacts.mapIndexed { i, c -> c.copy(name = "#${i + 1}") })
+    SafetyContent(shown, actions, modifier)
+}
+
+@Composable
+private fun SafetyContent(state: SafetyUiState, actions: SafetyActions, modifier: Modifier) {
     Column(
         modifier.fillMaxSize().background(Orbit.colors.background).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -152,7 +173,8 @@ private fun ActivePanel(state: SafetyUiState, sos: SosState.Active, actions: Saf
     val c = Orbit.colors
     Surface(color = c.sos, contentColor = c.onSos, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(stringResource(R.string.sos_sent), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            // "Active", not "sent": what was actually sent is in the rows below, fact by fact.
+            Text(stringResource(R.string.sos_active), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Assertive })
             Text(stringResource(R.string.sos_sent_at, timeOf(sos.serverAt ?: sos.raisedAt)), style = MaterialTheme.typography.bodyLarge)
         }
     }
@@ -168,8 +190,10 @@ private fun ActivePanel(state: SafetyUiState, sos: SosState.Active, actions: Saf
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
         BackendRow(state, sos)
-        ReceiptRow(stringResource(R.string.rcpt_delivered, state.partnerName), if (sos.deliveredToPartnerAt != null) ReceiptStatus.DONE else ReceiptStatus.UNKNOWN, sos.deliveredToPartnerAt?.let(::timeOf), null)
-        ReceiptRow(stringResource(R.string.rcpt_seen, state.partnerName), if (sos.partnerAckAt != null) ReceiptStatus.DONE else ReceiptStatus.UNKNOWN, sos.partnerAckAt?.let(::timeOf), null)
+        if (state.paired) {
+            ReceiptRow(stringResource(R.string.rcpt_shown, state.partnerName), if (sos.deliveredToPartnerAt != null) ReceiptStatus.DONE else ReceiptStatus.UNKNOWN, sos.deliveredToPartnerAt?.let(::timeOf), null)
+            ReceiptRow(stringResource(R.string.rcpt_acked, state.partnerName), if (sos.partnerAckAt != null) ReceiptStatus.DONE else ReceiptStatus.UNKNOWN, sos.partnerAckAt?.let(::timeOf), null)
+        }
         SmsRows(state, sos.sms, actions.onRetrySms)
         LocationRow(state.location)
     }
@@ -179,8 +203,8 @@ private fun ActivePanel(state: SafetyUiState, sos: SosState.Active, actions: Saf
 private fun BackendRow(state: SafetyUiState, sos: SosState.Active) = when {
     sos.backend == BackendStatus.SAVED -> ReceiptRow(stringResource(R.string.rcpt_saved), ReceiptStatus.DONE, sos.serverAt?.let(::timeOf), null)
     !state.paired -> ReceiptRow(stringResource(R.string.rcpt_no_orbit), ReceiptStatus.UNKNOWN, null, null)
-    sos.backend == BackendStatus.FAILED -> ReceiptRow(stringResource(R.string.rcpt_saving_retry), ReceiptStatus.PENDING, null, null)
-    else -> ReceiptRow(stringResource(R.string.rcpt_saved), ReceiptStatus.PENDING, null, null)
+    sos.backend == BackendStatus.FAILED -> ReceiptRow(stringResource(R.string.rcpt_waiting), ReceiptStatus.PENDING, null, null)
+    else -> ReceiptRow(stringResource(R.string.rcpt_saving), ReceiptStatus.PENDING, null, null)
 }
 
 @Composable
@@ -215,7 +239,11 @@ private fun CancelledPanel(state: SafetyUiState, sos: SosState.Cancelled, action
         Text(stringResource(R.string.sos_cancelled_at, timeOf(sos.cancelledAt)), style = MaterialTheme.typography.headlineSmall, color = Orbit.colors.text, modifier = Modifier.semantics { heading() })
         SmsRows(state, sos.sms, onRetry = null)
         val texted = sos.sms.values.any { it.status == SmsStatus.SENT || it.status == SmsStatus.DELIVERED }
-        if (texted) OrbitButton(stringResource(R.string.sos_offer_false_alarm), actions.onOfferFalseAlarm, Modifier.fillMaxWidth(), style = OrbitButtonStyle.Secondary)
+        when (val fa = state.falseAlarm) {
+            is FalseAlarm.Sent -> Text(pluralStringResource(R.plurals.sos_false_alarm_sent, fa.count, fa.count), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.goodInk, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            FalseAlarm.SmsOff -> Text(stringResource(R.string.sos_false_alarm_sms_off), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.warnInk, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            null -> if (texted) OrbitButton(stringResource(R.string.sos_offer_false_alarm), actions.onOfferFalseAlarm, Modifier.fillMaxWidth(), style = OrbitButtonStyle.Secondary)
+        }
         OrbitButton(stringResource(R.string.action_done), actions.onDone, Modifier.fillMaxWidth())
     }
 }

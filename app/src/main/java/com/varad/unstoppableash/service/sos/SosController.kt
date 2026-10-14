@@ -18,6 +18,8 @@ import com.varad.unstoppableash.domain.model.SosState
 import com.varad.unstoppableash.domain.sos.SmsComposer
 import com.varad.unstoppableash.domain.sos.SosStateMachine
 import com.varad.unstoppableash.service.location.LocationSource
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -30,7 +32,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.UUID
 
 enum class RaiseResult { RAISED, ALREADY_ACTIVE }
 
@@ -41,10 +42,17 @@ sealed interface SosLocation {
     data object Unavailable : SosLocation
 }
 
+/** What happened to the false-alarm text the person confirmed. */
+sealed interface FalseAlarm {
+    data class Sent(val count: Int) : FalseAlarm
+    data object SmsOff : FalseAlarm
+}
+
 /** The SOS operations screens use; [SosController] is the real one. */
 interface SosControl {
     val state: StateFlow<SosState>
     val location: StateFlow<SosLocation>
+    val falseAlarm: StateFlow<FalseAlarm?>
     suspend fun raise(): RaiseResult
     fun cancel()
     fun retryFailedSms()
@@ -88,8 +96,9 @@ class SosController(
         started = true
         scope.launch { sms.results.collect { r -> dispatch(SosAction.SmsResult(r.sosId, r.contactId, r.status, r.failure)) } }
         scope.launch {
-            val restored = store.state.first()
-            mutex.withLock { _state.value = restored }
+            val restored = runCatching { store.state.first() }.getOrDefault(SosState.Idle)
+            mutex.withLock { if (_state.value == SosState.Idle) _state.value = restored }
+            this@SosController.restored.complete(Unit)
             if (restored !is SosState.Active) return@launch
             // The alert record is idempotent, so a PENDING or FAILED one is simply written again.
             if (restored.backend != BackendStatus.SAVED) run(SosEffect.WriteBackend(restored.sosId)) else watchPartner(restored.sosId)
@@ -102,12 +111,19 @@ class SosController(
     }
 
     /** Two quick holds (or the tile and the app at once) still make one SOS. */
-    override suspend fun raise(): RaiseResult = raiseLock.withLock {
-        val targets = contacts.contacts.first().map { SmsTarget(it.id) }
-        val pairId = paired()?.meta?.pairId
+    /**
+     * Runs on the app scope, so a caller going away (the hold screen closing) can't cancel it half-way. Needs
+     * nothing from the network: the orbit is resolved later by the record write, never before the texts.
+     */
+    override suspend fun raise(): RaiseResult = scope.async { raiseNow() }.await()
+
+    private suspend fun raiseNow(): RaiseResult = raiseLock.withLock {
+        restored.await() // a persisted SOS wins over a raise in the first moments after start-up
         if (_state.value is SosState.Active) return@withLock RaiseResult.ALREADY_ACTIVE
-        val id = pairId?.let { sos.newSosId(it) } ?: "local-${UUID.randomUUID()}"
-        fixes[id] = locate() // started now, shared by the record and every SMS
+        val targets = runCatching { contacts.contacts.first() }.getOrDefault(emptyList()).map { SmsTarget(it.id) }
+        val id = sos.newSosId()
+        _falseAlarm.value = null
+        synchronized(fixes) { fixes[id] = locate() } // started now, shared by the record and every SMS
         dispatch(SosAction.Raise(id, clock.now(), targets))
         RaiseResult.RAISED
     }
@@ -117,19 +133,24 @@ class SosController(
     override fun retryFailedSms() = withActive { dispatch(SosAction.RetryFailedSms(it.sosId)) }
 
     /** Contacts who actually got the SOS text: the only ones a "false alarm" text is offered for. */
-    override suspend fun falseAlarmRecipients(): List<EmergencyContact> {
-        val s = _state.value as? SosState.Cancelled ?: return emptyList()
+    override suspend fun falseAlarmRecipients(): List<EmergencyContact> = recipientsOf(_state.value as? SosState.Cancelled)
+
+    private suspend fun recipientsOf(s: SosState.Cancelled?): List<EmergencyContact> {
+        if (s == null) return emptyList()
         val texted = s.sms.filterValues { it.status == SmsStatus.SENT || it.status == SmsStatus.DELIVERED }.keys
         return contacts.contacts.first().filter { it.id in texted }
     }
 
     /** Only after the person confirmed on screen (it costs money). Results are not tracked against the SOS. */
     override fun sendFalseAlarm() {
+        // Captured now: the person may tap Done straight away, and the text they confirmed must still go.
         val s = _state.value as? SosState.Cancelled ?: return
         scope.launch {
-            if (!sms.canSend()) return@launch
+            if (!sms.canSend()) { _falseAlarm.value = FalseAlarm.SmsOff; return@launch }
+            val recipients = recipientsOf(s)
             val text = SmsComposer.falseAlarm(myName())
-            falseAlarmRecipients().forEach { sms.send("${s.sosId}-false-alarm", it.id, it.number, text) }
+            recipients.forEach { sms.send("${s.sosId}-false-alarm", it.id, it.number, text) }
+            _falseAlarm.value = FalseAlarm.Sent(recipients.size)
         }
     }
 
@@ -148,7 +169,8 @@ class SosController(
             val t = SosStateMachine.reduce(before, action)
             if (t.state != before) {
                 _state.value = t.state
-                store.save(t.state)
+                // Best effort: a full or broken disk must never stop the alert and the texts.
+                runCatching { store.save(t.state) }
             }
             t.effects
         }
@@ -167,9 +189,17 @@ class SosController(
     private suspend fun writeBackend(id: String) {
         var backoff = 2_000L
         while (isActive(id)) {
-            val p = paired() ?: return dispatch(SosAction.BackendFailed(id)) // no orbit: SMS still go
-            // Core record first, without location, so a slow GPS never delays the partner's alert.
-            when (sos.raise(p.meta.pairId, p.myUid, id, location = null, battery = battery())) {
+            val state = withTimeoutOrNull(PAIR_WAIT_MS) { pairs.pairState().first() }
+            if (state != null && state !is PairState.Paired) return dispatch(SosAction.BackendFailed(id)) // no orbit: texts still go
+            val p = state as? PairState.Paired
+            if (p == null) { // offline with nothing cached: keep trying, the texts don't wait for this
+                dispatch(SosAction.BackendFailed(id)); delay(backoff); backoff = (backoff * 2).coerceAtMost(30_000); continue
+            }
+            // Core record first, without location, so a slow GPS never delays the partner's alert. Offline the SDK
+            // holds the write until it reconnects; after a while the screen says "waiting" instead of "saving".
+            val write = scope.async { sos.raise(p.meta.pairId, p.myUid, id, location = null, battery = battery()) }
+            val result = withTimeoutOrNull(BACKEND_WAIT_MS) { write.await() } ?: run { dispatch(SosAction.BackendFailed(id)); write.await() }
+            when (result) {
                 is Outcome.Success -> {
                     dispatch(SosAction.BackendSaved(id, clock.now()))
                     watchPartner(id)
@@ -191,6 +221,8 @@ class SosController(
         val contact = contacts.contacts.first().firstOrNull { it.id == contactId }
             ?: return dispatch(SosAction.SmsResult(id, contactId, SmsStatus.FAILED, "contact removed"))
         val text = SmsComposer.sos(myName(), fixOf(id).await(), battery(), clock.now())
+        // The location wait can outlast an "I'm safe": never send the alarm after it was called off.
+        if (!isActive(id)) return dispatch(SosAction.SmsResult(id, contactId, SmsStatus.FAILED, NOT_SENT_CANCELLED))
         sms.send(id, contactId, contact.number, text) // a refusal comes back through results as FAILED
     }
 
@@ -240,10 +272,19 @@ class SosController(
 
     private suspend fun paired(): PairState.Paired? = pairs.pairState().first() as? PairState.Paired
 
-    private suspend fun myName(): String = paired()?.me?.name?.takeIf { it.isNotBlank() }
+    /** Never waits long: offline with nothing cached, the alert goes out with the Google name instead. */
+    private suspend fun myName(): String = withTimeoutOrNull(NAME_WAIT_MS) { paired() }?.me?.name?.takeIf { it.isNotBlank() }
         ?: fallbackName()?.takeIf { it.isNotBlank() } ?: "An AshGo user"
 
+    private val _falseAlarm = MutableStateFlow<FalseAlarm?>(null)
+    override val falseAlarm: StateFlow<FalseAlarm?> = _falseAlarm.asStateFlow()
+    private val restored = CompletableDeferred<Unit>()
+
     companion object {
+        const val BACKEND_WAIT_MS = 10_000L
+        private const val PAIR_WAIT_MS = 5_000L
+        private const val NAME_WAIT_MS = 1_000L
+        const val NOT_SENT_CANCELLED = "not sent: cancelled"
         const val SMS_OFF = "SMS off"
         const val NOT_CONFIRMED = "not confirmed: app restarted"
     }

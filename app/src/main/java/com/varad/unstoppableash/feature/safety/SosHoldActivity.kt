@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.feature.safety
 
+import android.app.KeyguardManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -26,6 +27,18 @@ import com.varad.unstoppableash.ui.theme.ThemeMode
  * widget at cutover (D-6, D-8). It shows over the lock screen; sending still needs the full 3 s hold.
  */
 class SosHoldActivity : ComponentActivity() {
+    /**
+     * Raising is open to anyone holding the phone; calling it off is not. Over the keyguard, cancel and the
+     * false-alarm text wait for the owner's unlock (fingerprint/face keeps that quick).
+     */
+    private fun afterUnlock(action: () -> Unit) {
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (keyguard == null || !keyguard.isKeyguardLocked) return action()
+        keyguard.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+            override fun onDismissSucceeded() = action()
+        })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -41,10 +54,10 @@ class SosHoldActivity : ComponentActivity() {
             OrbitTheme(ThemeMode.SYSTEM) {
                 Surface(color = Orbit.colors.background) {
                     val vm: SafetyViewModel = viewModel(factory = viewModelFactory {
-                        initializer { SafetyViewModel(container.pairs, container.contacts, container.settings, container.sosController, permissions = { safetyPermissions(this@SosHoldActivity) }) }
+                        initializer { SafetyViewModel(container.pairs, container.contacts, container.settings, container.sosController, permissions = { safetyPermissions(applicationContext) }) }
                     })
                     // Managing contacts happens in the app proper (and needs the phone unlocked).
-                    SafetyTab(vm, onOpenContacts = { startActivity(Intent(this, V2Activity::class.java)) }, Modifier.safeDrawingPadding())
+                    SafetyTab(vm, onOpenContacts = { startActivity(Intent(this, V2Activity::class.java)) }, Modifier.safeDrawingPadding(), requireUnlock = ::afterUnlock)
                 }
             }
         }

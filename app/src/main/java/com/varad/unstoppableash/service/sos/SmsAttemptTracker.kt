@@ -3,7 +3,22 @@ package com.varad.unstoppableash.service.sos
 import com.varad.unstoppableash.domain.model.SmsStatus
 import com.varad.unstoppableash.domain.sos.SmsAggregator
 
-enum class SmsPart { SENT, DELIVERED, FAILED }
+enum class SmsPart {
+    SENT, DELIVERED, FAILED;
+
+    companion object {
+        /**
+         * A delivery report's TP-Status (3GPP TS 23.040): below 0x20 complete; 0x20–0x3F the network is still
+         * trying (no change); 0x40 and up it gave up. Unknown proves nothing, so it is never "delivered".
+         */
+        fun fromDeliveryStatus(tpStatus: Int?): SmsPart? = when {
+            tpStatus == null || tpStatus < 0 -> null
+            tpStatus < 0x20 -> DELIVERED
+            tpStatus < 0x40 -> null
+            else -> FAILED
+        }
+    }
+}
 
 /**
  * Turns Android's per-part sent/delivered callbacks into one status per message attempt, reported

@@ -242,16 +242,17 @@
         <item quantity="one">%1$d contact</item>
         <item quantity="other">%1$d contacts</item>
     </plurals>
-    <string name="sos_sent">SOS sent</string>
+    <string name="sos_active">SOS active</string>
     <string name="sos_sent_at">at %1$s</string>
     <string name="sos_cancel_label">I\'m safe: cancel SOS</string>
     <string name="sos_cancel_visible">I\'m safe</string>
     <string name="sos_cancel_hint">Hold for 1.5 seconds</string>
     <string name="rcpt_saved">Saved to AshGo</string>
-    <string name="rcpt_saving_retry">Saving to AshGo (retrying)</string>
+    <string name="rcpt_saving">Saving to AshGo</string>
+    <string name="rcpt_waiting">Waiting for connection · will save when online</string>
     <string name="rcpt_no_orbit">No orbit: not saved to AshGo</string>
-    <string name="rcpt_delivered">Delivered to %1$s\'s phone</string>
-    <string name="rcpt_seen">%1$s has seen it</string>
+    <string name="rcpt_shown">Shown on %1$s\'s phone</string>
+    <string name="rcpt_acked">%1$s acknowledged</string>
     <string name="rcpt_sms">SMS to %1$s</string>
     <string name="rcpt_sms_why">SMS to %1$s (%2$s)</string>
     <string name="rcpt_sms_sent">SMS sent to %1$s</string>
@@ -264,6 +265,11 @@
     <string name="sos_offer_false_alarm">Tell texted contacts it was a false alarm</string>
     <string name="sos_false_alarm_title">Send a false-alarm text?</string>
     <string name="sos_false_alarm_body">AshGo will text: %1$s. SMS charges may apply.</string>
+    <plurals name="sos_false_alarm_sent">
+        <item quantity="one">False-alarm text sent to %1$d contact</item>
+        <item quantity="other">False-alarm text sent to %1$d contacts</item>
+    </plurals>
+    <string name="sos_false_alarm_sms_off">SMS is off, so the false-alarm text wasn\'t sent</string>
     <string name="action_dont_send">Don\'t send</string>
     <string name="action_done">Done</string>
 

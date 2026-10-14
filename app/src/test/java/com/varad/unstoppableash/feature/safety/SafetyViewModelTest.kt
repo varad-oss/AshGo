@@ -43,6 +43,7 @@ class SafetyViewModelTest {
         var recipients = emptyList<EmergencyContact>()
         override val state = MutableStateFlow<SosState>(SosState.Idle)
         override val location = MutableStateFlow<SosLocation>(SosLocation.Unavailable)
+        override val falseAlarm = MutableStateFlow<com.varad.unstoppableash.service.sos.FalseAlarm?>(null)
         override suspend fun raise(): RaiseResult { raises++; return RaiseResult.RAISED }
         override fun cancel() { cancels++ }
         override fun retryFailedSms() { retries++ }
@@ -122,5 +123,12 @@ class SafetyViewModelTest {
         vm.setPartnerPhone("+91 99999 00000"); settle()
         assertEquals("+91 99999 00000", vm.state.value.partnerPhone)
         assertNull("never written to the backend", db.read("pairs/p1/profiles/alice/phone"))
+    }
+
+    @Test fun anUnreadableOrbitDoesNotFreezeTheScreen() = runTest(main.dispatcher) {
+        seedPair(); db.failReads("userPairs")
+        val vm = vm(); contacts.add("Mum", "111"); settle()
+        assertEquals(listOf("Mum"), vm.state.value.contacts.map { it.name })
+        assertFalse(vm.state.value.loading)
     }
 }

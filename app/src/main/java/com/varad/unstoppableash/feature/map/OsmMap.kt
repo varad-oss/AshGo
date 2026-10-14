@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -56,10 +57,12 @@ fun OsmMap(pins: MapPins, focus: MapFocus?, onLongPress: (Double, Double) -> Uni
         (pins.partner ?: pins.me)?.let { map.controller.setZoom(15.0); map.controller.setCenter(GeoPoint(it.lat, it.lng)) }
     }
 
+    val meLabel = stringResource(R.string.map_me)
+    val pickedLabel = stringResource(R.string.trip_dest_map)
     AndroidView(factory = { map }, modifier = modifier, update = {
-        place(it, me, pins.me?.let { GeoPoint(it.lat, it.lng) }, context.getString(R.string.map_me), faded = false)
+        place(it, me, pins.me?.let { GeoPoint(it.lat, it.lng) }, meLabel, faded = false)
         place(it, partner, pins.partner?.let { GeoPoint(it.lat, it.lng) }, pins.partnerName, faded = pins.partnerFaded)
-        place(it, destination, pins.destination?.let { GeoPoint(it.lat, it.lng) }, pins.destination?.label ?: context.getString(R.string.trip_dest_map), faded = false)
+        place(it, destination, pins.destination?.let { GeoPoint(it.lat, it.lng) }, pins.destination?.label ?: pickedLabel, faded = false)
         it.invalidate()
     })
 }

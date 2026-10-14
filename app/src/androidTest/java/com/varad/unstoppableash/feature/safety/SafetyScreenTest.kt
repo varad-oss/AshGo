@@ -1,5 +1,10 @@
 package com.varad.unstoppableash.feature.safety
 
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import com.varad.unstoppableash.service.sos.FalseAlarm
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -22,7 +27,7 @@ import org.junit.Test
 class SafetyScreenTest {
     @get:Rule val rule = createComposeRule()
 
-    private var raises = 0; private var cancels = 0; private var retries = 0; private var falseAlarms = 0
+    private var raises = 0; private var cancels = 0; private var retries = 0; private var falseAlarms = 0; private var unlocks = 0
     private val dialled = mutableListOf<String>()
     private val mum = EmergencyContact("c1", "Mum", "111")
     private val ready = SafetyUiState(
@@ -30,13 +35,14 @@ class SafetyScreenTest {
         permissions = SafetyPermissions(sms = true, location = LocationAccess.PRECISE),
     )
 
-    private fun show(state: SafetyUiState) = rule.setContent {
+    private fun show(state: SafetyUiState, locked: Boolean = false) = rule.setContent {
         OrbitTheme(ThemeMode.LIGHT) {
             SafetyScreen(
                 state,
                 SafetyActions(
                     onRaise = { raises++ }, onCancel = { cancels++ }, onRetrySms = { retries++ }, onConfirmFalseAlarm = { falseAlarms++ },
                     onCall = { dialled += it },
+                    requireUnlock = if (locked) { _ -> unlocks++ } else null,
                 ),
             )
         }
@@ -92,10 +98,10 @@ class SafetyScreenTest {
 
     @Test fun activeSosShowsEachFactSeparately() {
         show(active)
-        rule.onNodeWithText("SOS sent").assertExists()
+        rule.onNodeWithText("SOS active").assertExists()
         rule.onNodeWithContentDescription("Saved to AshGo: done", substring = true).assertExists()
-        rule.onNodeWithContentDescription("Delivered to Bob's phone: not confirmed yet", substring = true).assertExists()
-        rule.onNodeWithContentDescription("Bob has seen it: not confirmed yet", substring = true).assertExists()
+        rule.onNodeWithContentDescription("Shown on Bob's phone: not confirmed yet", substring = true).assertExists()
+        rule.onNodeWithContentDescription("Bob acknowledged: not confirmed yet", substring = true).assertExists()
         rule.onNodeWithContentDescription("SMS to Mum (no signal): failed", substring = true).assertExists()
         rule.onNodeWithText("Retry").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(1, retries) }
@@ -115,5 +121,39 @@ class SafetyScreenTest {
         rule.onNodeWithText("SMS charges may apply", substring = true).assertExists()
         rule.onNodeWithText("Send").performClick()
         rule.runOnIdle { assertEquals(1, falseAlarms) }
+    }
+
+    @Test fun anUnsavedAlertNeverClaimsSaved() {
+        show(active.copy(sos = (active.sos as SosState.Active).copy(backend = BackendStatus.PENDING)))
+        rule.onNodeWithContentDescription("Saving to AshGo", substring = true).assertExists()
+    }
+
+    @Test fun offlineTheAlertSaysItIsWaiting() {
+        show(active.copy(sos = (active.sos as SosState.Active).copy(backend = BackendStatus.FAILED)))
+        rule.onNodeWithContentDescription("Waiting for connection · will save when online", substring = true).assertExists()
+    }
+
+    @Test fun theActiveHeadingIsAnnounced() {
+        show(active)
+        rule.onNodeWithText("SOS active").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+    }
+
+    @Test fun overTheLockScreenCancellingNeedsAnUnlockAndNamesAreHidden() {
+        rule.mainClock.autoAdvance = false
+        show(active, locked = true)
+        rule.onNodeWithContentDescription("Mum", substring = true).assertDoesNotExist()
+        rule.onNodeWithContentDescription("I'm safe: cancel SOS").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(1_600, ignoreFrameDuration = true)
+        rule.runOnIdle { assertEquals(0, cancels); assertEquals(1, unlocks) }
+    }
+
+    @Test fun theFalseAlarmOutcomeIsShown() {
+        show(ready.copy(sos = SosState.Cancelled("s1", 1L, emptyMap()), falseAlarm = FalseAlarm.Sent(1)))
+        rule.onNodeWithText("False-alarm text sent to 1 contact").assertExists()
+    }
+
+    @Test fun aFalseAlarmBlockedBySmsOffSaysSo() {
+        show(ready.copy(sos = SosState.Cancelled("s1", 1L, emptyMap()), falseAlarm = FalseAlarm.SmsOff))
+        rule.onNodeWithText("SMS is off, so the false-alarm text wasn't sent").assertExists()
     }
 }

@@ -66,12 +66,21 @@ class AndroidSmsDispatcher(private val context: Context) : SmsDispatcher {
     private fun pending(attempt: String, sosId: String, contactId: String, part: Int, action: String): PendingIntent {
         val intent = Intent(context, SmsResultReceiver::class.java).setAction(action)
             .putExtra(EXTRA_ATTEMPT, attempt).putExtra(EXTRA_SOS, sosId).putExtra(EXTRA_CONTACT, contactId).putExtra(EXTRA_PART, part)
-        // A distinct request code per part keeps the extras from being merged by PendingIntent identity.
-        val code = (attempt + action + part).hashCode()
-        return PendingIntent.getBroadcast(context, code, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT)
+        // Delivery reports carry their real status in fill-in extras ("pdu", "format"), which only a mutable
+        // PendingIntent receives, and the network may report "still trying" before the final report, so it
+        // must not be one-shot. The intent is explicit to our own receiver, so mutability exposes nothing.
+        val flags = if (action == ACTION_DELIVERED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+        } else {
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+        }
+        return PendingIntent.getBroadcast(context, requestCodes.incrementAndGet(), intent, flags)
     }
 
     /** Process-wide, because results arrive in a broadcast receiver, not in the caller. */
+    /** Unique per PendingIntent so extras are never merged with another part's (hash codes can collide). */
+    private val requestCodes = java.util.concurrent.atomic.AtomicInteger((System.currentTimeMillis() % 1_000_000).toInt() * 100)
+
     internal object Hub {
         val tracker = SmsAttemptTracker()
         val results = MutableSharedFlow<SmsResult>(extraBufferCapacity = 64)
@@ -97,14 +106,24 @@ class SmsResultReceiver : BroadcastReceiver() {
         val ok = resultCode == android.app.Activity.RESULT_OK
         val result = when (intent.action) {
             AndroidSmsDispatcher.ACTION_SENT -> if (ok) SmsPart.SENT else SmsPart.FAILED
-            // A delivery report only ever confirms; a missing or odd report is "not confirmed", not "failed".
-            AndroidSmsDispatcher.ACTION_DELIVERED -> if (ok) SmsPart.DELIVERED else return
+            // The broadcast's resultCode is always OK for delivery reports; the truth is the TP-Status in the PDU.
+            AndroidSmsDispatcher.ACTION_DELIVERED -> SmsPart.fromDeliveryStatus(deliveryStatus(intent)) ?: return
             else -> return
         }
         val status = AndroidSmsDispatcher.Hub.tracker.record(attempt, part, result) ?: return
-        val failure = if (status == SmsStatus.FAILED) failureText(resultCode) else null
+        val failure = when {
+            status != SmsStatus.FAILED -> null
+            intent.action == AndroidSmsDispatcher.ACTION_DELIVERED -> "not delivered"
+            else -> failureText(resultCode)
+        }
         AndroidSmsDispatcher.Hub.results.tryEmit(SmsResult(sosId, contactId, status, failure))
     }
+
+    private fun deliveryStatus(intent: Intent): Int? = runCatching {
+        val pdu = intent.getByteArrayExtra("pdu") ?: return null
+        val format = intent.getStringExtra("format")
+        android.telephony.SmsMessage.createFromPdu(pdu, format)?.status
+    }.getOrNull()
 
     private fun failureText(code: Int): String = when (code) {
         SmsManager.RESULT_ERROR_NO_SERVICE -> "no signal"

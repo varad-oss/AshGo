@@ -17,6 +17,7 @@ import com.varad.unstoppableash.domain.model.SosState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -60,13 +61,16 @@ class SosControllerTest {
         store = ActiveSosStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { tmp.root.resolve("s.preferences_pb") })
     }
 
-    private fun TestScope.controller(): SosController {
+    private var locatorDelayMs = 0L
+
+    private fun TestScope.controller(settleAfterStart: Boolean = true): SosController {
         stores()
         val clock = Clock { db.nowMs }
         return SosController(
             scope = backgroundScope, pairs = PairRepository(db, auth, clock), sos = SosRepository(db, clock), contacts = contacts,
-            store = store, sms = sms, locator = { fix }, clock = clock, battery = { 57 },
-        ).also { it.start(); settle() }
+            store = store, sms = sms, locator = { kotlinx.coroutines.delay(locatorDelayMs); fix }, clock = clock, battery = { 57 },
+            fallbackName = { "Asha (offline)" },
+        ).also { it.start(); if (settleAfterStart) settle() }
     }
 
     private fun TestScope.settle(ms: Long = 1_000) { testScheduler.advanceTimeBy(ms); testScheduler.runCurrent() }
@@ -173,5 +177,86 @@ class SosControllerTest {
         assertEquals(RaiseResult.RAISED, c.raise()); settle(15_000)
         assertEquals(1, sms.sent.size)
         assertEquals(BackendStatus.FAILED, c.active().backend)
+    }
+
+    @Test fun textsGoEvenWhenTheOrbitCannotBeRead() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111")
+        db.failReads("userPairs") // offline with a cold cache: pairState never emits
+        val c = controller()
+        assertEquals(RaiseResult.RAISED, c.raise()); settle(15_000)
+        assertEquals(1, sms.sent.size)
+        assertTrue(sms.sent.single().third.startsWith("AshGo SOS: Asha (offline) needs help."))
+    }
+
+    @Test fun aRaiseSurvivesItsCallerGoingAway() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111")
+        val c = controller()
+        val caller = backgroundScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { c.raise() }
+        caller.cancel() // e.g. the hold screen closed right after the hold
+        settle(15_000)
+        assertTrue(c.state.value is SosState.Active); assertEquals(1, records().size); assertEquals(1, sms.sent.size)
+    }
+
+    @Test fun cancellingBeforeTheTextLeavesSendsNoSosText() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111"); locatorDelayMs = 60_000
+        val c = controller()
+        c.raise(); settle(2_000)
+        c.cancel(); settle(70_000)
+        assertTrue("no SOS text after I'm safe", sms.sent.isEmpty())
+        assertEquals(SmsReceipt(SmsStatus.FAILED, SosController.NOT_SENT_CANCELLED), (c.state.value as SosState.Cancelled).sms.values.single())
+    }
+
+    @Test fun aConfirmedFalseAlarmIsSentEvenIfTheScreenClosesAtOnce() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111")
+        val c = controller()
+        c.raise(); settle(15_000)
+        val id = c.active().sosId
+        sms.out.emit(SmsResult(id, c.active().sms.keys.single(), SmsStatus.SENT)); settle()
+        c.cancel(); settle()
+        c.sendFalseAlarm(); c.dismiss(); settle()
+        assertEquals(2, sms.sent.size)
+        assertEquals(FalseAlarm.Sent(1), c.falseAlarm.value)
+    }
+
+    @Test fun aFalseAlarmWithSmsOffSaysSo() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111")
+        val c = controller()
+        c.raise(); settle(15_000)
+        sms.out.emit(SmsResult(c.active().sosId, c.active().sms.keys.single(), SmsStatus.SENT)); settle()
+        c.cancel(); settle()
+        sms.permitted = false
+        c.sendFalseAlarm(); settle()
+        assertEquals(FalseAlarm.SmsOff, c.falseAlarm.value)
+    }
+
+    @Test fun offlineTheAlertSaysWaitingNotSaved() = runTest(main.dispatcher) {
+        seedPair()
+        val c = controller()
+        db.ackHeld.value = true
+        c.raise(); settle(SosController.BACKEND_WAIT_MS + 1_000)
+        assertEquals(BackendStatus.FAILED, c.active().backend)
+        db.ackHeld.value = false; settle()
+        assertEquals(BackendStatus.SAVED, c.active().backend)
+    }
+
+    @Test fun aRaiseRightAfterStartupDoesNotDuplicateARestoredSos() = runTest(main.dispatcher) {
+        seedPair(); stores(); contacts.add("Mum", "111")
+        val mumId = contacts.contacts.first().single().id
+        store.save(SosState.Active("s-restored", base - 1_000, BackendStatus.SAVED, base - 900, null, null, mapOf(mumId to SmsReceipt(SmsStatus.SENT))))
+        val c = controller(settleAfterStart = false)
+        assertEquals(RaiseResult.ALREADY_ACTIVE, c.raise()); settle(15_000)
+        assertEquals("s-restored", c.active().sosId)
+        assertTrue(sms.sent.isEmpty())
+    }
+
+    @Test fun aBrokenStateFileNeverStopsTheAlert() = runTest(main.dispatcher) {
+        seedPair()
+        contacts = EmergencyContactsStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { tmp.root.resolve("c.preferences_pb") })
+        contacts.add("Mum", "111")
+        val blocked = tmp.newFolder("blocked.preferences_pb") // a directory where the file should be: every save fails
+        store = ActiveSosStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { blocked })
+        val c = controller()
+        c.raise(); settle(15_000)
+        assertEquals(1, records().size); assertEquals(1, sms.sent.size)
     }
 }

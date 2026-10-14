@@ -21,6 +21,9 @@ class SosRepository(private val db: RtdbClient, private val clock: com.varad.uns
 
     fun newSosId(pairId: String): String = db.newKey(DbPaths.sosAll(pairId))
 
+    /** Push keys don't depend on the path, so an SOS gets its id before the orbit is even known. */
+    fun newSosId(): String = db.newKey("sos")
+
     /**
      * Writes the core record first; location follows in a separate update so a location problem can
      * never block the alert (review C2). Retrying with the same id is a no-op success (review I2).

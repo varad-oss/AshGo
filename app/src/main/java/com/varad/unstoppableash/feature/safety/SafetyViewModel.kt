@@ -8,12 +8,15 @@ import com.varad.unstoppableash.data.pair.PairRepository
 import com.varad.unstoppableash.domain.model.EmergencyContact
 import com.varad.unstoppableash.domain.model.PairState
 import com.varad.unstoppableash.domain.model.SosState
+import com.varad.unstoppableash.service.sos.FalseAlarm
 import com.varad.unstoppableash.service.sos.SosControl
 import com.varad.unstoppableash.service.sos.SosLocation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,6 +37,7 @@ data class SafetyUiState(
     val raising: Boolean = false,
     /** Non-null while the "tell them it was a false alarm?" confirmation is open. */
     val falseAlarmRecipients: List<EmergencyContact>? = null,
+    val falseAlarm: FalseAlarm? = null,
 ) {
     fun contactName(id: String): String = contacts.firstOrNull { it.id == id }?.name ?: ""
 }
@@ -55,9 +59,11 @@ class SafetyViewModel(
     private val local = MutableStateFlow(Local(permissions()))
 
     val state: StateFlow<SafetyUiState> = combine(
-        pairs.pairState(), contacts.contacts, settings.settings, sos.state, sos.location, local,
+        // Offline with nothing cached the orbit may never load; everything else must still show.
+        pairs.pairState().map<PairState, PairState?> { it }.onStart { emit(null) },
+        contacts.contacts, settings.settings, sos.state, sos.location, local, sos.falseAlarm,
     ) { v ->
-        val pair = v[0] as PairState
+        val pair = v[0] as PairState?
         @Suppress("UNCHECKED_CAST") val list = v[1] as List<EmergencyContact>
         val prefs = v[2] as com.varad.unstoppableash.data.local.Settings
         val l = v[5] as Local
@@ -72,6 +78,7 @@ class SafetyViewModel(
             location = v[4] as SosLocation,
             raising = l.raising,
             falseAlarmRecipients = l.falseAlarm,
+            falseAlarm = v[6] as FalseAlarm?,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), SafetyUiState())
 

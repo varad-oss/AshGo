@@ -124,7 +124,7 @@ private fun MainShell(container: AppContainer) {
     })
     val context = LocalContext.current
     val safetyVm: SafetyViewModel = viewModel(factory = viewModelFactory {
-        initializer { SafetyViewModel(container.pairs, container.contacts, container.settings, container.sosController, permissions = { safetyPermissions(context) }) }
+        initializer { SafetyViewModel(container.pairs, container.contacts, container.settings, container.sosController, permissions = { safetyPermissions(context.applicationContext) }) }
     })
     val homeState by home.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
@@ -226,7 +226,7 @@ private fun dial(context: Context, number: String) {
 }
 
 @Composable
-internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier: Modifier) {
+internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier: Modifier, requireUnlock: ((() -> Unit) -> Unit)? = null) {
     val context = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     // Permissions can change in Android settings while we're away; re-read them whenever we come back.
@@ -250,6 +250,7 @@ internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier
             onPickPartnerNumber = { pickPartner.launch(Unit) },
             onRequestSms = { askSms.launch(Manifest.permission.SEND_SMS) },
             onRequestLocation = { askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
+            requireUnlock = requireUnlock,
         ),
         modifier,
     )

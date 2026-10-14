@@ -85,7 +85,7 @@ fun PartnerSosScreen(state: PartnerSosUiState, partnerPhone: String?, nowMs: Lon
             Text(stringResource(R.string.psos_acked, state.partnerName), style = MaterialTheme.typography.titleMedium, color = c.onSos, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         } else {
             // White on SOS red: the one primary action, unmistakable.
-            Button(actions.onAcknowledge, Modifier.fillMaxWidth().padding(vertical = Spacing.xs), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = c.sosText)) {
+            Button(actions.onAcknowledge, Modifier.fillMaxWidth().padding(vertical = Spacing.xs), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ACK_RED)) {
                 Text(stringResource(R.string.psos_ack), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 6.dp))
             }
         }
@@ -99,6 +99,9 @@ fun PartnerSosScreen(state: PartnerSosUiState, partnerPhone: String?, nowMs: Lon
         }
     }
 }
+
+/** Fixed dark red on white (7.5:1): the theme's sosText is a light pink in dark mode, unreadable on white. */
+private val ACK_RED = Color(0xFFB3261E)
 
 private val timeFormat = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 private fun timeOf(at: Long): String = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).format(timeFormat)
