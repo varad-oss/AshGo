@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -65,6 +66,7 @@ data class HomeActions(
     val onOpenSettings: () -> Unit = {},
     val onOpenMap: () -> Unit = {},
     val onOpenSafety: () -> Unit = {},
+    val onOpenPartnerSos: () -> Unit = {},
     val onCheckIn: (kind: String, text: String?) -> Unit = { _, _ -> },
     val onNudge: (kind: String) -> Unit = {},
     val onDismissError: () -> Unit = {},
@@ -82,7 +84,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 state.partnerSos?.let {
                     Surface(
                         color = Orbit.colors.sos, contentColor = Orbit.colors.onSos, shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.fillMaxWidth().clickable(onClick = actions.onOpenSafety),
+                        modifier = Modifier.fillMaxWidth().clickable(onClick = actions.onOpenPartnerSos),
                     ) {
                         Text(stringResource(R.string.partner_sos_banner, state.partnerName), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(Spacing.lg))
                     }
@@ -167,7 +169,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 OrbitButton(stringResource(R.string.action_manage), actions.onOpenMap, style = OrbitButtonStyle.Quiet)
             }
 
-            SosRow(actions.onOpenSafety)
+            SosRow(state.mySosActive, actions.onOpenSafety)
         }
     }
     when (sheet) {
@@ -181,8 +183,8 @@ private enum class HomeSheet { CHECK_IN, NUDGE }
 
 /** Separate from the everyday actions, undecorated, and a tap only opens Safety (D-6: sending needs a hold). */
 @Composable
-private fun SosRow(onOpenSafety: () -> Unit) {
-    val description = stringResource(R.string.sos_row_cd)
+private fun SosRow(active: Boolean, onOpenSafety: () -> Unit) {
+    val description = stringResource(if (active) R.string.sos_row_active_cd else R.string.sos_row_cd)
     Box(
         Modifier
             .padding(top = Spacing.lg)
@@ -190,11 +192,15 @@ private fun SosRow(onOpenSafety: () -> Unit) {
             .heightIn(min = 56.dp)
             .clip(MaterialTheme.shapes.medium)
             .border(BorderStroke(2.dp, Orbit.colors.sos), MaterialTheme.shapes.medium)
+            .background(if (active) Orbit.colors.sos else Color.Transparent)
             .clickable(onClick = onOpenSafety)
             .clearAndSetSemantics { contentDescription = description; role = Role.Button; onClick { onOpenSafety(); true } },
         contentAlignment = Alignment.Center,
     ) {
-        Text(stringResource(R.string.sos_row), style = MaterialTheme.typography.titleMedium, color = Orbit.colors.sosText)
+        Text(
+            stringResource(if (active) R.string.sos_row_active else R.string.sos_row),
+            style = MaterialTheme.typography.titleMedium, color = if (active) Orbit.colors.onSos else Orbit.colors.sosText,
+        )
     }
 }
 

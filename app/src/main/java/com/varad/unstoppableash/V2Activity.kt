@@ -1,6 +1,5 @@
 package com.varad.unstoppableash
 
-import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,10 +26,7 @@ class V2Activity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as AshGoApplication).container
-        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (debuggable && intent.getBooleanExtra(EXTRA_USE_EMULATORS, false) && !container.usesEmulators) {
-            runCatching { container.useLocalEmulators() }
-        }
+        DevBackend.apply(this, container)
         enableEdgeToEdge()
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(Settings())
@@ -56,6 +52,6 @@ class V2Activity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_USE_EMULATORS = "useEmulators"
+        const val EXTRA_USE_EMULATORS = DevBackend.EXTRA_USE_EMULATORS
     }
 }

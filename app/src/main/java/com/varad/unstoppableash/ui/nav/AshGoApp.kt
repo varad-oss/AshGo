@@ -1,6 +1,26 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.feature.safety.SafetyViewModel
+import com.varad.unstoppableash.feature.safety.SafetyScreen
+import com.varad.unstoppableash.feature.safety.SafetyPermissions
+import com.varad.unstoppableash.feature.safety.SafetyActions
+import com.varad.unstoppableash.feature.safety.PickPhoneNumber
+import com.varad.unstoppableash.feature.safety.PartnerSosViewModel
+import com.varad.unstoppableash.feature.safety.PartnerSosScreen
+import com.varad.unstoppableash.feature.safety.PartnerSosActions
+import com.varad.unstoppableash.feature.safety.LocationAccess
+import com.varad.unstoppableash.feature.safety.ContactsViewModel
+import com.varad.unstoppableash.feature.safety.ContactsScreen
+import com.varad.unstoppableash.feature.safety.ContactsActions
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import android.content.pm.PackageManager
+import android.content.Intent
+import android.content.Context
+import android.Manifest
 import com.varad.unstoppableash.feature.chat.ChatViewModel
 import com.varad.unstoppableash.feature.chat.ChatScreen
 import com.varad.unstoppableash.feature.chat.ChatActions
@@ -93,7 +113,7 @@ fun AshGoApp(container: AppContainer, requestGoogleIdToken: suspend () -> Outcom
 private fun MainShell(container: AppContainer) {
     val home: HomeViewModel = viewModel(factory = viewModelFactory {
         initializer {
-            HomeViewModel(container.pairs, container.presence, container.location, container.chat, container.events, container.sos, container.trips, container.rtdb, container.clock)
+            HomeViewModel(container.pairs, container.presence, container.location, container.chat, container.events, container.sos, container.trips, container.rtdb, container.clock, container.sosController.state)
         }
     })
     val settingsVm: SettingsViewModel = viewModel(factory = viewModelFactory {
@@ -102,9 +122,26 @@ private fun MainShell(container: AppContainer) {
     val chatVm: ChatViewModel = viewModel(factory = viewModelFactory {
         initializer { ChatViewModel(container.pairs, container.chat, container.events, container.presence, container.photoEncoder, container.rtdb, container.clock) }
     })
+    val context = LocalContext.current
+    val safetyVm: SafetyViewModel = viewModel(factory = viewModelFactory {
+        initializer { SafetyViewModel(container.pairs, container.contacts, container.settings, container.sosController, permissions = { safetyPermissions(context) }) }
+    })
     val homeState by home.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showContacts by rememberSaveable { mutableStateOf(false) }
+    var showPartnerSos by rememberSaveable { mutableStateOf(false) }
+
+    if (showContacts) {
+        BackHandler { showContacts = false }
+        ContactsOverlay(container, onBack = { showContacts = false })
+        return
+    }
+    if (showPartnerSos) {
+        BackHandler { showPartnerSos = false }
+        PartnerSosOverlay(container, safetyVm, onClose = { showPartnerSos = false })
+        return
+    }
 
     if (showSettings) {
         BackHandler { showSettings = false }
@@ -131,6 +168,7 @@ private fun MainShell(container: AppContainer) {
                     onOpenSettings = { showSettings = true },
                     onOpenMap = { tab = Tab.MAP },
                     onOpenSafety = { tab = Tab.SAFETY },
+                    onOpenPartnerSos = { showPartnerSos = true },
                     onCheckIn = home::checkIn,
                     onNudge = home::nudge,
                     onDismissError = home::dismissError,
@@ -138,7 +176,8 @@ private fun MainShell(container: AppContainer) {
                 padding, // the scaffold's padding already includes the system bars
             )
             Tab.CHAT -> ChatTab(chatVm, padding)
-            Tab.MAP, Tab.SAFETY -> ComingLater(padding)
+            Tab.SAFETY -> SafetyTab(safetyVm, onOpenContacts = { showContacts = true }, padding)
+            Tab.MAP -> ComingLater(padding)
         }
     }
 }
@@ -166,5 +205,85 @@ private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
             photo = vm::photo,
         ),
         modifier,
+    )
+}
+
+private fun granted(context: Context, permission: String) =
+    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+internal fun safetyPermissions(context: Context) = SafetyPermissions(
+    sms = granted(context, Manifest.permission.SEND_SMS),
+    location = when {
+        granted(context, Manifest.permission.ACCESS_FINE_LOCATION) -> LocationAccess.PRECISE
+        granted(context, Manifest.permission.ACCESS_COARSE_LOCATION) -> LocationAccess.APPROXIMATE
+        else -> LocationAccess.OFF
+    },
+)
+
+/** The dialer, never a direct call: AshGo has no CALL_PHONE and never places calls itself (J9). */
+private fun dial(context: Context, number: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))) }
+}
+
+@Composable
+internal fun SafetyTab(vm: SafetyViewModel, onOpenContacts: () -> Unit, modifier: Modifier) {
+    val context = LocalContext.current
+    val state by vm.state.collectAsStateWithLifecycle()
+    // Permissions can change in Android settings while we're away; re-read them whenever we come back.
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(lifecycleState) { if (lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) vm.refreshPermissions() }
+    val askSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.refreshPermissions() }
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refreshPermissions() }
+    val pickPartner = rememberLauncherForActivityResult(PickPhoneNumber()) { picked -> picked?.let { vm.setPartnerPhone(it.number) } }
+    SafetyScreen(
+        state,
+        SafetyActions(
+            onRaise = vm::raise,
+            onCancel = vm::cancel,
+            onRetrySms = vm::retrySms,
+            onOfferFalseAlarm = vm::offerFalseAlarm,
+            onConfirmFalseAlarm = vm::confirmFalseAlarm,
+            onDeclineFalseAlarm = vm::declineFalseAlarm,
+            onDone = vm::done,
+            onCall = { dial(context, it) },
+            onOpenContacts = onOpenContacts,
+            onPickPartnerNumber = { pickPartner.launch(Unit) },
+            onRequestSms = { askSms.launch(Manifest.permission.SEND_SMS) },
+            onRequestLocation = { askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
+        ),
+        modifier,
+    )
+}
+
+@Composable
+private fun ContactsOverlay(container: AppContainer, onBack: () -> Unit) {
+    val vm: ContactsViewModel = viewModel(factory = viewModelFactory { initializer { ContactsViewModel(container.contacts) } })
+    val state by vm.state.collectAsStateWithLifecycle()
+    val pick = rememberLauncherForActivityResult(PickPhoneNumber()) { picked -> picked?.let { vm.add(it.name, it.number) } }
+    ContactsScreen(
+        state,
+        ContactsActions(onBack = onBack, onPick = { pick.launch(Unit) }, onAdd = vm::add, onRemove = vm::remove),
+        Modifier.safeDrawingPadding(),
+    )
+}
+
+@Composable
+private fun PartnerSosOverlay(container: AppContainer, safety: SafetyViewModel, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val vm: PartnerSosViewModel = viewModel(factory = viewModelFactory { initializer { PartnerSosViewModel(container.pairs, container.sos) } })
+    val state by vm.state.collectAsStateWithLifecycle()
+    val safetyState by safety.state.collectAsStateWithLifecycle()
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(lifecycleState) { vm.setVisible(lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(vm) { onDispose { vm.setVisible(false) } }
+    PartnerSosScreen(
+        state, safetyState.partnerPhone, container.clock.now(),
+        PartnerSosActions(
+            onAcknowledge = vm::acknowledge,
+            onCall = { dial(context, it) },
+            onOpenMap = { lat, lng -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "geo:$lat,$lng?q=$lat,$lng".toUri())) } },
+            onClose = onClose,
+        ),
+        Modifier.safeDrawingPadding(),
     )
 }

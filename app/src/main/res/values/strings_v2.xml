@@ -135,6 +135,8 @@
     <string name="my_sharing_off">You: not sharing location</string>
     <string name="action_manage">Manage</string>
     <string name="sos_row">SOS · open Safety</string>
+    <string name="sos_row_active">SOS active · open</string>
+    <string name="sos_row_active_cd">Your SOS is active. Opens the Safety screen.</string>
     <string name="sos_row_cd">SOS. Opens the Safety screen. Nothing is sent from here.</string>
     <string name="partner_sos_banner">%1$s needs help · tap to see</string>
     <string name="status_sending">Sending…</string>
@@ -212,6 +214,7 @@
 
     <!-- ===== Safety / SOS (Stage 7). Neutral copy only: no hearts, no relationship tone. ===== -->
     <string name="safety_title">Safety</string>
+    <string name="sos_tile_label">AshGo SOS</string>
     <string name="sos_hold_label">Hold for 3 seconds to send SOS</string>
     <string name="sos_hold_visible">SOS</string>
     <string name="what_happens">What happens when you send SOS</string>
@@ -276,7 +279,6 @@
     <string name="contacts_duplicate">That number is already on the list</string>
     <string name="contacts_full">You can have up to 5 emergency contacts</string>
     <string name="contacts_invalid">That doesn\'t look like a phone number</string>
-    <string name="partner_number_title">%1$s\'s number</string>
 
     <string name="psos_title">%1$s needs help</string>
     <string name="psos_sent">Sent at %1$s · %2$s</string>

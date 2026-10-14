@@ -31,12 +31,13 @@ class HomeScreenTest {
     @get:Rule val rule = createComposeRule()
 
     private var safetyOpened = 0
+    private var partnerSosOpened = 0
     private val base = HomeUiState(loading = false, myName = "Alice", partnerName = "Bob")
 
     private fun show(state: HomeUiState, fontScale: Float = 1f) = rule.setContent {
         val d = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-            OrbitTheme(ThemeMode.LIGHT) { HomeScreen(state, HomeActions(onOpenSafety = { safetyOpened++ })) }
+            OrbitTheme(ThemeMode.LIGHT) { HomeScreen(state, HomeActions(onOpenSafety = { safetyOpened++ }, onOpenPartnerSos = { partnerSosOpened++ })) }
         }
     }
 
@@ -113,5 +114,17 @@ class HomeScreenTest {
         val at = 1_000_000_000L
         show(base.copy(partnerPresence = PresenceState.Paused(at), partnerLocation = LocationFix(1.0, 2.0, null, at), nowMs = at + 5 * 60_000))
         rule.onNodeWithText("Last location 5 min ago", substring = true).assertExists()
+    }
+
+    @Test fun thePartnersSosBannerOpensTheirSos() {
+        show(base.copy(partnerSos = sos))
+        rule.onNodeWithText("Bob needs help", substring = true).performClick()
+        rule.runOnIdle { assertEquals(1, partnerSosOpened); assertEquals(0, safetyOpened) }
+    }
+
+    @Test fun myActiveSosIsShownOnTheSosRow() {
+        show(base.copy(mySosActive = true))
+        rule.onNodeWithContentDescription("Your SOS is active. Opens the Safety screen.").performClick()
+        rule.runOnIdle { assertEquals(1, safetyOpened) }
     }
 }

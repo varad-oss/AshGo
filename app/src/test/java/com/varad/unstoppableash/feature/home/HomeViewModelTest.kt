@@ -46,12 +46,14 @@ class HomeViewModelTest {
         ))
     }
 
+    private val mySos = MutableStateFlow<com.varad.unstoppableash.domain.model.SosState>(com.varad.unstoppableash.domain.model.SosState.Idle)
+
     private fun vm(clock: Clock = Clock { db.nowMs }): HomeViewModel {
         val auth = FakeAuthGateway(FakeAuthGateway.google("alice"))
         return HomeViewModel(
             pairs = PairRepository(db, auth, clock), presence = PresenceRepository(db), location = LocationRepository(db),
             chat = ChatRepository(db), events = EventRepository(db, clock), sos = SosRepository(db, clock), trips = TripRepository(db),
-            rtdb = db, clock = clock,
+            rtdb = db, clock = clock, mySos = mySos,
         )
     }
 
@@ -217,5 +219,16 @@ class HomeViewModelTest {
         assertTrue(first >= base + 7_000)
         settle(31_000)
         assertTrue("now advances on its own", vm.state.value.nowMs >= first + 30_000)
+    }
+
+    @Test fun myActiveSosReachesHome() = runTest(main.dispatcher) {
+        seedPair()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        settle()
+        assertFalse(vm.state.value.mySosActive)
+        mySos.value = com.varad.unstoppableash.domain.model.SosState.Active("s1", 1L, com.varad.unstoppableash.domain.model.BackendStatus.PENDING, null, null, null, emptyMap())
+        settle()
+        assertTrue(vm.state.value.mySosActive)
     }
 }

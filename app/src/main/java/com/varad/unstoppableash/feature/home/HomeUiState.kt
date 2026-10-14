@@ -44,4 +44,6 @@ data class HomeUiState(
     val error: FailureReason? = null,
     /** Server-corrected now, ticking, so ages on screen keep moving. */
     val nowMs: Long = 0L,
+    /** My own SOS is running (from SosController on this phone). */
+    val mySosActive: Boolean = false,
 )

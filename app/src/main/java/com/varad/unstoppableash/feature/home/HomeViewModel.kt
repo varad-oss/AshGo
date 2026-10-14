@@ -21,6 +21,7 @@ import com.varad.unstoppableash.domain.model.PresenceSnapshot
 import com.varad.unstoppableash.domain.model.PresenceState
 import com.varad.unstoppableash.domain.model.SharingMode
 import com.varad.unstoppableash.domain.model.SosRecord
+import com.varad.unstoppableash.domain.model.SosState
 import com.varad.unstoppableash.domain.model.Trip
 import com.varad.unstoppableash.domain.presence.PresenceCalculator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,6 +62,7 @@ class HomeViewModel(
     private val trips: TripRepository,
     private val rtdb: RtdbClient,
     private val clock: Clock,
+    private val mySos: Flow<SosState> = flowOf(SosState.Idle),
 ) : ViewModel() {
 
     /** Tagged with the pair it happened in, so nothing follows you into another orbit or account. */
@@ -91,9 +93,10 @@ class HomeViewModel(
     }
 
     val state: StateFlow<HomeUiState> =
-        combine(details, action, error, rtdb.connected().onStart { emit(true) }) { d, a, e, connected ->
+        combine(details, action, error, rtdb.connected().onStart { emit(true) }, mySos) { d, a, e, connected, sos ->
             val pairId = current?.meta?.pairId
             d.copy(
+                mySosActive = sos is SosState.Active,
                 action = a.value.takeIf { a.pairId == pairId } ?: ActionStatus.Idle,
                 error = e?.value?.takeIf { e.pairId == pairId },
                 connectionProblem = if (connected) null else FailureReason.OFFLINE,
