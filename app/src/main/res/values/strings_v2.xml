@@ -262,6 +262,22 @@
     <string name="action_dont_send">Don\'t send</string>
     <string name="action_done">Done</string>
 
+    <string name="contacts_title">Emergency contacts</string>
+    <string name="contacts_explain">These people get an SMS if you send SOS. Normal SMS charges may apply. They are kept only on this phone.</string>
+    <string name="contacts_pick">Choose from your contacts</string>
+    <string name="contacts_type">Or type a number</string>
+    <string name="contacts_name">Name</string>
+    <string name="contacts_number">Phone number</string>
+    <string name="contacts_remove">Remove %1$s</string>
+    <string name="contacts_remove_title">Remove %1$s?</string>
+    <string name="contacts_remove_body">They won\'t get an SMS if you send SOS.</string>
+    <string name="action_remove">Remove</string>
+    <string name="contacts_count">%1$d of %2$d</string>
+    <string name="contacts_duplicate">That number is already on the list</string>
+    <string name="contacts_full">You can have up to 5 emergency contacts</string>
+    <string name="contacts_invalid">That doesn\'t look like a phone number</string>
+    <string name="partner_number_title">%1$s\'s number</string>
+
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>
     <string name="catalog_dark">Dark</string>
