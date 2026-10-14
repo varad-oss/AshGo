@@ -935,3 +935,108 @@ An outbox entry whose id is already on the server is dropped, so a send is never
   - a nudge chip;
   - unread clears when the tab opens.
 - Then the fresh review.
+
+---
+
+## Stage 7 — Safety / SOS (detailed, written 2026-10-14)
+
+**Spec:** REDESIGN_SPEC §Safety, §SosActive, §PartnerSos, §EmergencyContacts; D-6, D-8; USER_JOURNEYS J10.
+
+**Rulings carried into this stage:**
+- **Profiles have no phone field.** Adding one would need a production rules redeploy, and would put a phone number on the server. "Call {partner}" therefore uses a partner number stored only on this phone, chosen with the system contact picker (no `READ_CONTACTS`), in `SettingsStore`.
+- **SOS entry points stay debug-only until Stage 11:** `SosHoldActivity`, `SosTileService`, and the in-app Safety tab. The release build still runs v1. The v1 widget (`SosWidgetProvider`, same FQCN) is repointed to the hold screen at cutover, never before, so the live v1 app keeps its current behaviour.
+- **Automated tests never send SMS.** `SmsDispatcher` is an interface. JVM tests use a fake. `AndroidSmsDispatcher` is exercised only by hand on the emulator, whose modem never reaches a carrier.
+
+### Task 7.1 — SMS text and part aggregation (pure)
+**Files:** `domain/sos/SmsComposer.kt`, `domain/sos/SmsAggregator.kt`.
+
+`SmsComposer.sos(name, fix?, battery?, nowMs)` builds GSM-7-safe text:
+- `AshGo SOS: {name} needs help. Location: https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=17/{lat}/{lng} (±{acc} m, {age} ago). Battery {b}%. Sent automatically by AshGo.`
+- Coordinates have 5 decimals and are never 0,0. With no fix: "Location unavailable."
+
+`SmsComposer.falseAlarm(name)`.
+
+`SmsAggregator`: per-part sent/delivered results → one worst-of-parts `SmsStatus` per attempt.
+
+**Tests:**
+- coordinates are formatted, and there is no "0,0";
+- missing location → "Location unavailable";
+- the text is GSM-7 only, apart from the name;
+- the aggregator: any FAILED → FAILED; all SENT → SENT; DELIVERED only when every part is delivered.
+
+### Task 7.2 — Ports: SMS dispatcher, device location, contact numbers
+**Files:** `service/sos/SmsDispatcher.kt` (interface + `AndroidSmsDispatcher` + `SmsResultReceiver`) and `service/location/LocationSource.kt` (interface + `FusedLocationSource`).
+
+- `getCurrentLocation(PRIORITY_HIGH_ACCURACY)` with a 10 s timeout, falling back to `lastLocation`. Returns null without permission.
+- Results arrive as `SmsResult(sosId, contactId, status)` through a `SharedFlow`.
+
+### Task 7.3 — SosController (orchestrator, app-scoped)
+**Files:** `service/sos/SosController.kt`.
+
+It owns `StateFlow<SosState>`, persisted through `ActiveSosStore` and restored on start, and runs the reducer's effects:
+- WriteBackend → `SosRepository.raise` with a location (or none), then `BackendSaved`/`BackendFailed`. Retried with backoff while active.
+- SendSms → number from `EmergencyContactsStore` → dispatcher.
+- WriteCancel → `SosRepository.cancel`.
+
+It also:
+- mirrors the record's `deliveredTo`/`ackBy` into `PartnerDelivered`/`PartnerAcked`;
+- pushes SMS counts to the record;
+- provides `raise()`, `cancel()`, `retryFailedSms()`, `falseAlarmRecipients()` and `sendFalseAlarm()`.
+
+**Restore after process death:**
+- a PENDING backend is re-raised (idempotent);
+- a QUEUED SMS becomes FAILED("not confirmed: app restarted"), and is never auto-resent.
+
+**Tests** (FakeRtdb, fake dispatcher, fake location, temp DataStore):
+- one record and one SMS per contact;
+- raising again while active creates nothing;
+- no contacts → no SMS;
+- SMS not permitted → no sends, `smsOff`;
+- location arrives after the core write;
+- cancel writes once, and the partner can't cancel (rules, already tested);
+- false alarm only to SENT/DELIVERED;
+- partner ack → state;
+- restore semantics.
+
+### Task 7.4 — Safety screen + SosActive panel
+**Files:** `feature/safety/SafetyViewModel.kt`, `SafetyScreen.kt`, `SosActivePanel.kt`.
+
+- The Safety tab shows the hold (3 s) and "What happens", built from real state: paired, contacts count + SMS permission, location permission.
+- Call 112 and Call {partner} open the dialer, with no `CALL_PHONE`.
+- Rows: emergency contacts, partner number, fake call (Stage 10).
+- While an SOS is active, the tab shows the SosActive panel:
+  - hold 1.5 s "I'm safe: cancel SOS";
+  - ReceiptRows: saved, delivered to partner, seen, one per SMS contact with Retry, and location;
+  - after cancelling, a false-alarm confirmation that lists recipients and mentions charges.
+- Home's SOS row reads "SOS active · open" while active.
+- **UI tests:** a tap never raises; receipts render each fact; the false-alarm dialog lists names; cancel needs a hold.
+
+### Task 7.5 — PartnerSos
+**Files:** `feature/safety/PartnerSosScreen.kt`, plus view-model wiring.
+
+- Full red. Shows the time raised, the last location + age, and battery.
+- Acknowledge, Call {partner}, Call 112.
+- Opening it writes `deliveredTo` (the phone has shown it); Acknowledge writes `ackBy`.
+- Reached from Home's banner now; Stage 9 adds the full-screen notification.
+- **Tests:** VM: display → delivered once; ack once; own SOS never shown.
+
+### Task 7.6 — Emergency contacts + partner number
+**Files:** `feature/safety/ContactsScreen.kt`.
+
+- The picker is `ACTION_PICK` on `Phone.CONTENT_TYPE`, which grants that one row, so no `READ_CONTACTS`.
+- Manual add, remove, and an SMS cost note. At most 5 contacts.
+
+### Task 7.7 — SosHoldActivity + Quick Settings tile (debug manifest)
+- The hold screen works over the lock screen (`showWhenLocked`, `turnScreenOn`) and holds 3 s; a tap never sends.
+- The tile opens it.
+- **Test:** the activity raises only after the hold.
+
+### Task 7.8 — Manual verification + review
+On the emulator against the emulators:
+- raise;
+- Bob (REST) delivers and acks → rows update;
+- an SMS to the emulator's own number (5554), which never leaves the machine;
+- cancel → false alarm;
+- PartnerSos as Alice when Bob raises.
+
+Then the fresh review.
