@@ -86,7 +86,7 @@ fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier:
         map(
             MapPins(state.myFix, state.partnerFix, state.partnerName, state.partnerFaded, state.myTrip?.dest ?: picked),
             focus,
-            { lat, lng -> picked = TripDestination(lat, lng, null); tripSheet = true },
+            { lat, lng -> if (!state.watcher) { picked = TripDestination(lat, lng, null); tripSheet = true } },
             Modifier.fillMaxSize(),
         )
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
@@ -139,6 +139,11 @@ private fun Header(state: MapUiState) {
 private fun Panel(state: MapUiState, actions: MapActions, onStartTrip: () -> Unit) {
     Surface(color = Orbit.colors.surface, shadowElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            if (state.watcher) {
+                if (state.partnerTripPhase == OverduePhase.ALERT_PARTNER) PartnerOverdue(state, null)
+                WatchedTrip(state)
+                return@Column
+            }
             if (state.partnerTripPhase == OverduePhase.ALERT_PARTNER) PartnerOverdue(state, actions.onGetHelp)
             if (state.myTripPhase == OverduePhase.ASK_TRAVELLER || state.myTripPhase == OverduePhase.ALERT_PARTNER) MeOverdue(actions)
             Trip(state, actions, onStartTrip)
@@ -148,7 +153,7 @@ private fun Panel(state: MapUiState, actions: MapActions, onStartTrip: () -> Uni
 }
 
 @Composable
-fun PartnerOverdueCard(partnerName: String, overdueMs: Long, lastFix: LocationFix?, nowMs: Long, onGetHelp: () -> Unit, modifier: Modifier = Modifier) {
+fun PartnerOverdueCard(partnerName: String, overdueMs: Long, lastFix: LocationFix?, nowMs: Long, onGetHelp: (() -> Unit)?, modifier: Modifier = Modifier) {
     val c = Orbit.colors
     val where = lastFix?.let { shortAgeAgo(nowMs - it.at) }
     Surface(color = c.warnBg, contentColor = c.warnInk, shape = MaterialTheme.shapes.medium, modifier = modifier.fillMaxWidth()) {
@@ -158,13 +163,13 @@ fun PartnerOverdueCard(partnerName: String, overdueMs: Long, lastFix: LocationFi
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             where?.let { Text(stringResource(R.string.overdue_partner_location, it), style = MaterialTheme.typography.bodyMedium) }
-            OrbitButton(stringResource(R.string.overdue_partner_help), onGetHelp, style = OrbitButtonStyle.Secondary)
+            onGetHelp?.let { OrbitButton(stringResource(R.string.overdue_partner_help), it, style = OrbitButtonStyle.Secondary) }
         }
     }
 }
 
 @Composable
-private fun PartnerOverdue(state: MapUiState, onGetHelp: () -> Unit) {
+private fun PartnerOverdue(state: MapUiState, onGetHelp: (() -> Unit)?) {
     val trip = state.partnerTrip ?: return
     val deadline = trip.extendedTo ?: trip.expectBy ?: return
     PartnerOverdueCard(state.partnerName, state.nowMs - deadline, state.partnerFix, state.nowMs, onGetHelp)
@@ -183,6 +188,22 @@ private fun MeOverdue(actions: MapActions) {
             }
         }
     }
+}
+
+/** The watcher's panel: where their trip stands, nothing to start or share. */
+@Composable
+private fun WatchedTrip(state: MapUiState) {
+    val trip = state.partnerTrip
+    val deadline = trip?.let { it.extendedTo ?: it.expectBy }
+    Text(
+        when {
+            trip == null -> stringResource(R.string.watch_no_trip, state.partnerName)
+            deadline != null -> stringResource(R.string.watch_trip_until, state.partnerName, timeOf(deadline))
+            else -> stringResource(R.string.watch_trip, state.partnerName)
+        },
+        style = MaterialTheme.typography.titleMedium, color = Orbit.colors.text,
+    )
+    trip?.dest?.label?.let { Text(stringResource(R.string.watch_trip_to, it), style = MaterialTheme.typography.bodyMedium, color = Orbit.colors.textSecondary) }
 }
 
 @Composable

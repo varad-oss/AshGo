@@ -39,13 +39,13 @@ enum class Tab(val route: String, val label: Int, val icon: ImageVector) {
 
 /** Bottom navigation: Home · Map · Chat · Safety (REDESIGN_SPEC §8), with the unread badge on Chat. */
 @Composable
-fun MainScaffold(selected: Tab, unread: Int, onSelect: (Tab) -> Unit, content: @Composable (Modifier) -> Unit) {
+fun MainScaffold(selected: Tab, unread: Int, onSelect: (Tab) -> Unit, tabs: List<Tab> = Tab.entries, content: @Composable (Modifier) -> Unit) {
     val c = Orbit.colors
     Scaffold(
         containerColor = c.background,
         bottomBar = {
             NavigationBar(containerColor = c.surface) {
-                Tab.entries.forEach { tab ->
+                tabs.forEach { tab ->
                     val unreadText = pluralStringResource(R.plurals.unread_badge_cd, unread, unread)
                     NavigationBarItem(
                         // The item merges and clears its icon's semantics, so the count goes on the item itself.

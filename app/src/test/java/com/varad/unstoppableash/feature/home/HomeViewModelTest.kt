@@ -242,4 +242,15 @@ class HomeViewModelTest {
         settle(6 * 60_000L)
         assertTrue((vm.state.value.partnerOverdueMs ?: 0) >= 11 * 60_000L)
     }
+
+    @Test fun whoeverCreatedTheOrbitWatches() = runTest(main.dispatcher) {
+        seedPair() // alice is memberA: she created the orbit
+        assertTrue(vm().state.first { !it.loading }.watcher)
+    }
+
+    @Test fun whoeverJoinedIsWatchedOver() = runTest(main.dispatcher) {
+        seedPair()
+        db.set("pairs/p1/meta/memberA", "bob"); db.set("pairs/p1/meta/memberB", "alice")
+        assertFalse(vm().state.first { !it.loading }.watcher)
+    }
 }

@@ -134,6 +134,7 @@ class HomeViewModel(
                 partnerAvatar = p.partner?.avatar,
                 relationship = p.meta.relationship,
                 greetingEnabled = p.me?.greeting ?: true,
+                watcher = p.isWatcher,
                 partnerPresence = snapshot?.let { PresenceCalculator.compute(it, now) } ?: PresenceState.Unknown,
                 partnerBattery = snapshot?.battery,
                 partnerCharging = snapshot?.charging,

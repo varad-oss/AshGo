@@ -49,4 +49,6 @@ data class HomeUiState(
     val mySosActive: Boolean = false,
     /** How long the partner's trip is past its deadline + grace (OverdueEvaluator ALERT_PARTNER); null otherwise. */
     val partnerOverdueMs: Long? = null,
+    /** I created the orbit: I watch over them and only nudge, chat and follow (roles). */
+    val watcher: Boolean = false,
 )

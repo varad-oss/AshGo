@@ -30,5 +30,8 @@ sealed interface PairState {
     data class Confirming(val meta: PairMeta, val myUid: String, val me: Profile?, val partner: Profile?) : PairState {
         val iMustConfirm: Boolean get() = meta.memberA == myUid
     }
-    data class Paired(val meta: PairMeta, val myUid: String, val partnerUid: String, val me: Profile?, val partner: Profile?) : PairState
+    data class Paired(val meta: PairMeta, val myUid: String, val partnerUid: String, val me: Profile?, val partner: Profile?) : PairState {
+        /** Roles: whoever created the orbit watches over whoever joined (no sharing, trips or SOS of their own). */
+        val isWatcher: Boolean get() = meta.memberA == myUid
+    }
 }

@@ -38,6 +38,8 @@ data class SafetyUiState(
     /** Non-null while the "tell them it was a false alarm?" confirmation is open. */
     val falseAlarmRecipients: List<EmergencyContact>? = null,
     val falseAlarm: FalseAlarm? = null,
+    /** I created the orbit: SOS lives on the other person's phone, not mine (roles). */
+    val watcher: Boolean = false,
 ) {
     fun contactName(id: String): String = contacts.firstOrNull { it.id == id }?.name ?: ""
 }
@@ -71,6 +73,7 @@ class SafetyViewModel(
             loading = false,
             paired = pair is PairState.Paired,
             partnerName = (pair as? PairState.Paired)?.partner?.name.orEmpty(),
+            watcher = (pair as? PairState.Paired)?.isWatcher == true,
             partnerPhone = prefs.partnerPhone,
             contacts = list,
             permissions = l.perms,

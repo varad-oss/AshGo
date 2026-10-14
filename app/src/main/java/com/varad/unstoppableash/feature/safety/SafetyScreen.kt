@@ -91,6 +91,14 @@ fun SafetyScreen(state: SafetyUiState, givenActions: SafetyActions, modifier: Mo
 
 @Composable
 private fun SafetyContent(state: SafetyUiState, actions: SafetyActions, modifier: Modifier) {
+    if (state.watcher) {
+        // Reached from the widget or Quick Settings tile on the watcher's phone: say where SOS lives, send nothing.
+        Column(modifier.fillMaxSize().background(Orbit.colors.background).padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(stringResource(R.string.safety_title), style = MaterialTheme.typography.headlineSmall, color = Orbit.colors.text, modifier = Modifier.semantics { heading() })
+            Text(stringResource(R.string.sos_watcher, state.partnerName), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text)
+        }
+        return
+    }
     Column(
         modifier.fillMaxSize().background(Orbit.colors.background).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),

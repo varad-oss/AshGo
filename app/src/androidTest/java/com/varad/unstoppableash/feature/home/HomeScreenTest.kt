@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.feature.home
 
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,4 +135,19 @@ class HomeScreenTest {
         rule.onNodeWithText("Get help").performClick()
         rule.runOnIdle { assertEquals(1, safetyOpened) }
     }
+
+    @Test fun theWatcherOnlyWatchesAndNudges() {
+        show(base.copy(watcher = true))
+        rule.onNodeWithText("Nudge").assertExists()
+        for (gone in listOf("Check in", "Trip", "You: not sharing location")) rule.onNodeWithText(gone).assertDoesNotExist()
+        rule.onNodeWithContentDescription(SOS_ROW).assertDoesNotExist()
+    }
+
+    @Test fun theOneWatchedOverKeepsEverything() {
+        show(base.copy(watcher = false))
+        for (here in listOf("Check in", "Nudge", "Trip", "You: not sharing location")) rule.onNodeWithText(here).performScrollTo().assertExists()
+        rule.onNodeWithContentDescription(SOS_ROW).performScrollTo().assertExists()
+    }
+
+    private companion object { const val SOS_ROW = "SOS. Opens the Safety screen. Nothing is sent from here." }
 }

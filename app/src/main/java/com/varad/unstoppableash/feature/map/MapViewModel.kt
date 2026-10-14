@@ -57,6 +57,8 @@ data class MapUiState(
     val partnerTripPhase: OverduePhase = OverduePhase.NOT_DUE,
     val nowMs: Long = 0L,
     val sharingFromThisPhone: Boolean = true,
+    /** I created the orbit: I follow them on the map, with no sharing or trip controls of my own (roles). */
+    val watcher: Boolean = false,
 )
 
 /** Map tab (REDESIGN_SPEC §Map, J6, J9): both pins as they really are, my sharing controls, and trips. */
@@ -124,6 +126,7 @@ class MapViewModel(
                 partnerTripPhase = OverdueEvaluator.evaluate(partnerTrip?.snapshot, now),
                 nowMs = now,
                 sharingFromThisPhone = v[7] as Boolean,
+                watcher = p.isWatcher,
             )
         }
     }

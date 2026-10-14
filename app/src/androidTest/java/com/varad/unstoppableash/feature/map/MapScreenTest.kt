@@ -142,4 +142,11 @@ class MapScreenTest {
         rule.onNodeWithText("Start").performClick()
         rule.runOnIdle { assertEquals(com.varad.unstoppableash.domain.model.TripDestination(19.06, 72.83, "Blue Tokai, Bandra"), started!![0]) }
     }
+
+    @Test fun theWatcherHasNoSharingOrTripControls() {
+        show(base.copy(watcher = true))
+        rule.onNodeWithText("Start a trip").assertDoesNotExist()
+        rule.onNodeWithText("Share live").assertDoesNotExist()
+        rule.onNodeWithText("Bob isn't on a trip", substring = true).assertExists()
+    }
 }

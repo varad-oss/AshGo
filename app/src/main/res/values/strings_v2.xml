@@ -319,6 +319,11 @@
     <string name="sharing_pause_open">Pause</string>
     <string name="sharing_stop">Stop</string>
     <string name="trip_start">Start a trip</string>
+    <string name="sos_watcher">SOS is on %1$s\'s phone. If they raise one, it alerts you here and texts their emergency contacts.</string>
+    <string name="watch_no_trip">%1$s isn\'t on a trip right now.</string>
+    <string name="watch_trip">%1$s is on a trip.</string>
+    <string name="watch_trip_until">%1$s is on a trip · expected by %2$s</string>
+    <string name="watch_trip_to">Going to %1$s</string>
     <string name="trip_active_until">On a trip · expected %1$s</string>
     <string name="trip_active">On a trip</string>
     <string name="trip_arrived_button">I\'m here</string>

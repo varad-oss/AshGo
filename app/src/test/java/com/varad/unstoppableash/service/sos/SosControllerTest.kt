@@ -48,7 +48,8 @@ class SosControllerTest {
 
     private fun seedPair() = runBlocking {
         db.set("userPairs/alice", "p1")
-        db.set("pairs/p1/meta", mapOf("memberA" to "alice", "memberB" to "bob", "relationship" to "PARTNER", "createdAt" to 1L, "confirmedAt" to 2L))
+        // alice joined the orbit (memberB): she is the one who can raise SOS (roles).
+        db.set("pairs/p1/meta", mapOf("memberA" to "bob", "memberB" to "alice", "relationship" to "PARTNER", "createdAt" to 1L, "confirmedAt" to 2L))
         db.set("pairs/p1/profiles", mapOf("alice" to mapOf("name" to "Asha"), "bob" to mapOf("name" to "Bob")))
     }
 
@@ -258,5 +259,15 @@ class SosControllerTest {
         val c = controller()
         c.raise(); settle(15_000)
         assertEquals(1, records().size); assertEquals(1, sms.sent.size)
+    }
+
+    @Test fun whoeverCreatedTheOrbitCannotRaiseSosFromAnyEntryPoint() = runTest(main.dispatcher) {
+        seedPair()
+        db.set("pairs/p1/meta/memberA", "alice"); db.set("pairs/p1/meta/memberB", "bob")
+        val c = controller()
+        assertEquals(RaiseResult.NOT_FOR_WATCHER, c.raise())
+        settle()
+        assertEquals(null, db.read("pairs/p1/sos"))
+        assertTrue(sms.sent.isEmpty())
     }
 }

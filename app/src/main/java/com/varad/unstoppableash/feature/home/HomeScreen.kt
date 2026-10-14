@@ -120,7 +120,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
             }
 
             state.partnerOverdueMs?.let { overdue ->
-                PartnerOverdueCard(state.partnerName, overdue, state.partnerLocation, state.nowMs, onGetHelp = actions.onOpenSafety)
+                PartnerOverdueCard(state.partnerName, overdue, state.partnerLocation, state.nowMs, onGetHelp = if (state.watcher) actions.onOpenMap else actions.onOpenSafety)
             }
 
             val trip = state.partnerTrip
@@ -149,9 +149,9 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
             }
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OrbitButton(stringResource(R.string.action_check_in), { sheet = HomeSheet.CHECK_IN })
-                OrbitButton(stringResource(R.string.action_nudge), { sheet = HomeSheet.NUDGE }, style = OrbitButtonStyle.Secondary)
-                OrbitButton(stringResource(R.string.action_trip), actions.onOpenMap, style = OrbitButtonStyle.Secondary)
+                if (!state.watcher) OrbitButton(stringResource(R.string.action_check_in), { sheet = HomeSheet.CHECK_IN })
+                OrbitButton(stringResource(R.string.action_nudge), { sheet = HomeSheet.NUDGE }, style = if (state.watcher) OrbitButtonStyle.Primary else OrbitButtonStyle.Secondary)
+                if (!state.watcher) OrbitButton(stringResource(R.string.action_trip), actions.onOpenMap, style = OrbitButtonStyle.Secondary)
             }
             actionLine(state.action)?.let { (text, isError) ->
                 Text(
@@ -160,7 +160,8 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // The watcher never shares, takes trips or raises SOS; those are for the one they watch over.
+            if (!state.watcher) Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(
                         when (state.mySharing) {
@@ -174,7 +175,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
                 OrbitButton(stringResource(R.string.action_manage), actions.onOpenMap, style = OrbitButtonStyle.Quiet)
             }
 
-            SosRow(state.mySosActive, actions.onOpenSafety)
+            if (!state.watcher) SosRow(state.mySosActive, actions.onOpenSafety)
         }
     }
     when (sheet) {

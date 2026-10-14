@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-enum class RaiseResult { RAISED, ALREADY_ACTIVE }
+enum class RaiseResult { RAISED, ALREADY_ACTIVE, NOT_FOR_WATCHER }
 
 /** What this phone knows about its own location for the current SOS. */
 sealed interface SosLocation {
@@ -120,6 +120,9 @@ class SosController(
     private suspend fun raiseNow(): RaiseResult = raiseLock.withLock {
         restored.await() // a persisted SOS wins over a raise in the first moments after start-up
         if (_state.value is SosState.Active) return@withLock RaiseResult.ALREADY_ACTIVE
+        // Roles: whoever created the orbit watches; SOS is the other person's (widget and tile included).
+        val pair = withTimeoutOrNull(PAIR_LOOKUP_MS) { pairs.pairState().first() } as? PairState.Paired
+        if (pair?.isWatcher == true) return@withLock RaiseResult.NOT_FOR_WATCHER
         val targets = runCatching { contacts.contacts.first() }.getOrDefault(emptyList()).map { SmsTarget(it.id) }
         val id = sos.newSosId()
         _falseAlarm.value = null
@@ -283,6 +286,8 @@ class SosController(
     companion object {
         const val BACKEND_WAIT_MS = 10_000L
         private const val PAIR_WAIT_MS = 5_000L
+        /** The role check must never hold up an SOS: unknown after 1 s means "not a watcher". */
+        private const val PAIR_LOOKUP_MS = 1_000L
         private const val NAME_WAIT_MS = 1_000L
         const val NOT_SENT_CANCELLED = "not sent: cancelled"
         const val SMS_OFF = "SMS off"

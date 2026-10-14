@@ -231,7 +231,7 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
         when (openRequest) {
             AndroidNotifier.OPEN_CHAT -> tab = Tab.CHAT
             AndroidNotifier.OPEN_MAP -> tab = Tab.MAP
-            AndroidNotifier.OPEN_SAFETY -> tab = Tab.SAFETY
+            AndroidNotifier.OPEN_SAFETY -> tab = if (homeState.watcher) Tab.HOME else Tab.SAFETY
             AndroidNotifier.OPEN_HOME -> tab = Tab.HOME
             OPEN_PARTNER_SOS -> showPartnerSos = true
         }
@@ -263,7 +263,10 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
         }
     }
     if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
-    MainScaffold(tab, homeState.unread, onSelect = { tab = it }) { padding ->
+    // The watcher has no Safety tab: SOS, contacts and fake call are for the one they watch over.
+    val tabs = if (homeState.watcher) Tab.entries - Tab.SAFETY else Tab.entries
+    LaunchedEffect(homeState.watcher) { if (homeState.watcher && tab == Tab.SAFETY) tab = Tab.HOME }
+    MainScaffold(tab, homeState.unread, onSelect = { tab = it }, tabs = tabs) { padding ->
         when (tab) {
             Tab.HOME -> HomeScreen(
                 homeState,
