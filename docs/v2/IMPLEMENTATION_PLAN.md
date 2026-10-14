@@ -1040,3 +1040,89 @@ On the emulator against the emulators:
 - PartnerSos as Alice when Bob raises.
 
 Then the fresh review.
+
+---
+
+## Stage 8 — Map, trips, location sharing (detailed, written 2026-10-14)
+
+**Spec:** REDESIGN_SPEC §Map/§Trip sheet; D-7 (osmdroid, attribution, UA, no prefetch); D-14 (pause keeps the last point, shown as paused); USER_JOURNEYS J6 and J9; CadencePolicy, ArrivalDetector and OverdueEvaluator (Stage 1).
+
+**Rulings carried in:**
+- **OSM User-Agent** is `AshGo/<versionName> (+https://github.com/varad-oss/AshGo)`. D-7 allowed a GitHub URL when no other contact is given, and the owner can swap it.
+- **Notifications** (overdue prompt, arrival notice, the ongoing sharing notification's actions beyond Pause) come in Stage 9. Stage 8 shows overdue in the app.
+- **The location service** is started only from the foreground, when sharing is LIVE. Restart after reboot is Stage 9.
+
+### Task 8.1 — Sharing plan (pure)
+`domain/location/SharingPlan.kt`:
+- `effective(mode, until, now): SharingMode` — a PAUSED mode with `until` ≤ now becomes LIVE again.
+- `pauseUntil(choice, now)` with choices: 1 h, until tomorrow 07:00 local, and indefinitely.
+
+**Tests:** expiry; indefinite pause; OFF stays OFF.
+
+### Task 8.2 — LocationShareEngine (testable core of the service)
+`service/location/LocationShareEngine.kt` takes:
+- my presence (sharing mode and until)
+- my trip
+- battery
+- a `LocationUpdates` port: `fun updates(cadence): Flow<LocationFix>`
+
+It writes `LocationRepository.write` for each fix while effectively LIVE, and stops writing while PAUSED or OFF (D-14 keeps the last point). Cadence changes when a trip starts or ends or the battery drops.
+
+For an active trip with a destination:
+- feeds `ArrivalDetector`;
+- on arrival → `TripRepository.arrive`, plus a check-in event with kind `arrived` if `notifyPartner` is set — once only.
+
+At the moment a pause expires it writes `sharing=live`.
+
+**Tests** (FakeRtdb plus a fake updates flow):
+- writes while LIVE;
+- nothing while PAUSED, and the last point is kept;
+- pause expiry resumes;
+- trip cadence is used;
+- arrival fires once and ignores inaccurate fixes;
+- low battery switches cadence.
+
+### Task 8.3 — LocationShareService (FGS `location`) + FusedLocationUpdates
+A thin wrapper around the engine:
+- an ongoing notification "Sharing your location with {partner}" with a Pause 1 h action, on the `service` channel (low);
+- started from the Map/Home sharing controls only when permission is granted;
+- stops itself when sharing is not LIVE.
+
+**Test:** a manual emulator walk with `adb emu geo fix`.
+
+### Task 8.4 — Map screen + view-model
+- osmdroid `MapView` in `AndroidView`, with the tile cache in the app cache dir and no prefetch.
+- Attribution "© OpenStreetMap contributors" is always visible.
+- Markers:
+  - my marker, only when I have a location;
+  - the partner's marker only when a location exists (no fake pin), faded when Stale/Offline/Paused, with an age label.
+- Recentre buttons: Me and {partner}.
+- Header: StatusPill and age.
+- Sharing controls: Share live / Pause 1 h / Pause until morning / Pause until I resume / Stop.
+- A trip card opens the TripSheet.
+
+**VM tests:** marker visibility per presence state; the age; the sharing actions write presence.
+
+**UI tests** on the overlay (not the tiles): attribution present; no partner marker label without a location.
+
+### Task 8.5 — Trips: sheet + view-model + overdue in the app
+- TripSheet: destination (none / long-press on the map / my current spot), an expect-by time, a note (≤ 80 chars), "Tell {partner} I've started" (on by default).
+- While active: I'm here / End trip / +15 min.
+
+Overdue in the app:
+- **traveller**, ASK_TRAVELLER: a banner "Are you okay?" with I'm safe (arrive), +15 min, and Get help (opens Safety);
+- **partner**, ALERT_PARTNER for the partner's trip: an Overdue card on Home in warn colours with last location + age, battery, Call, and "Raise SOS for them" (opens Safety).
+
+**Tests:**
+- VM: start / extend / arrive / end write the right fields;
+- the overdue phases drive the banners;
+- "Raise SOS for them" never sends without a hold.
+
+### Task 8.6 — Wire-up + manual verification
+- The Map tab replaces ComingLater. Home's Trip and Manage buttons go to Map. The Home location card opens Map.
+- On the emulator against the emulators, using `adb emu geo fix` to walk:
+  - share LIVE → the record updates;
+  - pause → it stops, and the partner sees Paused;
+  - a trip to a destination → arrival → a check-in chip in Chat;
+  - Bob's overdue trip → the Home card.
+- Then the fresh review.
