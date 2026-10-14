@@ -1,6 +1,7 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.service.cleanup.CleanupWorker
 import com.varad.unstoppableash.domain.location.SharingPlan
 import com.varad.unstoppableash.feature.settings.readReliability
 import com.varad.unstoppableash.feature.settings.openFix
@@ -207,6 +208,7 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
         Channels.create(context)
         StayConnectedService.start(context)
         HeartbeatWorker.schedule(context)
+        CleanupWorker.schedule(context)
     }
     val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val settingsNow by container.settings.settings.collectAsStateWithLifecycle(null)
