@@ -445,7 +445,7 @@
     <string name="privacy_kept_title">How long it is kept</string>
     <string name="privacy_kept_body">Messages 7 days · photos 3 days · check-ins 7 days · trips 24 hours after they end · cancelled SOS 30 days. Your location is only your latest point, and it is removed when you stop sharing.</string>
     <string name="privacy_phone_title">Only on this phone</string>
-    <string name="privacy_phone_body">Emergency contacts, fake call voices and Our page photos never leave this phone.</string>
+    <string name="privacy_phone_body">Emergency contacts and fake call voices never leave this phone. Our page photos are shared only with your orbit.</string>
     <string name="privacy_delete_messages">Delete my messages now</string>
     <string name="privacy_delete_messages_body">Removes every message and photo you sent in this orbit, for both of you. Their messages stay.</string>
     <plurals name="privacy_deleted">
@@ -509,10 +509,10 @@
     <!-- Stage 10.5 our page -->
     <string name="our_page_title">Our page</string>
     <string name="our_page_empty_title">Your photos, on a string</string>
-    <string name="our_page_empty_body">Pick a few photos of the two of you. They stay on this phone.</string>
+    <string name="our_page_empty_body">Pick a few photos of the two of you. Both of your phones show the same wall.</string>
     <string name="our_page_add">Add photos</string>
     <string name="our_page_full">That\'s the most this page holds (%1$d). Remove one to add another.</string>
-    <string name="our_page_private">Photos are copied into AshGo on this phone only, never uploaded.</string>
+    <string name="our_page_private">Shared with only the two of you, in your orbit. Either of you can take a photo down; leaving the orbit deletes the wall.</string>
     <string name="our_page_photo">A photo on our page</string>
     <plurals name="our_page_skipped">
         <item quantity="one">%d photo couldn\'t be added.</item>

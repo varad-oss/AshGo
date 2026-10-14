@@ -38,6 +38,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.varad.unstoppableash.R
+import com.varad.unstoppableash.data.wall.WallRepository
 import com.varad.unstoppableash.ui.components.EmptyState
 import com.varad.unstoppableash.ui.components.OrbitButton
 import com.varad.unstoppableash.ui.components.OrbitButtonStyle
@@ -62,7 +63,7 @@ fun OurPageScreen(state: OurPageState, actions: OurPageActions, modifier: Modifi
         state.photos.chunked(2).forEachIndexed { rope, pair -> Rope(rope, pair, actions.onRemove) }
         if (state.skipped > 0) Text(pluralStringResource(R.plurals.our_page_skipped, state.skipped, state.skipped), color = Orbit.colors.textSecondary, style = MaterialTheme.typography.bodySmall)
         if (state.full) {
-            Text(stringResource(R.string.our_page_full, OurPhotosStore.MAX), color = Orbit.colors.textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.our_page_full, WallRepository.MAX), color = Orbit.colors.textSecondary, style = MaterialTheme.typography.bodySmall)
         } else {
             OrbitButton(stringResource(R.string.our_page_add), actions.onAdd, Modifier.fillMaxWidth(), loading = state.adding)
         }
@@ -71,7 +72,7 @@ fun OurPageScreen(state: OurPageState, actions: OurPageActions, modifier: Modifi
 }
 
 @Composable
-private fun Rope(index: Int, photos: List<String>, onRemove: (String) -> Unit) {
+private fun Rope(index: Int, photos: List<WallPhoto>, onRemove: (String) -> Unit) {
     val ropeColor = Orbit.colors.outline
     Box(Modifier.fillMaxWidth()) {
         Canvas(Modifier.fillMaxWidth().height(28.dp)) {
@@ -80,9 +81,9 @@ private fun Rope(index: Int, photos: List<String>, onRemove: (String) -> Unit) {
             listOf(0.27f, 0.73f).forEach { drawCircle(ropeColor, 6f, Offset(size.width * it, size.height * 0.62f)) }
         }
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            photos.forEachIndexed { i, path ->
+            photos.forEachIndexed { i, photo ->
                 val tilt = if ((index + i) % 2 == 0) -4f else 3f
-                Polaroid(path, tilt, Modifier.weight(1f).padding(horizontal = Spacing.sm), onRemove)
+                Polaroid(photo, tilt, Modifier.weight(1f).padding(horizontal = Spacing.sm), onRemove)
             }
             if (photos.size == 1) Box(Modifier.weight(1f))
         }
@@ -90,9 +91,10 @@ private fun Rope(index: Int, photos: List<String>, onRemove: (String) -> Unit) {
 }
 
 @Composable
-private fun Polaroid(path: String, tilt: Float, modifier: Modifier, onRemove: (String) -> Unit) {
+private fun Polaroid(photo: WallPhoto, tilt: Float, modifier: Modifier, onRemove: (String) -> Unit) {
+    val path = photo.file
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(path) { bitmap = withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() } }
+    LaunchedEffect(path) { bitmap = path?.let { withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(it)?.asImageBitmap() }.getOrNull() } } }
     Column(modifier.rotate(tilt), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Orbit.colors.surfaceWarm).padding(6.dp)) {
             val b = bitmap
@@ -102,6 +104,6 @@ private fun Polaroid(path: String, tilt: Float, modifier: Modifier, onRemove: (S
                 Box(Modifier.fillMaxWidth().aspectRatio(0.8f).background(Orbit.colors.blush))
             }
         }
-        OrbitButton(stringResource(R.string.action_remove), { onRemove(path) }, style = OrbitButtonStyle.Quiet)
+        OrbitButton(stringResource(R.string.action_remove), { onRemove(photo.id) }, style = OrbitButtonStyle.Quiet)
     }
 }

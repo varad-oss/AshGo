@@ -67,7 +67,16 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     )
 
     /** Like the SDK's get(): asks the server, so a denied path or no connection is a failure, not a cached value. */
-    override suspend fun get(path: String): Outcome<Any?> = when {
+    /** How many server reads (get) were made: proves a cache saved one. */
+    var getCount = 0
+        private set
+
+    override suspend fun get(path: String): Outcome<Any?> {
+        getCount++
+        return getNow(path)
+    }
+
+    private fun getNow(path: String): Outcome<Any?> = when {
         readFailurePaths.any { path == it || path.startsWith("$it/") } -> Outcome.Failure(FailureReason.PERMISSION_DENIED, "denied")
         !serverReachable.value -> Outcome.Failure(FailureReason.OFFLINE)
         else -> Outcome.Success(read(path))

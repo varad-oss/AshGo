@@ -2,7 +2,7 @@ package com.varad.unstoppableash
 
 import com.varad.unstoppableash.service.nudge.AndroidSoundControl
 import com.varad.unstoppableash.service.nudge.LoudNudge
-import com.varad.unstoppableash.feature.ourpage.OurPhotosStore
+import com.varad.unstoppableash.data.wall.WallRepository
 import com.varad.unstoppableash.feature.fakecall.FakeCallVoiceStore
 import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
 import kotlinx.coroutines.withContext
@@ -128,9 +128,9 @@ class AppContainer(private val app: Application) {
     val fakeCallVoices by lazy {
         FakeCallVoiceStore(app.fakeCallStore, copyIn = { src, id -> withContext(Dispatchers.IO) { AndroidFakeCallAudio.copyIn(app, src, id) } }, deleteFile = { withContext(Dispatchers.IO) { AndroidFakeCallAudio.delete(it) } })
     }
-    val ourPhotos by lazy {
-        OurPhotosStore(java.io.File(app.filesDir, "our_page"), encode = { photoEncoder.encode(it)?.jpeg }, now = System::currentTimeMillis)
-    }
+    val wall by lazy { WallRepository(rtdb) }
+    /** Our page photos already on this phone (cache: re-fetchable from the shared wall). */
+    val wallCacheDir: java.io.File get() = java.io.File(app.cacheDir, "wall")
     val loudNudge by lazy { LoudNudge(AndroidSoundControl(app)) }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 

@@ -80,7 +80,7 @@ import com.varad.unstoppableash.feature.settings.SettingsPage
 import com.varad.unstoppableash.feature.ourpage.OurPageActions
 import com.varad.unstoppableash.feature.ourpage.OurPageScreen
 import com.varad.unstoppableash.feature.ourpage.OurPageViewModel
-import com.varad.unstoppableash.feature.ourpage.OurPhotosStore
+import com.varad.unstoppableash.data.wall.WallRepository
 import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
 import com.varad.unstoppableash.feature.fakecall.CallPhase
 import com.varad.unstoppableash.feature.fakecall.FakeCallActions
@@ -382,9 +382,9 @@ private fun SettingsOverlay(
             SettingsPage.HELP -> HelpScreen(back, m)
             SettingsPage.ABOUT -> AboutScreen(container.versionName, back, m)
             SettingsPage.OUR_PAGE -> {
-                val our: OurPageViewModel = viewModel(factory = viewModelFactory { initializer { OurPageViewModel(container.ourPhotos) } })
+                val our: OurPageViewModel = viewModel(factory = viewModelFactory { initializer { OurPageViewModel(container.pairs, container.wall, encode = { container.photoEncoder.encode(it) }, cacheDir = container.wallCacheDir) } })
                 val o by our.state.collectAsStateWithLifecycle()
-                val pickPhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(OurPhotosStore.MAX)) { uris -> our.add(uris.map { it.toString() }) }
+                val pickPhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(WallRepository.MAX)) { uris -> our.add(uris.map { it.toString() }) }
                 OurPageScreen(o, OurPageActions(onBack = back, onAdd = { pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, onRemove = { our.remove(it) }), m)
             }
             SettingsPage.CONTACTS, SettingsPage.RELIABILITY -> Unit

@@ -14,11 +14,11 @@ class OurPageScreenTest {
         rule.setContent { OrbitTheme(ThemeMode.LIGHT) { OurPageScreen(OurPageState(), OurPageActions()) } }
         rule.onNodeWithText("Your photos, on a string").assertExists()
         rule.onNodeWithText("Add photos").assertExists()
-        rule.onNodeWithText("never uploaded", substring = true).assertExists()
+        rule.onNodeWithText("only the two of you", substring = true).assertExists()
     }
 
     @Test fun aFullPageOffersNoAddButton() {
-        rule.setContent { OrbitTheme(ThemeMode.LIGHT) { OurPageScreen(OurPageState(photos = List(OurPhotosStore.MAX) { "/nope/$it.jpg" }), OurPageActions()) } }
+        rule.setContent { OrbitTheme(ThemeMode.LIGHT) { OurPageScreen(OurPageState(photos = List(com.varad.unstoppableash.data.wall.WallRepository.MAX) { WallPhoto("p$it", "alice", null) }), OurPageActions()) } }
         rule.onNodeWithText("Add photos").assertDoesNotExist()
         rule.onNodeWithText("most this page holds", substring = true).assertExists()
     }
