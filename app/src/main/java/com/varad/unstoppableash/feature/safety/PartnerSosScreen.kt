@@ -1,5 +1,6 @@
 package com.varad.unstoppableash.feature.safety
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,8 @@ fun PartnerSosScreen(state: PartnerSosUiState, partnerPhone: String?, nowMs: Lon
         }
         return
     }
+    // The default outline is nearly invisible on SOS red; white keeps the secondary buttons findable.
+    val onRed = BorderStroke(1.dp, c.onSos)
     Column(
         modifier.fillMaxSize().background(c.sos).verticalScroll(rememberScrollState()).padding(Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -71,7 +74,7 @@ fun PartnerSosScreen(state: PartnerSosUiState, partnerPhone: String?, nowMs: Lon
             val age = shortAgeAgo(nowMs - (r.locAt ?: r.at))
             val acc = r.accuracyM?.toInt()
             Text(if (acc != null) stringResource(R.string.psos_location_acc, age, acc) else stringResource(R.string.psos_location, age), style = MaterialTheme.typography.bodyLarge, color = c.onSos)
-            OutlinedButton({ actions.onOpenMap(lat, lng) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos)) {
+            OutlinedButton({ actions.onOpenMap(lat, lng) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos), border = onRed) {
                 Text(stringResource(R.string.psos_open_map))
             }
         } else {
@@ -87,11 +90,11 @@ fun PartnerSosScreen(state: PartnerSosUiState, partnerPhone: String?, nowMs: Lon
             }
         }
         if (partnerPhone != null) {
-            OutlinedButton({ actions.onCall(partnerPhone) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos)) {
+            OutlinedButton({ actions.onCall(partnerPhone) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos), border = onRed) {
                 Text(stringResource(R.string.call_partner, state.partnerName))
             }
         }
-        OutlinedButton({ actions.onCall(EMERGENCY_NUMBER) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos)) {
+        OutlinedButton({ actions.onCall(EMERGENCY_NUMBER) }, Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = c.onSos), border = onRed) {
             Text(stringResource(R.string.call_112))
         }
     }
