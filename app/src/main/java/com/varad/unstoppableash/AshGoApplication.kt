@@ -4,7 +4,7 @@ import android.app.Application
 import com.google.firebase.database.FirebaseDatabase
 
 class AshGoApplication : Application() {
-    /** v2 dependencies; lazy so v1 behaviour is unchanged until v2 code uses it. */
+    /** App dependencies, created on first use. */
     val container: AppContainer by lazy { AppContainer(this) }
 
     override fun onCreate() {
@@ -15,9 +15,5 @@ class AshGoApplication : Application() {
         } catch (e: Exception) {
             // Already enabled
         }
-        val db = FirebaseDatabase.getInstance().reference
-        db.child("chat").keepSynced(true)
-        db.child("buzz").keepSynced(true)
-        db.child("tracking").keepSynced(true)
     }
 }

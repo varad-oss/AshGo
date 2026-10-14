@@ -195,4 +195,29 @@ class PairRepositoryTest {
         repo.pairState().test { awaitItem(); cancelAndIgnoreRemainingEvents() }
         assertEquals(0, db.activeObservers)
     }
+
+    @Test fun whenThePartnerEndsTheOrbitMyLeftoverPointerIsClearedAndICanStartAgain() = runTest {
+        val pid = created()
+        joinedAsBob(pid)
+        auth.user.value = alice; repo.confirm(pid)
+        auth.user.value = bob
+        assertTrue(repo.leave(pid) is Outcome.Success)
+        auth.user.value = alice
+        // Real server: the deleted pair's meta is no longer readable at all.
+        db.failReads("pairs/$pid")
+        assertEquals(PairState.Unpaired, repo.pairState().first { it == PairState.Unpaired })
+        repo.pairState().first { db.read("userPairs/alice") == null }
+        assertNull("my pointer to the dead orbit is gone", db.read("userPairs/alice"))
+        val again = repo.createPair(Relationship.PARTNER, "Alice")
+        assertTrue("a new orbit can be started", again is Outcome.Success)
+        assertEquals((again as Outcome.Success).value, db.read("userPairs/alice"))
+    }
+
+    @Test fun aPointerIsNotClearedWhenTheServerCannotBeReached() = runTest {
+        val pid = created()
+        db.failReads("pairs/$pid")
+        db.serverReachable.value = false
+        assertEquals(PairState.Unpaired, repo.pairState().first())
+        assertEquals("offline proves nothing: keep it", pid, db.read("userPairs/alice"))
+    }
 }

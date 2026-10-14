@@ -66,7 +66,12 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         },
     )
 
-    override suspend fun get(path: String): Outcome<Any?> = Outcome.Success(read(path))
+    /** Like the SDK's get(): asks the server, so a denied path or no connection is a failure, not a cached value. */
+    override suspend fun get(path: String): Outcome<Any?> = when {
+        readFailurePaths.any { path == it || path.startsWith("$it/") } -> Outcome.Failure(FailureReason.PERMISSION_DENIED, "denied")
+        !serverReachable.value -> Outcome.Failure(FailureReason.OFFLINE)
+        else -> Outcome.Success(read(path))
+    }
 
     override suspend fun set(path: String, value: Any?): Outcome<Unit> {
         if (createOnly.any { it.matches(path) } && read(path) != null) return Outcome.Failure(FailureReason.PERMISSION_DENIED, "exists")

@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.channelFlow
 
 /**
  * Pairing (PRODUCT_DECISIONS D-1, D-16). Write order follows the security rules: a pair's meta must
@@ -40,7 +44,17 @@ class PairRepository(
     fun pairState(): Flow<PairState> = auth.currentUser.flatMapLatest { user ->
         if (user == null) flowOf(PairState.NotSignedIn)
         else db.observe(DbPaths.userPair(user.uid)).resilient().map { it as? String }.distinctUntilChanged()
-            .flatMapLatest { pairId -> if (pairId == null) flowOf(PairState.Unpaired) else pairStateOf(user.uid, pairId) }
+            .flatMapLatest { pairId ->
+                if (pairId == null) flowOf<PairState>(PairState.Unpaired)
+                else channelFlow<PairState> {
+                    // Runs beside the state, so the cached-orbit replays between retries can't cancel it.
+                    var healing: Job? = null
+                    pairStateOf(user.uid, pairId).collect { st ->
+                        send(st)
+                        if (st == PairState.Unpaired && healing?.isActive != true) healing = launch { clearIfOrbitGone(user.uid, pairId) }
+                    }
+                }
+            }
     }
 
     /** A denied meta read means "not a member of that pair" (left, removed, stale pointer) — but keep retrying. */
@@ -58,6 +72,28 @@ class PairRepository(
                 }
             }
         }.distinctUntilChanged()
+
+    /**
+     * The partner left (which deletes the pair) or the pair is otherwise gone, but my pointer still names it. Left
+     * alone, the offline cache keeps replaying the old orbit between denied retries (a flicker) and blocks starting a
+     * new one. Cleared only when the server itself says the orbit is gone or isn't mine — never on a cached or
+     * offline answer.
+     */
+    private suspend fun clearIfOrbitGone(uid: String, pairId: String) {
+        // A brief refusal (e.g. while the sign-in token refreshes) must never cost a live orbit: the server has to
+        // say "gone" on every one of a few checks spread over ~20 s.
+        repeat(GONE_CHECKS) { i ->
+            if (i > 0) delay(GONE_CHECK_SPACING_MS)
+            if (!orbitGoneOnServer(uid, pairId)) return
+        }
+        val pointer = (db.get(DbPaths.userPair(uid)) as? Outcome.Success)?.value as? String
+        if (pointer == pairId) db.remove(DbPaths.userPair(uid))
+    }
+
+    private suspend fun orbitGoneOnServer(uid: String, pairId: String): Boolean = when (val r = db.get(DbPaths.meta(pairId))) {
+        is Outcome.Failure -> r.reason == FailureReason.PERMISSION_DENIED
+        is Outcome.Success -> PairMappers.meta(pairId, r.value)?.let { it.memberA != uid && it.memberB != uid } ?: true
+    }
 
     private fun observeOrDenied(path: String): Flow<Any?> = db.observe(path).resilient { emit(Denied) }
 
@@ -170,6 +206,8 @@ class PairRepository(
 
     companion object {
         private const val INVITE_MARGIN_MS = 60 * 60_000L
+        private const val GONE_CHECKS = 3
+        private const val GONE_CHECK_SPACING_MS = 10_000L
         private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
         fun isPlausibleEmail(email: String) = EMAIL.matches(email)
