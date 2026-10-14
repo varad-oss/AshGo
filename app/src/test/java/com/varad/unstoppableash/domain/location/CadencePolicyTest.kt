@@ -6,7 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CadencePolicyTest {
-    private val trip = LocationCadence(15_000, 10f, LocationAccuracy.HIGH)
+    // No minimum distance on a trip: someone who stops at the destination must keep producing fixes, or arrival can never be confirmed.
+    private val trip = LocationCadence(15_000, 0f, LocationAccuracy.HIGH)
     private val idle = LocationCadence(180_000, 0f, LocationAccuracy.BALANCED)
     private val lowBattery = LocationCadence(600_000, 0f, LocationAccuracy.BALANCED)
 

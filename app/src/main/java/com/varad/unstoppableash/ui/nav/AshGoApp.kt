@@ -1,6 +1,11 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.service.location.LocationShareService
+import com.varad.unstoppableash.feature.map.OsmMap
+import com.varad.unstoppableash.feature.map.MapViewModel
+import com.varad.unstoppableash.feature.map.MapScreen
+import com.varad.unstoppableash.feature.map.MapActions
 import com.varad.unstoppableash.feature.safety.SafetyViewModel
 import com.varad.unstoppableash.feature.safety.SafetyScreen
 import com.varad.unstoppableash.feature.safety.SafetyPermissions
@@ -159,6 +164,10 @@ private fun MainShell(container: AppContainer) {
         )
         return
     }
+    // If I was already sharing (or on a timed pause) when the app opened, make sure the service is running.
+    LaunchedEffect(homeState.mySharing) {
+        if (homeState.mySharing == com.varad.unstoppableash.domain.model.SharingMode.LIVE) LocationShareService.start(context)
+    }
     if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
     MainScaffold(tab, homeState.unread, onSelect = { tab = it }) { padding ->
         when (tab) {
@@ -177,7 +186,7 @@ private fun MainShell(container: AppContainer) {
             )
             Tab.CHAT -> ChatTab(chatVm, padding)
             Tab.SAFETY -> SafetyTab(safetyVm, onOpenContacts = { showContacts = true }, padding)
-            Tab.MAP -> ComingLater(padding)
+            Tab.MAP -> MapTab(container, onGetHelp = { tab = Tab.SAFETY }, padding)
         }
     }
 }
@@ -205,6 +214,37 @@ private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
             photo = vm::photo,
         ),
         modifier,
+    )
+}
+
+@Composable
+private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Modifier) {
+    val context = LocalContext.current
+    val vm: MapViewModel = viewModel(factory = viewModelFactory {
+        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.clock) }
+    })
+    val state by vm.state.collectAsStateWithLifecycle()
+    // Sharing live needs location permission first; the service only starts once it's granted.
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it }) { vm.shareLive(); LocationShareService.start(context) }
+    }
+    MapScreen(
+        state,
+        MapActions(
+            onShareLive = {
+                if (LocationShareService.hasLocationPermission(context)) { vm.shareLive(); LocationShareService.start(context) }
+                else askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            },
+            onPause = vm::pause,
+            onStopSharing = vm::stopSharing,
+            onStartTrip = { d, e, n, t -> vm.startTrip(d, e, n, t); LocationShareService.start(context) },
+            onExtendTrip = vm::extendTrip,
+            onArrive = vm::arrive,
+            onEndTrip = vm::endTrip,
+            onGetHelp = onGetHelp,
+        ),
+        map = { pins, focus, onLongPress, m -> OsmMap(pins, focus, onLongPress, m) },
+        modifier = modifier,
     )
 }
 

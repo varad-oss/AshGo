@@ -8,6 +8,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.varad.unstoppableash.domain.location.LocationAccuracy
 import com.varad.unstoppableash.domain.location.LocationCadence
 import com.varad.unstoppableash.domain.model.LocationFix
@@ -31,6 +32,13 @@ class FusedLocationUpdates(private val context: Context) : LocationUpdates {
             }
         }
         client.requestLocationUpdates(request, callback, Looper.getMainLooper())
-        awaitClose { client.removeLocationUpdates(callback) }
+        // The first periodic fix can take a whole interval (3 min when idle); turning sharing on should show
+        // where I am now, so ask for one fix straight away as well.
+        val cts = CancellationTokenSource()
+        // One-off, so high accuracy is affordable; a balanced fix can be unavailable with only GPS (no Wi-Fi/cell).
+        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token).addOnSuccessListener { loc ->
+            loc?.let { trySend(LocationFix(it.latitude, it.longitude, it.accuracy.takeIf { a -> it.hasAccuracy() && a > 0f }, it.time)) }
+        }
+        awaitClose { cts.cancel(); client.removeLocationUpdates(callback) }
     }
 }

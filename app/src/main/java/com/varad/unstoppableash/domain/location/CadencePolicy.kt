@@ -9,7 +9,8 @@ data class LocationCadence(val intervalMs: Long, val minDistanceM: Float, val ac
 /** How often to send location (ARCHITECTURE_PROPOSAL §8); null means send nothing. */
 object CadencePolicy {
     private const val LOW_BATTERY_PCT = 15
-    private val TRIP = LocationCadence(15_000, 10f, LocationAccuracy.HIGH)
+    // No minimum distance: a person standing at the destination still yields fixes, so arrival can be confirmed.
+    private val TRIP = LocationCadence(15_000, 0f, LocationAccuracy.HIGH)
     private val IDLE = LocationCadence(180_000, 0f, LocationAccuracy.BALANCED)
     private val LOW_BATTERY = LocationCadence(600_000, 0f, LocationAccuracy.BALANCED)
 

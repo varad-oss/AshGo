@@ -60,10 +60,11 @@ class LocationShareEngine(
     suspend fun run() {
         pairs.pairState().map { it as? PairState.Paired }
             .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid }
-            .collectLatest { p -> if (p != null) runFor(p.meta.pairId, p.myUid) }
+            .collectLatest { p -> log("orbit ${p != null}"); if (p != null) runFor(p.meta.pairId, p.myUid) }
     }
 
     private suspend fun runFor(pid: String, uid: String) = coroutineScope {
+        val sideEffects = this
         var expiredPause: Long? = null
         val plans = combine(
             presence.snapshot(pid, uid),
@@ -85,34 +86,49 @@ class LocationShareEngine(
         val arrival = ArrivalTracker()
         launch { plans.collect { currentTrip = it.trip } }
         plans.map { it.cadence }.distinctUntilChanged().collectLatest { cadence ->
+            log("cadence ${cadence?.intervalMs}")
             if (cadence == null) return@collectLatest // paused/off: no GPS, no writes
             updates.updates(cadence).collect { fix ->
+                log("fix (acc ${fix.accuracyM})") // never the coordinates
                 location.write(pid, uid, fix.lat, fix.lng, fix.accuracyM)
                 currentTrip?.let { trip ->
                     if (arrival.arrived(trip, fix)) {
-                        trips.arrive(pid, uid)
-                        if (trip.notifyPartner) events.checkIn(pid, uid, ARRIVED_KIND, trip.dest?.label)
+                        // Its own job: writing "arrived" ends the trip, which changes the cadence and restarts this
+                        // collector (collectLatest) — seen on the emulator cancelling the check-in mid-way.
+                        sideEffects.launch {
+                            trips.arrive(pid, uid)
+                            if (trip.notifyPartner) events.checkIn(pid, uid, ARRIVED_KIND, trip.dest?.label)
+                        }
                     }
                 }
             }
         }
     }
 
-    /** One detector per trip (keyed by its start), and at most one arrival per trip. */
+    /**
+     * One detector per trip (keyed by its start), at most one arrival per trip, and only after having been
+     * away from the destination at least once — a trip "back to where I am" must not arrive on its first fix.
+     */
     private class ArrivalTracker {
         private var tripKey: Long? = null
         private var detector = ArrivalDetector()
+        private var leftOnce = false
         private var done = false
 
         fun arrived(trip: Trip, fix: LocationFix): Boolean {
             val dest = trip.dest ?: return false
-            if (trip.startedAt != tripKey) { tripKey = trip.startedAt; detector = ArrivalDetector(); done = false }
+            if (trip.startedAt != tripKey) { tripKey = trip.startedAt; detector = ArrivalDetector(); leftOnce = false; done = false }
             if (done) return false
             val accuracy = fix.accuracyM ?: Float.MAX_VALUE // unknown accuracy can't prove arrival
-            done = detector.onFix(distanceMeters(fix.lat, fix.lng, dest.lat, dest.lng), accuracy)
+            val distance = distanceMeters(fix.lat, fix.lng, dest.lat, dest.lng)
+            if (accuracy <= LEAVE_ACCURACY_M && distance > maxOf(LEAVE_RADIUS_M, accuracy.toDouble())) leftOnce = true
+            val atDestination = detector.onFix(distance, accuracy)
+            done = leftOnce && atDestination
             return done
         }
     }
+
+    private fun log(message: String) = runCatching { android.util.Log.d("AshGoShare", message) }
 
     private fun ticker(): Flow<Unit> = flow {
         while (true) { emit(Unit); delay(tickMs) }
@@ -120,5 +136,7 @@ class LocationShareEngine(
 
     companion object {
         const val ARRIVED_KIND = "arrived"
+        private const val LEAVE_RADIUS_M = 300.0
+        private const val LEAVE_ACCURACY_M = 200f
     }
 }

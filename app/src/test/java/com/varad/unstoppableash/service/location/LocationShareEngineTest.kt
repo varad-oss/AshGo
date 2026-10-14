@@ -93,6 +93,7 @@ class LocationShareEngineTest {
     @Test fun arrivalHappensOnceAndIgnoresVagueFixes() = runTest(main.dispatcher) {
         seed(); engine(); settle()
         db.set("pairs/p1/trips/alice", mapOf("state" to "active", "startedAt" to base, "notifyPartner" to true, "dest" to mapOf("lat" to 18.5, "lng" to 73.8, "label" to "Home"))); settle()
+        fixes.emit(fix(18.6)); settle() // ~11 km away: on the way
         repeat(3) { fixes.emit(fix(18.5, acc = 900f)); settle() }
         assertEquals("a 900 m fix never arrives", "active", db.read("pairs/p1/trips/alice/state"))
         repeat(4) { fixes.emit(fix(18.5001)); settle() }
@@ -105,8 +106,30 @@ class LocationShareEngineTest {
     @Test fun noArrivalNoticeWhenThePartnerWasNotTold() = runTest(main.dispatcher) {
         seed(); engine(); settle()
         db.set("pairs/p1/trips/alice", mapOf("state" to "active", "startedAt" to base, "notifyPartner" to false, "dest" to mapOf("lat" to 18.5, "lng" to 73.8))); settle()
+        fixes.emit(fix(18.6)); settle()
         repeat(3) { fixes.emit(fix(18.5)); settle() }
         assertEquals("arrived", db.read("pairs/p1/trips/alice/state"))
         assertNull(db.read("pairs/p1/events"))
+    }
+
+    @Test fun aTripBackToWhereIStartedArrivesOnlyAfterLeaving() = runTest(main.dispatcher) {
+        seed(); engine(); settle()
+        db.set("pairs/p1/trips/alice", mapOf("state" to "active", "startedAt" to base, "notifyPartner" to true, "dest" to mapOf("lat" to 18.5, "lng" to 73.8))); settle()
+        repeat(3) { fixes.emit(fix(18.5)); settle() }
+        assertEquals("still here is not 'arrived'", "active", db.read("pairs/p1/trips/alice/state"))
+        fixes.emit(fix(18.51)); settle() // ~1.1 km away
+        repeat(2) { fixes.emit(fix(18.5)); settle() }
+        assertEquals("arrived", db.read("pairs/p1/trips/alice/state"))
+    }
+
+    @Test fun theArrivalCheckInSurvivesTheCadenceChangeItCauses() = runTest(main.dispatcher) {
+        seed(); engine(); settle()
+        db.set("pairs/p1/trips/alice", mapOf("state" to "active", "startedAt" to base, "notifyPartner" to true, "dest" to mapOf("lat" to 18.5, "lng" to 73.8))); settle()
+        fixes.emit(fix(18.6)); settle()
+        db.ackHeld.value = true // like the SDK: the "arrived" write is visible at once but not yet confirmed
+        repeat(2) { fixes.emit(fix(18.5)); settle() }
+        db.ackHeld.value = false; settle()
+        val kinds = (db.read("pairs/p1/events") as? Map<*, *>)?.values?.map { (it as Map<*, *>)["kind"] }
+        assertEquals(listOf("arrived"), kinds)
     }
 }

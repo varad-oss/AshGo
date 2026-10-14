@@ -85,8 +85,13 @@ fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier:
             Header(state)
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.md), horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End)) {
-                    OrbitButton(stringResource(R.string.map_center_me), { state.myFix?.let { focus = MapFocus(it.lat, it.lng, System.nanoTime()) } }, enabled = state.myFix != null, style = OrbitButtonStyle.Secondary)
-                    OrbitButton(stringResource(R.string.map_center_partner, state.partnerName), { state.partnerFix?.let { focus = MapFocus(it.lat, it.lng, System.nanoTime()) } }, enabled = state.partnerFix != null, style = OrbitButtonStyle.Secondary)
+                    // Solid backing: outlined buttons alone are unreadable over busy map tiles.
+                    Surface(color = Orbit.colors.surface, shape = MaterialTheme.shapes.extraLarge) {
+                        OrbitButton(stringResource(R.string.map_center_me), { state.myFix?.let { focus = MapFocus(it.lat, it.lng, System.nanoTime()) } }, enabled = state.myFix != null, style = OrbitButtonStyle.Secondary)
+                    }
+                    Surface(color = Orbit.colors.surface, shape = MaterialTheme.shapes.extraLarge) {
+                        OrbitButton(stringResource(R.string.map_center_partner, state.partnerName), { state.partnerFix?.let { focus = MapFocus(it.lat, it.lng, System.nanoTime()) } }, enabled = state.partnerFix != null, style = OrbitButtonStyle.Secondary)
+                    }
                 }
                 // OSM licence: attribution is always on screen, never behind a menu (D-7).
                 Text(

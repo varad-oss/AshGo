@@ -52,9 +52,11 @@ fun OsmMap(pins: MapPins, focus: MapFocus?, onLongPress: (Double, Double) -> Uni
         onDispose { lifecycle.removeObserver(observer); map.onDetach() }
     }
     LaunchedEffect(focus) { focus?.let { map.controller.animateTo(GeoPoint(it.lat, it.lng), 16.0, 600L) } }
-    LaunchedEffect(Unit) {
-        // First open: frame whoever we know about; otherwise stay at a wide default rather than invent a spot.
-        (pins.partner ?: pins.me)?.let { map.controller.setZoom(15.0); map.controller.setCenter(GeoPoint(it.lat, it.lng)) }
+    // Frame the first real pin once it arrives (data loads after the map); until then a wide default, never a guess.
+    val first = pins.partner ?: pins.me
+    val framed = remember { booleanArrayOf(false) }
+    LaunchedEffect(first != null) {
+        if (first != null && !framed[0]) { framed[0] = true; map.controller.setZoom(15.0); map.controller.setCenter(GeoPoint(first.lat, first.lng)) }
     }
 
     val meLabel = stringResource(R.string.map_me)
