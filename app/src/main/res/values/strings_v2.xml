@@ -278,6 +278,18 @@
     <string name="contacts_invalid">That doesn\'t look like a phone number</string>
     <string name="partner_number_title">%1$s\'s number</string>
 
+    <string name="psos_title">%1$s needs help</string>
+    <string name="psos_sent">Sent at %1$s · %2$s</string>
+    <string name="psos_location">Last location %1$s</string>
+    <string name="psos_location_acc">Last location %1$s · within %2$d m</string>
+    <string name="psos_location_unknown">Location unavailable</string>
+    <string name="psos_battery">Battery %1$d%%</string>
+    <string name="psos_ack">Acknowledge</string>
+    <string name="psos_acked">You acknowledged · %1$s can see it</string>
+    <string name="psos_open_map">Open location in maps</string>
+    <string name="psos_cancelled">%1$s cancelled the SOS at %2$s</string>
+    <string name="psos_none">No SOS right now</string>
+
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>
     <string name="catalog_dark">Dark</string>
