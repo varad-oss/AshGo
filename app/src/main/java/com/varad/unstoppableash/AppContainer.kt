@@ -1,5 +1,6 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.feature.ourpage.OurPhotosStore
 import com.varad.unstoppableash.feature.fakecall.FakeCallVoiceStore
 import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
 import kotlinx.coroutines.withContext
@@ -124,6 +125,9 @@ class AppContainer(private val app: Application) {
     val settings by lazy { SettingsStore(app.settingsStore) }
     val fakeCallVoices by lazy {
         FakeCallVoiceStore(app.fakeCallStore, copyIn = { src, id -> withContext(Dispatchers.IO) { AndroidFakeCallAudio.copyIn(app, src, id) } }, deleteFile = { withContext(Dispatchers.IO) { AndroidFakeCallAudio.delete(it) } })
+    }
+    val ourPhotos by lazy {
+        OurPhotosStore(java.io.File(app.filesDir, "our_page"), encode = { photoEncoder.encode(it)?.jpeg }, now = System::currentTimeMillis)
     }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 

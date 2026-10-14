@@ -43,7 +43,7 @@ import com.varad.unstoppableash.ui.theme.Spacing
 import com.varad.unstoppableash.ui.theme.ThemeMode
 
 /** Where a settings row leads; Contacts and Reliability are their own screens elsewhere. */
-enum class SettingsPage { CONTACTS, RELIABILITY, PRIVACY, UPDATES, HELP, ABOUT }
+enum class SettingsPage { OUR_PAGE, CONTACTS, RELIABILITY, PRIVACY, UPDATES, HELP, ABOUT }
 
 data class SettingsActions(
     val onBack: () -> Unit = {},
@@ -115,6 +115,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
         }
 
         OrbitCard(Modifier.fillMaxWidth()) {
+            NavRow(stringResource(R.string.our_page_title)) { actions.onOpen(SettingsPage.OUR_PAGE) }
             NavRow(stringResource(R.string.contacts_title)) { actions.onOpen(SettingsPage.CONTACTS) }
             NavRow(stringResource(R.string.settings_reliability)) { actions.onOpen(SettingsPage.RELIABILITY) }
             NavRow(stringResource(R.string.settings_privacy)) { actions.onOpen(SettingsPage.PRIVACY) }

@@ -490,4 +490,17 @@
     <string name="fake_call_end">End</string>
     <string name="fake_call_open">Fake call</string>
     <string name="fake_call_open_body">Get a believable call to step away</string>
+
+    <!-- Stage 10.5 our page -->
+    <string name="our_page_title">Our page</string>
+    <string name="our_page_empty_title">Your photos, on a string</string>
+    <string name="our_page_empty_body">Pick a few photos of the two of you. They stay on this phone.</string>
+    <string name="our_page_add">Add photos</string>
+    <string name="our_page_full">That\'s the most this page holds (%1$d). Remove one to add another.</string>
+    <string name="our_page_private">Photos are copied into AshGo on this phone only, never uploaded.</string>
+    <string name="our_page_photo">A photo on our page</string>
+    <plurals name="our_page_skipped">
+        <item quantity="one">%d photo couldn\'t be added.</item>
+        <item quantity="other">%d photos couldn\'t be added.</item>
+    </plurals>
 </resources>

@@ -41,7 +41,7 @@ class SettingsScreenTest {
     @Test fun eachRowOpensItsPage() {
         val opened = mutableListOf<SettingsPage>()
         rule.setContent { OrbitTheme(ThemeMode.LIGHT) { SettingsScreen(SettingsUiState(myName = "Alice", pairId = "p1"), SettingsActions(onOpen = { opened += it })) } }
-        for (label in listOf("Emergency contacts", "Reliability", "Privacy & data", "Updates", "Help", "About & licences")) {
+        for (label in listOf("Our page", "Emergency contacts", "Reliability", "Privacy & data", "Updates", "Help", "About & licences")) {
             rule.onNode(hasText(label) and hasClickAction()).performScrollTo().performClick()
         }
         rule.runOnIdle { assertEquals(SettingsPage.entries.toList(), opened) }
