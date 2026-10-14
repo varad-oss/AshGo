@@ -41,6 +41,7 @@ class PresenceRepository(private val db: RtdbClient) {
             sharing = sharingOf(p["sharing"]),
             locationAt = fix?.at,
             accuracyM = fix?.accuracyM,
+            sharingUntil = p.long("sharingUntil"),
         )
     }
 

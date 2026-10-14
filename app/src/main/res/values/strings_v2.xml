@@ -148,6 +148,8 @@
     <string name="kind_call_me">Call me when you\'re free?</string>
     <string name="kind_are_you_ok">Are you okay?</string>
     <string name="kind_custom">Note</string>
+    <string name="kind_arrived">Arrived</string>
+    <string name="kind_arrived_at">Arrived at %1$s</string>
     <string name="checkin_sheet_title">Check in with %1$s</string>
     <string name="checkin_custom_label">Or write a short note</string>
     <string name="action_send">Send</string>

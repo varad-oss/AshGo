@@ -238,5 +238,6 @@ fun kindLabel(kind: String, text: String?): String = when (kind) {
     "thinking_of_you" -> stringResource(R.string.kind_thinking_of_you)
     "call_me" -> stringResource(R.string.kind_call_me)
     "are_you_ok" -> stringResource(R.string.kind_are_you_ok)
+    "arrived" -> if (text != null) stringResource(R.string.kind_arrived_at, text) else stringResource(R.string.kind_arrived)
     else -> text ?: stringResource(R.string.kind_custom)
 }

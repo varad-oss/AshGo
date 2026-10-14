@@ -12,6 +12,8 @@ data class PresenceSnapshot(
     val sharing: SharingMode?,
     val locationAt: Long?,
     val accuracyM: Float?,
+    /** When a pause ends by itself; null for "until I resume" or not paused. */
+    val sharingUntil: Long? = null,
 )
 
 sealed interface PresenceState {
