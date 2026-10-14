@@ -5,13 +5,13 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
 export const DAY = 86_400_000;
 
-export async function makeEnv() {
+export async function makeEnv(rulesFile = 'database.rules.json') {
   return initializeTestEnvironment({
     projectId: 'demo-ashgo',
     database: {
       host: '127.0.0.1',
       port: 9000,
-      rules: readFileSync(new URL('../database.rules.json', import.meta.url), 'utf8'),
+      rules: readFileSync(new URL(`../${rulesFile}`, import.meta.url), 'utf8'),
     },
   });
 }
