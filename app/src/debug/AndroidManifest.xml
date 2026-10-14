@@ -34,6 +34,11 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <!-- v2 location sharing (debug only until the Stage 11 cutover). -->
+        <service
+            android:name="com.varad.unstoppableash.service.location.LocationShareService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
         <activity
             android:name=".catalog.DesignCatalogActivity"
             android:exported="true"

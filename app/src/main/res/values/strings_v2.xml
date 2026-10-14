@@ -294,6 +294,12 @@
     <string name="psos_cancelled">%1$s cancelled the SOS at %2$s</string>
     <string name="psos_none">No SOS right now</string>
 
+    <!-- ===== Location sharing (Stage 8) ===== -->
+    <string name="channel_service">Sharing status</string>
+    <string name="sharing_notification_title">Sharing your location</string>
+    <string name="sharing_notification_body">Your orbit can see where you are. Pause any time.</string>
+    <string name="sharing_pause_1h">Pause 1 h</string>
+
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>
     <string name="catalog_dark">Dark</string>
