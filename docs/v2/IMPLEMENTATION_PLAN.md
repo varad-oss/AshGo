@@ -1236,3 +1236,90 @@ On the emulator against the emulators, with the app backgrounded and the screen 
 - reboot → service back, plus the resume-sharing prompt.
 
 Then the fresh review.
+
+---
+
+## Stage 10 — Supporting features (detailed, written 2026-10-14)
+
+**Spec:** REDESIGN_SPEC §Settings sub-screens / §FakeCall / OurPage / About; D-10 updates, D-14 retention.
+
+**Rulings carried in:**
+- **Updater (D-10 v2 flow).** No token in the app.
+  - Version, APK URL and SHA-256 come from the read-only `app_config` in RTDB.
+  - The download URL must be https and on an allowlist: `github.com/varad-oss/AshGo-releases` and GitHub's release-asset CDN.
+  - A hash mismatch is never installed.
+  - The installer is the system one, via FileProvider.
+  - Until the owner makes the releases repo public (after phase-2 rules and the legacy data deletion), the download fails with a clear message. The old token flow stays in v1 only and is removed at cutover.
+- **LegacyImporter** imports only phone-local v1 data: emergency contacts (already done) and fake-call voices. v1 cloud chat is not imported:
+  - the rules require `at == now`, so original times can't be kept;
+  - D-14's 7-day retention would delete it anyway.
+- **Cleanup** runs on either phone at most once a day (WorkManager), with server-time cutoffs. It deletes only what the rules allow (own items, or anything past retention). It never touches an active SOS or an active trip.
+
+### Task 10.1 — Updater
+`data/update/UpdateChecker.kt`:
+- `check()` → `UpdateInfo(versionCode, versionName, url, sha256, sizeBytes?, notes?)` or none;
+- `download(info, progress)` → File;
+- `verify(file, sha256)`;
+- `install(file)` (system installer).
+
+Pure parts: version comparison (never a downgrade), the URL allowlist, and hex SHA-256 compare.
+
+**Tests:**
+- a mismatching hash is rejected;
+- http or an off-allowlist host is rejected;
+- the same or a lower version means "up to date";
+- `app_config` missing or malformed means "can't check".
+
+Plus Settings → Updates: check → found (version, size, notes) → download with progress → verify → install, with each failure shown.
+
+### Task 10.2 — Privacy & Data + CleanupWorker
+- `service/cleanup/Cleanup.kt` reads the pair's chat, media, events, trips and sos, runs RetentionSelector, and deletes only the selected items. It is a pure-ish function, JVM-tested with FakeRtdb.
+- `CleanupWorker` runs daily.
+- Privacy screen:
+  - the retention table;
+  - "Delete my messages now" — the rules let each person delete their own, with a confirmation;
+  - "What AshGo stores", with the on-phone vs in-orbit lists.
+
+**Tests:**
+- expired items are deleted;
+- fresh ones kept;
+- an active SOS is never deleted;
+- an active trip is never deleted;
+- the partner's fresh items are never deleted.
+
+### Task 10.3 — Settings sub-screens
+Settings becomes a list:
+- **Profile:** name, avatar (256 px / ≤ 30 KB via the encoder), greeting toggle.
+- **Orbit:** partner, relationship label, Leave.
+- **Notifications:** chat / nudges / check-in toggles; SOS links to its system channel and is not toggleable.
+- **Emergency contacts**
+- **Reliability**
+- **Privacy & data**
+- **Appearance**
+- **Updates**
+- **Help**
+- **About & licences**
+- **Sign out**
+
+**Tests:** VM tests for the profile and toggles; UI tests for each row's navigation and that SOS has no in-app toggle.
+
+### Task 10.4 — Fake call
+`feature/fakecall/*`:
+- caller name and voice (a locally picked audio file, copied into app storage, never uploaded);
+- delay: now / 10 s / 1 min;
+- a generic incoming-call screen with no OEM branding, Accept / Decline;
+- on Accept, audio plays on the earpiece (USAGE_VOICE_COMMUNICATION) with a timer.
+
+Started from Safety. v1 voices are imported.
+
+**Tests:** VM scheduling and decline; UI that the screen shows the caller and the actions.
+
+### Task 10.5 — Our page
+Locally picked photos (PickMultipleVisualMedia), downscaled into app storage and shown as "photo ropes". Never uploaded. Remove a photo.
+
+**Tests:** the store adds, removes and caps the count; UI shows the empty state.
+
+### Task 10.6 — Help, About & licences
+Static screens: status meanings, reliability tips, SMS costs, a privacy summary, and licences (Nunito OFL, osmdroid Apache-2.0, OSM attribution, AndroidX/Firebase Apache-2.0).
+
+### Task 10.7 — Manual verification + review
