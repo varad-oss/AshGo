@@ -18,6 +18,8 @@ import com.varad.unstoppableash.domain.trips.OverduePhase
 import com.varad.unstoppableash.ui.theme.OrbitTheme
 import com.varad.unstoppableash.ui.theme.ThemeMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -148,5 +150,51 @@ class MapScreenTest {
         rule.onNodeWithText("Start a trip").assertDoesNotExist()
         rule.onNodeWithText("Share live").assertDoesNotExist()
         rule.onNodeWithText("Bob isn't on a trip", substring = true).assertExists()
+    }
+
+    @Test fun aSavedPlaceIsOneTapAway() {
+        val home = com.varad.unstoppableash.data.local.SavedPlace("h1", "Home", 18.52, 73.85)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(base, MapActions(onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }), map = { p, _, _, m -> pins = p; Box(m) }, savedPlaces = listOf(home))
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Home").performClick()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle { assertEquals(com.varad.unstoppableash.domain.model.TripDestination(18.52, 73.85, "Home"), started!![0]) }
+    }
+
+    @Test fun aPickedPlaceCanBeSavedWithAName() {
+        var saved: Pair<String, com.varad.unstoppableash.domain.model.TripDestination>? = null
+        val cafe = com.varad.unstoppableash.data.places.Place("Blue Tokai", "Mumbai", 19.06, 72.83)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(
+                    base, MapActions(onSearchPlace = {}, onSavePlace = { n, d -> saved = n to d }), map = { p, _, _, m -> pins = p; Box(m) },
+                    places = PlaceSearchState.Results(listOf(cafe)),
+                )
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Blue Tokai").performClick()
+        rule.onNodeWithText("Save this place").performClick()
+        rule.onNodeWithText("Name (e.g. Home, PG)").performTextInput("Office")
+        rule.onNodeWithText("Save").performClick()
+        rule.runOnIdle { assertEquals("Office", saved!!.first); assertEquals(19.06, saved!!.second.lat, 0.0) }
+    }
+
+    @Test fun expectBackCanBeACustomTime() {
+        show(base)
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Choose a custom time").performClick()
+        rule.onNodeWithText("Expect me back by").assertExists()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("By ", substring = true).assertExists()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle {
+            val expectBy = started!![1] as Long
+            assertTrue("a real deadline, later than now, within a day", expectBy > now && expectBy <= now + 24 * 3_600_000L)
+        }
     }
 }

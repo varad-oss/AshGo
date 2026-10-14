@@ -1,5 +1,6 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.data.local.SavedPlacesStore
 import com.varad.unstoppableash.service.connect.NotificationHost
 import com.varad.unstoppableash.service.connect.BackgroundWatch
 import com.varad.unstoppableash.service.notify.NotificationEngine
@@ -57,6 +58,7 @@ private fun resetOnCorruption() = ReplaceFileCorruptionHandler { emptyPreference
 private val Context.contactsStore by preferencesDataStore(name = "v2_emergency_contacts", corruptionHandler = resetOnCorruption())
 private val Context.settingsStore by preferencesDataStore(name = "v2_settings", corruptionHandler = resetOnCorruption())
 private val Context.fakeCallStore by preferencesDataStore(name = "v2_fake_call_voices", corruptionHandler = resetOnCorruption())
+private val Context.savedPlacesStore by preferencesDataStore(name = "v2_saved_places", corruptionHandler = resetOnCorruption())
 private val Context.activeSosStore by preferencesDataStore(name = "v2_active_sos", corruptionHandler = resetOnCorruption())
 
 /**
@@ -142,6 +144,7 @@ class AppContainer(private val app: Application) {
     }
     val backgroundWatch by lazy { BackgroundWatch(pairs, trips, presence, settings, clock, LocationShareService.running) }
     val loudNudge by lazy { LoudNudge(AndroidSoundControl(app)) }
+    val savedPlaces by lazy { SavedPlacesStore(app.savedPlacesStore) }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 
     /** Copies v1's on-phone emergency contacts into the v2 store, once. */

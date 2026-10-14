@@ -335,6 +335,13 @@
     <string name="trip_dest_map">Chosen on the map</string>
     <string name="trip_dest_hint">Search for a place above, or long-press the map.</string>
     <string name="trip_search_label">Search for a place</string>
+    <string name="trip_expect_custom">Custom</string>
+    <string name="trip_expect_custom_cd">Choose a custom time</string>
+    <string name="trip_expect_custom_title">Expect me back by</string>
+    <string name="trip_expect_by">By %1$s</string>
+    <string name="saved_place_save">Save this place</string>
+    <string name="saved_place_name">Name (e.g. Home, PG)</string>
+    <string name="saved_place_remove">Remove %1$s</string>
     <string name="trip_search">Search</string>
     <string name="trip_search_none">No places found. Try adding the area or city.</string>
     <string name="trip_search_failed">Couldn\'t search right now. Check you\'re online and try again.</string>

@@ -323,9 +323,10 @@ private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
 private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val vm: MapViewModel = viewModel(factory = viewModelFactory {
-        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.settings, container.clock, places = AndroidPlaceSearch(context.applicationContext)) }
+        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.settings, container.clock, places = AndroidPlaceSearch(context.applicationContext), saved = container.savedPlaces) }
     })
     val placeSearch by vm.placeSearch.collectAsStateWithLifecycle()
+    val savedPlaces by vm.savedPlaces.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     // Sharing live needs location permission first; the service only starts once it's granted. Notifications are
     // asked for too: the ongoing "sharing your location" notice is how sharing stays visible (review 8 I4).
@@ -352,6 +353,8 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
             onExtendTrip = vm::extendTrip,
             onSearchPlace = vm::searchPlace,
             onClearPlaceSearch = vm::clearPlaceSearch,
+            onSavePlace = { n, d -> vm.savePlace(n, d) },
+            onRemovePlace = { vm.removePlace(it) },
             onArrive = vm::arrive,
             onEndTrip = vm::endTrip,
             onGetHelp = onGetHelp,
@@ -359,6 +362,7 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
         map = { pins, focus, onLongPress, m -> OsmMap(pins, focus, onLongPress, m) },
         modifier = modifier,
         places = placeSearch,
+        savedPlaces = savedPlaces,
     )
 }
 

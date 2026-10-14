@@ -72,7 +72,13 @@ class MapViewModel(
     private val clock: Clock,
     private val zone: ZoneId = ZoneId.systemDefault(),
     places: PlaceSearch = PlaceSearch { SearchResult.Unavailable },
+    private val saved: com.varad.unstoppableash.data.local.SavedPlacesStore? = null,
 ) : ViewModel() {
+
+    val savedPlaces: StateFlow<List<com.varad.unstoppableash.data.local.SavedPlace>> =
+        (saved?.places ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    fun savePlace(name: String, dest: TripDestination) = viewModelScope.launch { saved?.save(name, dest.lat, dest.lng) }
+    fun removePlace(id: String) = viewModelScope.launch { saved?.remove(id) }
 
     private val placeFinder = PlaceFinder(places, viewModelScope)
     val placeSearch: StateFlow<PlaceSearchState> = placeFinder.state

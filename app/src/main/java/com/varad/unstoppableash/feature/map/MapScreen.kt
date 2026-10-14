@@ -1,5 +1,18 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.varad.unstoppableash.feature.map
 
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Place
+import androidx.compose.foundation.layout.size
+import com.varad.unstoppableash.data.local.SavedPlace
+import com.varad.unstoppableash.data.local.SavedPlacesStore
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
@@ -73,12 +86,18 @@ data class MapActions(
     /** Trip destination by name; results arrive as [MapScreen]'s `places`. */
     val onSearchPlace: (String) -> Unit = {},
     val onClearPlaceSearch: () -> Unit = {},
+    /** Saved places ("Home", "PG") live on this phone only. */
+    val onSavePlace: (name: String, dest: TripDestination) -> Unit = { _, _ -> },
+    val onRemovePlace: (id: String) -> Unit = {},
 )
 
 typealias MapContent = @Composable (pins: MapPins, focus: MapFocus?, onLongPress: (Double, Double) -> Unit, modifier: Modifier) -> Unit
 
 @Composable
-fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier: Modifier = Modifier, places: PlaceSearchState = PlaceSearchState.Idle) {
+fun MapScreen(
+    state: MapUiState, actions: MapActions, map: MapContent, modifier: Modifier = Modifier,
+    places: PlaceSearchState = PlaceSearchState.Idle, savedPlaces: List<SavedPlace> = emptyList(),
+) {
     var focus by remember { mutableStateOf<MapFocus?>(null) }
     var picked by remember { mutableStateOf<TripDestination?>(null) }
     var tripSheet by rememberSaveable { mutableStateOf(false) }
@@ -112,8 +131,9 @@ fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier:
     }
     if (tripSheet) {
         TripSheet(
-            state, picked, places,
+            state, picked, places, savedPlaces,
             onSearch = actions.onSearchPlace,
+            onSave = actions.onSavePlace, onRemoveSaved = actions.onRemovePlace,
             onPick = { place ->
                 picked = place.toDestination()
                 focus = MapFocus(place.lat, place.lng, System.nanoTime())
@@ -255,12 +275,13 @@ private fun Sharing(state: MapUiState, actions: MapActions) {
 }
 
 private enum class DestChoice { NONE, HERE, MAP }
-private enum class ExpectChoice(val minutes: Long?) { NONE(null), M30(30), H1(60), H2(120) }
+private enum class ExpectChoice(val minutes: Long?) { NONE(null), M30(30), H1(60), H2(120), CUSTOM(null) }
 
 @Composable
 private fun TripSheet(
-    state: MapUiState, picked: TripDestination?, places: PlaceSearchState,
+    state: MapUiState, picked: TripDestination?, places: PlaceSearchState, saved: List<SavedPlace>,
     onSearch: (String) -> Unit, onPick: (Place) -> Unit,
+    onSave: (String, TripDestination) -> Unit, onRemoveSaved: (String) -> Unit,
     onStart: (TripDestination?, Long?, String?, Boolean, Boolean) -> Unit, onDismiss: () -> Unit,
 ) {
     val sharingNow = state.mySharing == SharingMode.LIVE && state.sharingFromThisPhone
@@ -270,6 +291,10 @@ private fun TripSheet(
     var note by rememberSaveable { mutableStateOf("") }
     var tell by rememberSaveable { mutableStateOf(true) }
     var query by rememberSaveable { mutableStateOf("") }
+    var customAt by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pickingTime by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    val savedChosen = picked?.let { p -> saved.firstOrNull { it.lat == p.lat && it.lng == p.lng } }
     // A place found by search (or a long-press) becomes the chosen destination.
     LaunchedEffect(picked) { if (picked != null) dest = DestChoice.MAP }
     OrbitSheet(onDismiss) {
@@ -278,7 +303,22 @@ private fun TripSheet(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 FilterChip(dest == DestChoice.NONE, { dest = DestChoice.NONE }, { Text(stringResource(R.string.trip_dest_none)) })
                 if (state.myFix != null) FilterChip(dest == DestChoice.HERE, { dest = DestChoice.HERE }, { Text(stringResource(R.string.trip_dest_here)) })
-                if (picked != null) FilterChip(dest == DestChoice.MAP, { dest = DestChoice.MAP }, { Text(picked.label ?: stringResource(R.string.trip_dest_map)) })
+                if (picked != null && savedChosen == null) FilterChip(dest == DestChoice.MAP, { dest = DestChoice.MAP }, { Text(picked.label ?: stringResource(R.string.trip_dest_map)) })
+                saved.forEach { place ->
+                    val removeLabel = stringResource(R.string.saved_place_remove, place.name)
+                    InputChip(
+                        selected = dest == DestChoice.MAP && savedChosen?.id == place.id,
+                        onClick = { onPick(Place(place.name, null, place.lat, place.lng)) },
+                        label = { Text(place.name) },
+                        leadingIcon = { Icon(Icons.Rounded.Place, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            Icon(Icons.Rounded.Close, contentDescription = removeLabel, modifier = Modifier.size(18.dp).clickable { onRemoveSaved(place.id) })
+                        },
+                    )
+                }
+            }
+            if (dest == DestChoice.MAP && picked != null && savedChosen == null) {
+                OrbitButton(stringResource(R.string.saved_place_save), { naming = true }, style = OrbitButtonStyle.Quiet)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 OrbitTextField(query, { query = it }, stringResource(R.string.trip_search_label), Modifier.weight(1f), maxLength = 100)
@@ -288,13 +328,21 @@ private fun TripSheet(
             if (picked == null) Text(stringResource(R.string.trip_dest_hint), style = MaterialTheme.typography.bodySmall, color = Orbit.colors.textSecondary)
             Text(stringResource(R.string.trip_expect), style = MaterialTheme.typography.labelLarge, color = Orbit.colors.text)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                ExpectChoice.entries.forEach { e ->
+                ExpectChoice.entries.filter { it != ExpectChoice.CUSTOM }.forEach { e ->
                     val label = when (e) {
                         ExpectChoice.NONE -> R.string.trip_expect_none; ExpectChoice.M30 -> R.string.trip_expect_30
                         ExpectChoice.H1 -> R.string.trip_expect_60; ExpectChoice.H2 -> R.string.trip_expect_120
+                        ExpectChoice.CUSTOM -> R.string.trip_expect_custom
                     }
                     FilterChip(expect == e, { expect = e }, { Text(stringResource(label)) })
                 }
+                // ✎ "By 9:30 PM": any time she likes (owner's ask).
+                FilterChip(
+                    selected = expect == ExpectChoice.CUSTOM,
+                    onClick = { pickingTime = true },
+                    label = { Text(customAt?.let { stringResource(R.string.trip_expect_by, timeOf(it)) } ?: stringResource(R.string.trip_expect_custom)) },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.trip_expect_custom_cd), modifier = Modifier.size(18.dp)) },
+                )
             }
             OrbitTextField(note, { note = it }, stringResource(R.string.trip_note), Modifier.fillMaxWidth(), maxLength = 80)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -314,9 +362,38 @@ private fun TripSheet(
                     DestChoice.HERE -> state.myFix?.let { TripDestination(it.lat, it.lng, null) }
                     DestChoice.MAP -> picked
                 }
-                onStart(d, expect.minutes?.let { state.nowMs + it * 60_000 }, note.trim().ifEmpty { null }, tell, !sharingNow && share)
+                val expectBy = if (expect == ExpectChoice.CUSTOM) customAt else expect.minutes?.let { state.nowMs + it * 60_000 }
+                onStart(d, expectBy, note.trim().ifEmpty { null }, tell, !sharingNow && share)
             }, Modifier.fillMaxWidth())
         }
+    }
+    if (pickingTime) {
+        val now = java.time.Instant.ofEpochMilli(customAt ?: (state.nowMs + 60 * 60_000)).atZone(ZoneId.systemDefault())
+        val timeState = rememberTimePickerState(initialHour = now.hour, initialMinute = now.minute)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pickingTime = false },
+            title = { Text(stringResource(R.string.trip_expect_custom_title)) },
+            text = { TimePicker(timeState) },
+            confirmButton = {
+                OrbitButton(stringResource(R.string.action_save), {
+                    customAt = ExpectTime.next(timeState.hour, timeState.minute, state.nowMs, ZoneId.systemDefault())
+                    expect = ExpectChoice.CUSTOM; pickingTime = false
+                }, style = OrbitButtonStyle.Quiet)
+            },
+            dismissButton = { OrbitButton(stringResource(R.string.action_cancel), { pickingTime = false }, style = OrbitButtonStyle.Quiet) },
+        )
+    }
+    if (naming && picked != null) {
+        var name by remember { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { naming = false },
+            title = { Text(stringResource(R.string.saved_place_save)) },
+            text = { OrbitTextField(name, { name = it }, stringResource(R.string.saved_place_name), maxLength = SavedPlacesStore.NAME_MAX) },
+            confirmButton = {
+                OrbitButton(stringResource(R.string.action_save), { onSave(name.trim(), picked); naming = false }, enabled = name.isNotBlank(), style = OrbitButtonStyle.Quiet)
+            },
+            dismissButton = { OrbitButton(stringResource(R.string.action_cancel), { naming = false }, style = OrbitButtonStyle.Quiet) },
+        )
     }
 }
 
