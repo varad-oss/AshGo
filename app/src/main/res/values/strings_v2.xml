@@ -395,7 +395,7 @@
     <string name="rel_battery">Not restricted by battery saving</string>
     <string name="rel_location">Precise location allowed</string>
     <string name="rel_sms">SMS allowed for SOS</string>
-    <string name="rel_connection">Connected, even with AshGo closed</string>
+    <string name="rel_connection">Connected in the background when there\'s something to watch</string>
     <string name="rel_dnd">Nudges can ring through Do Not Disturb</string>
     <string name="rel_problem">%1$s: needs attention</string>
     <string name="rel_ok_cd">%1$s: OK</string>
@@ -435,6 +435,8 @@
     <string name="settings_notify_nudges">Nudges</string>
     <string name="settings_notify_checkins">Check-ins</string>
     <string name="settings_notify_sos">SOS and overdue alerts</string>
+    <string name="settings_follow_sharing">Follow %1$s\'s live location with AshGo closed</string>
+    <string name="settings_follow_sharing_body">During their trips AshGo always keeps running. Outside trips, this keeps it running only while they share live. Otherwise, clearing AshGo closes it fully, and alerts reach you when you open it.</string>
     <string name="settings_notify_sos_body">Always on in AshGo. Opens your phone\'s settings for how they sound.</string>
     <string name="settings_privacy">Privacy &amp; data</string>
     <string name="settings_updates">Updates</string>

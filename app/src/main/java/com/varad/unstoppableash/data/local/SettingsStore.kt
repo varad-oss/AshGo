@@ -27,6 +27,10 @@ data class Settings(
     val shareFromThisPhone: Boolean = false,
     /** We asked for notification permission once already; Reliability asks again on request. */
     val askedNotifications: Boolean = false,
+    /** Watcher's choice: keep following their live location with AshGo cleared (owner's ask; trips always count). */
+    val followPartnerSharing: Boolean = true,
+    /** Last answer of BackgroundWatch, so a reboot or heartbeat only restarts AshGo when there's something to watch. */
+    val keepConnected: Boolean = false,
 )
 
 class SettingsStore(private val store: DataStore<Preferences>) {

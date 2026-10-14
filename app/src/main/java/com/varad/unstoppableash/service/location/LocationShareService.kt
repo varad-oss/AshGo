@@ -45,6 +45,7 @@ import java.time.ZoneId
 class LocationShareService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var engine: Job? = null
+    private var hostAcquired = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -74,6 +75,8 @@ class LocationShareService : Service() {
                 FusedLocationUpdates(this), batteryLevels(), container.clock,
             )
             engine = scope.launch { e.run() }
+            // Sharing keeps AshGo running anyway, so it also carries alerts (nudges, check-ins) on this phone.
+            container.notificationHost.acquire(); hostAcquired = true
             scope.launch { container.settings.update { it.copy(sharingActive = true) } }
             scope.launch { stopWhenNotSharing() }
         }
@@ -102,6 +105,7 @@ class LocationShareService : Service() {
     override fun onDestroy() {
         running.value = false
         val container = (application as AshGoApplication).container
+        if (hostAcquired) { container.notificationHost.release(); hostAcquired = false }
         container.appScope.launch { container.settings.update { it.copy(sharingActive = false) } }
         scope.cancel()
         super.onDestroy()

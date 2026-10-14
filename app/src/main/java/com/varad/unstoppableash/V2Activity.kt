@@ -33,6 +33,17 @@ class V2Activity : ComponentActivity() {
         openRequest.value = intent.getStringExtra(AndroidNotifier.EXTRA_OPEN)
     }
 
+    // Alerts work whenever AshGo is on screen; in the background only while there's something to watch.
+    override fun onStart() {
+        super.onStart()
+        (application as AshGoApplication).container.notificationHost.acquire()
+    }
+
+    override fun onStop() {
+        (application as AshGoApplication).container.notificationHost.release()
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (savedInstanceState == null) openRequest.value = intent.getStringExtra(AndroidNotifier.EXTRA_OPEN)
         super.onCreate(savedInstanceState)

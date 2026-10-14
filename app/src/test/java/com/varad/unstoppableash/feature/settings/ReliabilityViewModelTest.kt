@@ -21,4 +21,10 @@ class ReliabilityViewModelTest {
         running.value = true
         vm.items.first { items -> items.single { it.check == Check.CONNECTION }.ok }
     }
+
+    @Test fun aServiceThatIsNotNeededIsNotAProblem() = runTest(main.dispatcher) {
+        val vm = ReliabilityViewModel({ allGood }, MutableStateFlow(true), MutableStateFlow(false), needed = MutableStateFlow(false))
+        backgroundScope.launch { vm.items.collect {} }
+        vm.items.first { items -> items.single { it.check == Check.CONNECTION }.ok }
+    }
 }

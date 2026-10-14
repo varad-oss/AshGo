@@ -240,9 +240,14 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
     // Paired: keep the connection that carries alerts (no push server on Spark), and ask once to be allowed to notify.
     LaunchedEffect(Unit) {
         Channels.create(context)
-        StayConnectedService.start(context)
-        HeartbeatWorker.schedule(context)
         CleanupWorker.schedule(context)
+    }
+    // Keep AshGo running after it's cleared only while there's something to watch (her trip, or followed sharing).
+    LaunchedEffect(Unit) {
+        container.backgroundWatch.needed().collect { need ->
+            container.settings.update { it.copy(keepConnected = need) }
+            if (need) { StayConnectedService.start(context); HeartbeatWorker.schedule(context) } else HeartbeatWorker.cancel(context)
+        }
     }
     val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val settingsNow by container.settings.settings.collectAsStateWithLifecycle(null)
@@ -412,6 +417,7 @@ private fun SettingsOverlay(
             onGreeting = vm::setGreeting,
             onNotify = vm::setNotify,
             onOpenSosChannel = { openFix(context, Fix.SOS_CHANNEL_SETTINGS) },
+            onFollowSharing = vm::setFollowSharing,
         ),
         m,
     )
@@ -452,7 +458,7 @@ private fun FakeCallOverlay(container: AppContainer, onBack: () -> Unit) {
 private fun ReliabilityOverlay(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: ReliabilityViewModel = viewModel(factory = viewModelFactory {
-        initializer { ReliabilityViewModel({ readReliability(context.applicationContext) }, container.rtdb.connected(), StayConnectedService.running) }
+        initializer { ReliabilityViewModel({ readReliability(context.applicationContext) }, container.rtdb.connected(), StayConnectedService.running, container.backgroundWatch.needed()) }
     })
     val items by vm.items.collectAsStateWithLifecycle()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()

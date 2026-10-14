@@ -1,6 +1,7 @@
 package com.varad.unstoppableash.service.connect
 
 import android.content.Context
+import kotlinx.coroutines.flow.first
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -16,6 +17,8 @@ class HeartbeatWorker(context: Context, params: WorkerParameters) : CoroutineWor
     override suspend fun doWork(): Result {
         val c = (applicationContext as AshGoApplication).container
         if (c.auth.current() == null) return Result.success()
+        // Nothing to watch: AshGo isn't meant to run in the background now (owner's ask).
+        if (!c.settings.settings.first().keepConnected) { cancel(applicationContext); return Result.success() }
         heartbeatOnce(c.pairs, c.presence)
         StayConnectedService.start(applicationContext) // may be refused in the background; that's fine
         return Result.success()
@@ -29,6 +32,10 @@ class HeartbeatWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(NAME)
         }
     }
 }

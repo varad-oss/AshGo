@@ -16,9 +16,7 @@ import com.varad.unstoppableash.AshGoApplication
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.domain.model.PairState
 import com.varad.unstoppableash.domain.notify.Channel
-import com.varad.unstoppableash.service.notify.AndroidNotifier
 import com.varad.unstoppableash.service.notify.Channels
-import com.varad.unstoppableash.service.notify.NotificationEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +45,8 @@ class StayConnectedService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private var hostAcquired = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Channels.create(this)
         val notification = NotificationCompat.Builder(this, Channel.SERVICE.id)
@@ -72,9 +72,15 @@ class StayConnectedService : Service() {
 
     private suspend fun run() {
         val c = (application as AshGoApplication).container
-        val engine = NotificationEngine(c.pairs, c.chat, c.events, c.sos, c.trips, c.settings, AndroidNotifier(this), c.clock)
-        // The engine watches the pair itself, so leaving or signing out also takes its alerts down.
-        scope.launch { engine.run() }
+        // One engine per process, shared with the app on screen and location sharing (never two posting).
+        c.notificationHost.acquire(); hostAcquired = true
+        // Only while there's something to watch (owner's ask); otherwise clearing AshGo really stops it.
+        scope.launch {
+            c.backgroundWatch.needed().collectLatest { need ->
+                c.settings.update { it.copy(keepConnected = need) }
+                if (!need) { delay(NOT_NEEDED_GRACE_MS); stopSelf() }
+            }
+        }
         c.pairs.pairState()
             .distinctUntilChanged { a, b -> a is PairState.Paired && b is PairState.Paired && a.meta.pairId == b.meta.pairId && a.myUid == b.myUid || (a !is PairState.Paired && a == b) }
             .collectLatest { state ->
@@ -104,12 +110,15 @@ class StayConnectedService : Service() {
 
     override fun onDestroy() {
         _running.value = false
+        if (hostAcquired) { (application as AshGoApplication).container.notificationHost.release(); hostAcquired = false }
         scope.cancel()
         super.onDestroy()
     }
 
     companion object {
         private const val NOTIFICATION_ID = 42
+        /** A trip ending and a new one starting moments later shouldn't bounce the service. */
+        private const val NOT_NEEDED_GRACE_MS = 60_000L
         private val _running = MutableStateFlow(false)
         /** Whether alerts can reach this phone with AshGo closed (Reliability shows it). */
         val running: StateFlow<Boolean> = _running.asStateFlow()

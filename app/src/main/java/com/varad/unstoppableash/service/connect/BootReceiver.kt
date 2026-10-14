@@ -25,11 +25,14 @@ class BootReceiver : BroadcastReceiver() {
         val container = (context.applicationContext as AshGoApplication).container
         if (container.auth.current() == null) return
         Channels.create(context)
-        StayConnectedService.start(context)
-        HeartbeatWorker.schedule(context)
         val pending = goAsync()
         container.appScope.launch {
             try {
+                // Only if there was something to watch when the phone went down (her trip, or followed sharing).
+                if (container.settings.settings.first().keepConnected) {
+                    StayConnectedService.start(context)
+                    HeartbeatWorker.schedule(context)
+                }
                 if (container.settings.settings.first().sharingActive) {
                     val open = android.app.PendingIntent.getActivity(
                         context, 20, Intent(context, V2Activity::class.java).putExtra(AndroidNotifier.EXTRA_OPEN, AndroidNotifier.OPEN_MAP),

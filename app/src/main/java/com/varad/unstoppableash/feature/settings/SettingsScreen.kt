@@ -59,6 +59,7 @@ data class SettingsActions(
     val onNotify: (NotifyToggle, Boolean) -> Unit = { _, _ -> },
     /** SOS alerts are never switched off in the app; this opens the system's own channel settings. */
     val onOpenSosChannel: () -> Unit = {},
+    val onFollowSharing: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -104,6 +105,10 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
             ToggleRow(stringResource(R.string.settings_notify_nudges), state.notifyNudges) { actions.onNotify(NotifyToggle.NUDGES, it) }
             ToggleRow(stringResource(R.string.settings_notify_checkins), state.notifyCheckins) { actions.onNotify(NotifyToggle.CHECKINS, it) }
             NavRow(stringResource(R.string.settings_notify_sos), stringResource(R.string.settings_notify_sos_body), actions.onOpenSosChannel)
+            if (state.watcher) {
+                ToggleRow(stringResource(R.string.settings_follow_sharing, state.partnerName), state.followSharing, actions.onFollowSharing)
+                Text(stringResource(R.string.settings_follow_sharing_body), style = MaterialTheme.typography.bodySmall, color = Orbit.colors.textSecondary)
+            }
         }
 
         Section(R.string.settings_theme) {

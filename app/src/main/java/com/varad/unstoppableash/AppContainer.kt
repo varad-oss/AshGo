@@ -1,5 +1,10 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.service.connect.NotificationHost
+import com.varad.unstoppableash.service.connect.BackgroundWatch
+import com.varad.unstoppableash.service.notify.NotificationEngine
+import com.varad.unstoppableash.service.notify.AndroidNotifier
+import com.varad.unstoppableash.service.location.LocationShareService
 import com.varad.unstoppableash.service.nudge.AndroidSoundControl
 import com.varad.unstoppableash.service.nudge.LoudNudge
 import com.varad.unstoppableash.data.wall.WallRepository
@@ -131,6 +136,11 @@ class AppContainer(private val app: Application) {
     val wall by lazy { WallRepository(rtdb) }
     /** Our page photos already on this phone (cache: re-fetchable from the shared wall). */
     val wallCacheDir: java.io.File get() = java.io.File(app.cacheDir, "wall")
+    /** One notification engine per process, shared by the app on screen and the background services. */
+    val notificationHost by lazy {
+        NotificationHost(appScope) { NotificationEngine(pairs, chat, events, sos, trips, settings, AndroidNotifier(app), clock).run() }
+    }
+    val backgroundWatch by lazy { BackgroundWatch(pairs, trips, presence, settings, clock, LocationShareService.running) }
     val loudNudge by lazy { LoudNudge(AndroidSoundControl(app)) }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 

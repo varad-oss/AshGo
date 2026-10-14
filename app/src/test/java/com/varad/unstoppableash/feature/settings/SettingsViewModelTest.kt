@@ -15,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import com.varad.unstoppableash.core.result.FailureReason
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -166,5 +167,14 @@ class SettingsViewModelTest {
         vm.deleteMyMessages()
         assertEquals(4, vm.state.first { it.deletedCount != null }.deletedCount)
         assertEquals(1, deleted)
+    }
+
+    @Test fun theWatcherChoosesWhetherToFollowTheirSharingInTheBackground() = runTest(main.dispatcher) {
+        seed() // alice created the orbit
+        val vm = vm()
+        assertTrue(vm.state.first { it.pairId != null }.watcher)
+        assertTrue(vm.state.value.followSharing)
+        vm.setFollowSharing(false)
+        assertFalse(vm.state.first { !it.followSharing }.followSharing)
     }
 }

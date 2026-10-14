@@ -41,6 +41,10 @@ data class SettingsUiState(
     val deleting: Boolean = false,
     /** How many of my messages and photos "Delete my messages" removed; null until it has run. */
     val deletedCount: Int? = null,
+    /** I created the orbit: I watch over the other person (roles). */
+    val watcher: Boolean = false,
+    /** Keep following their live location with AshGo cleared (trips always count). */
+    val followSharing: Boolean = true,
 )
 
 enum class NotifyToggle { CHAT, NUDGES, CHECKINS }
@@ -93,6 +97,8 @@ class SettingsViewModel(
             savingAvatar = l.savingAvatar,
             deleting = l.deleting,
             deletedCount = l.deletedCount,
+            watcher = (pair as? PairState.Paired)?.isWatcher == true,
+            followSharing = prefs.followPartnerSharing,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), SettingsUiState())
 
@@ -127,6 +133,8 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun setFollowSharing(on: Boolean) = viewModelScope.launch { settings.update { it.copy(followPartnerSharing = on) } }
 
     fun deleteMyMessages() {
         local.update { it.copy(deleting = true, deletedCount = null) }
