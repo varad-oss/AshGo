@@ -30,9 +30,14 @@ interface SmsDispatcher {
 /** Multipart send with per-part sent/delivered PendingIntents → [SmsResultReceiver] → [SmsAttemptTracker]. */
 class AndroidSmsDispatcher(private val context: Context) : SmsDispatcher {
 
-    override fun canSend(): Boolean =
-        context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING) &&
+    override fun canSend(): Boolean = hasSmsHardware() &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+
+    // FEATURE_TELEPHONY_MESSAGING only exists from API 33; older phones never declare it, so asking for it
+    // there would switch SOS SMS off on every Android 8–12 phone (lint InlinedApi caught this).
+    private fun hasSmsHardware(): Boolean = context.packageManager.hasSystemFeature(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) PackageManager.FEATURE_TELEPHONY_MESSAGING else PackageManager.FEATURE_TELEPHONY,
+    )
 
     override val results: SharedFlow<SmsResult> get() = Hub.results.asSharedFlow()
 
