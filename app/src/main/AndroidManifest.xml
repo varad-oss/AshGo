@@ -16,6 +16,8 @@
     <!-- Only for Settings → Updates (D-10): the system installer opens after a checksum-verified download. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Lets a nudge's beep ring through Do Not Disturb, only after the person grants it in Settings. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <application
         android:name=".AshGoApplication"

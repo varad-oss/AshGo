@@ -3,6 +3,8 @@ package com.varad.unstoppableash.service.notify
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import com.varad.unstoppableash.AshGoApplication
+import kotlinx.coroutines.launch
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -17,8 +19,12 @@ import com.varad.unstoppableash.feature.safety.PartnerSosActivity
 class AndroidNotifier(private val context: Context) : Notifier {
 
     override fun post(n: PlannedNotification, partnerName: String): Boolean {
+        if (n.kind == NotificationKind.NUDGE) {
+            val c = (context.applicationContext as AshGoApplication).container
+            c.appScope.launch { runCatching { c.loudNudge.ring() } }
+        }
         val nm = NotificationManagerCompat.from(context)
-        if (!nm.areNotificationsEnabled()) return false // Reliability shows this; the engine tries again later
+        if (!nm.areNotificationsEnabled()) return n.kind == NotificationKind.NUDGE // Reliability shows this; the engine tries again later
         val b = NotificationCompat.Builder(context, n.kind.channel.id)
             .setSmallIcon(R.drawable.ic_orbit_glyph)
             .setAutoCancel(true)
@@ -72,7 +78,10 @@ class AndroidNotifier(private val context: Context) : Notifier {
                 .setContentText(KindText.of(context, n.detail.orEmpty(), n.text))
                 .setContentIntent(activityIntent(V2Activity::class.java, OPEN_CHAT, 16))
         }
-        return safeNotify(context, n.tag, ID, b.build())
+        val shown = safeNotify(context, n.tag, ID, b.build())
+        // The beep is the nudge (it rings even if notifications are off), so it counts as delivered either way:
+        // otherwise a blocked notification would replay the beep on every run.
+        return shown || n.kind == NotificationKind.NUDGE
     }
 
     /** On Android 12+ the system asks for an unlock first; older versions open AshGo instead of acting from the lock screen. */

@@ -12,6 +12,8 @@ import com.varad.unstoppableash.domain.notify.Channel
 object Channels {
     fun create(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        // v2.0's nudge channel had a normal sound; nudges now beep on the alarm stream instead (LoudNudge).
+        runCatching { nm.deleteNotificationChannel("nudges") }
         Channel.entries.forEach { c -> nm.createNotificationChannel(channelFor(context, c)) }
     }
 
@@ -30,7 +32,11 @@ object Channels {
         Channel.OVERDUE -> NotificationChannel(c.id, context.getString(R.string.channel_overdue), NotificationManager.IMPORTANCE_HIGH)
         Channel.CHAT -> NotificationChannel(c.id, context.getString(R.string.channel_chat), NotificationManager.IMPORTANCE_DEFAULT)
         Channel.CHECKINS -> NotificationChannel(c.id, context.getString(R.string.channel_checkins), NotificationManager.IMPORTANCE_DEFAULT)
-        Channel.NUDGES -> NotificationChannel(c.id, context.getString(R.string.channel_nudges), NotificationManager.IMPORTANCE_DEFAULT)
+        // Silent on purpose: the nudge's own beep plays on the alarm stream, so it is heard even in silent mode.
+        Channel.NUDGES -> NotificationChannel(c.id, context.getString(R.string.channel_nudges), NotificationManager.IMPORTANCE_HIGH).apply {
+            setSound(null, null)
+            enableVibration(false)
+        }
         Channel.SERVICE -> NotificationChannel(c.id, context.getString(R.string.channel_service), NotificationManager.IMPORTANCE_LOW)
     }
 }

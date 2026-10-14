@@ -26,6 +26,7 @@ fun readReliability(context: Context): ReliabilityChecks {
         locationPrecise = granted(context, Manifest.permission.ACCESS_FINE_LOCATION),
         smsAllowed = granted(context, Manifest.permission.SEND_SMS),
         connected = false, // filled in from the live connection by the view-model
+        dndAccess = nm?.isNotificationPolicyAccessGranted == true,
     )
 }
 
@@ -38,6 +39,7 @@ fun openFix(context: Context, fix: Fix) {
         Fix.FULL_SCREEN_SETTINGS -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.fromParts("package", pkg, null))
         } else appDetails(pkg)
+        Fix.DND_SETTINGS -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
         Fix.BATTERY_SETTINGS -> Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         Fix.LOCATION_PERMISSION, Fix.SMS_PERMISSION -> appDetails(pkg)
         Fix.RESTART_CONNECTION -> { StayConnectedService.start(context); return }

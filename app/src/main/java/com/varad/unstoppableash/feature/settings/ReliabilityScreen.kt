@@ -71,4 +71,5 @@ private fun labelOf(check: Check) = when (check) {
     Check.LOCATION -> R.string.rel_location
     Check.SMS -> R.string.rel_sms
     Check.CONNECTION -> R.string.rel_connection
+    Check.DND -> R.string.rel_dnd
 }

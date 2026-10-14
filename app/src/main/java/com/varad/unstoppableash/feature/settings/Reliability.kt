@@ -8,10 +8,12 @@ data class ReliabilityChecks(
     val locationPrecise: Boolean,
     val smsAllowed: Boolean,
     val connected: Boolean,
+    /** Do Not Disturb access: lets a nudge's beep ring through DND (owner's ask). */
+    val dndAccess: Boolean = true,
 )
 
-enum class Check { NOTIFICATIONS, SOS_CHANNEL, FULL_SCREEN, BATTERY, LOCATION, SMS, CONNECTION }
-enum class Fix { NOTIFICATION_SETTINGS, SOS_CHANNEL_SETTINGS, FULL_SCREEN_SETTINGS, BATTERY_SETTINGS, LOCATION_PERMISSION, SMS_PERMISSION, RESTART_CONNECTION }
+enum class Check { NOTIFICATIONS, SOS_CHANNEL, FULL_SCREEN, BATTERY, LOCATION, SMS, CONNECTION, DND }
+enum class Fix { NOTIFICATION_SETTINGS, SOS_CHANNEL_SETTINGS, FULL_SCREEN_SETTINGS, BATTERY_SETTINGS, LOCATION_PERMISSION, SMS_PERMISSION, RESTART_CONNECTION, DND_SETTINGS }
 data class ReliabilityItem(val check: Check, val ok: Boolean, val fix: Fix)
 
 /** J12: everything that can silently stop an alert reaching this phone, safety-critical first, each with its fix. */
@@ -24,6 +26,7 @@ fun reliabilityItems(c: ReliabilityChecks): List<ReliabilityItem> {
         ReliabilityItem(Check.BATTERY, c.batteryUnrestricted, Fix.BATTERY_SETTINGS),
         ReliabilityItem(Check.SMS, c.smsAllowed, Fix.SMS_PERMISSION),
         ReliabilityItem(Check.LOCATION, c.locationPrecise, Fix.LOCATION_PERMISSION),
+        ReliabilityItem(Check.DND, c.dndAccess, Fix.DND_SETTINGS),
     )
     // Problems first, in the order above (which is already by how much they matter in an emergency).
     return items.filter { !it.ok } + items.filter { it.ok }

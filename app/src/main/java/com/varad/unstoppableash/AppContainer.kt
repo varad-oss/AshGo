@@ -1,5 +1,7 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.service.nudge.AndroidSoundControl
+import com.varad.unstoppableash.service.nudge.LoudNudge
 import com.varad.unstoppableash.feature.ourpage.OurPhotosStore
 import com.varad.unstoppableash.feature.fakecall.FakeCallVoiceStore
 import com.varad.unstoppableash.feature.fakecall.AndroidFakeCallAudio
@@ -129,6 +131,7 @@ class AppContainer(private val app: Application) {
     val ourPhotos by lazy {
         OurPhotosStore(java.io.File(app.filesDir, "our_page"), encode = { photoEncoder.encode(it)?.jpeg }, now = System::currentTimeMillis)
     }
+    val loudNudge by lazy { LoudNudge(AndroidSoundControl(app)) }
     val activeSos by lazy { ActiveSosStore(app.activeSosStore) }
 
     /** Copies v1's on-phone emergency contacts into the v2 store, once. */

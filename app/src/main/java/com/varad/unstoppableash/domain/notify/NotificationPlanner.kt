@@ -7,7 +7,7 @@ import com.varad.unstoppableash.domain.model.SosRecord
 import com.varad.unstoppableash.domain.model.SosRecordState
 import com.varad.unstoppableash.domain.trips.OverduePhase
 
-enum class Channel(val id: String) { SOS("sos"), OVERDUE("overdue"), CHAT("chat"), CHECKINS("checkins"), NUDGES("nudges"), SERVICE("service") }
+enum class Channel(val id: String) { SOS("sos"), OVERDUE("overdue"), CHAT("chat"), CHECKINS("checkins"), NUDGES("nudge_alerts"), SERVICE("service") }
 
 enum class NotificationKind(val channel: Channel) {
     PARTNER_SOS(Channel.SOS), PARTNER_OVERDUE(Channel.OVERDUE), MY_OVERDUE(Channel.OVERDUE),
