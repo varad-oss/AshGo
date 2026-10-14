@@ -344,6 +344,49 @@
     <string name="overdue_partner_location">Last location %1$s</string>
     <string name="overdue_partner_help">Raise SOS for them</string>
 
+    <!-- ===== Notifications (Stage 9) ===== -->
+    <string name="channel_sos">SOS alerts</string>
+    <string name="channel_sos_desc">When your person needs help. Loud, even on silent where Android allows.</string>
+    <string name="channel_overdue">Overdue trips</string>
+    <string name="channel_chat">Messages</string>
+    <string name="channel_checkins">Check-ins</string>
+    <string name="channel_nudges">Nudges</string>
+    <string name="n_sos_title">%1$s needs help</string>
+    <string name="n_sos_body">Tap to see where they are and to acknowledge.</string>
+    <string name="n_partner_overdue_title">%1$s\'s trip is overdue</string>
+    <string name="n_partner_overdue_body">They haven\'t checked in since their expected time. Tap to see their last location.</string>
+    <string name="n_my_overdue_title">Are you okay?</string>
+    <string name="n_my_overdue_body">Your trip is past its time. Let your person know.</string>
+    <string name="n_chat_one">%1$s</string>
+    <plurals name="n_chat_many">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <string name="n_chat_public">New message from %1$s</string>
+    <string name="n_photo">Photo</string>
+    <string name="n_checkin_title">%1$s checked in</string>
+    <string name="n_nudge_title">%1$s nudged you</string>
+    <string name="n_connected_title">AshGo is keeping you connected</string>
+    <string name="n_connected_body">So alerts from your person reach you without delay.</string>
+    <string name="n_resume_sharing_title">Location sharing paused by restart</string>
+    <string name="n_resume_sharing_body">Open AshGo to share your location again.</string>
+    <string name="n_test_title">Test notification</string>
+    <string name="n_test_body">If you can see this, AshGo can reach you.</string>
+
+    <string name="reliability_title">Reliability</string>
+    <string name="reliability_intro">Things that can stop alerts reaching you, and how to fix them.</string>
+    <string name="rel_notifications">Notifications allowed</string>
+    <string name="rel_sos_channel">SOS alerts switched on</string>
+    <string name="rel_full_screen">SOS can show over the lock screen</string>
+    <string name="rel_battery">Not restricted by battery saving</string>
+    <string name="rel_location">Precise location allowed</string>
+    <string name="rel_sms">SMS allowed for SOS</string>
+    <string name="rel_connection">Connected to your orbit</string>
+    <string name="rel_problem">%1$s: needs attention</string>
+    <string name="rel_ok_cd">%1$s: OK</string>
+    <string name="rel_test">Send a test notification</string>
+    <string name="settings_reliability">Reliability</string>
+
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>
     <string name="catalog_dark">Dark</string>

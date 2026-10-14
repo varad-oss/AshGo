@@ -21,6 +21,10 @@ data class Settings(
     val lastNotified: Map<String, String> = emptyMap(),
     /** For "Call {partner}". Kept on this phone only — profiles carry no phone numbers (Stage 7 ruling). */
     val partnerPhone: String? = null,
+    /** This phone was sharing live when last checked, so a reboot can say "open AshGo to resume sharing". */
+    val sharingActive: Boolean = false,
+    /** We asked for notification permission once already; Reliability asks again on request. */
+    val askedNotifications: Boolean = false,
 )
 
 class SettingsStore(private val store: DataStore<Preferences>) {

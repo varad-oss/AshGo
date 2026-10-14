@@ -1,6 +1,16 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.feature.settings.readReliability
+import com.varad.unstoppableash.feature.settings.openFix
+import com.varad.unstoppableash.feature.settings.ReliabilityViewModel
+import com.varad.unstoppableash.feature.settings.ReliabilityScreen
+import com.varad.unstoppableash.feature.settings.ReliabilityActions
+import com.varad.unstoppableash.service.connect.HeartbeatWorker
+import com.varad.unstoppableash.service.connect.StayConnectedService
+import com.varad.unstoppableash.service.notify.Channels
+import com.varad.unstoppableash.service.notify.AndroidNotifier
+import android.os.Build
 import com.varad.unstoppableash.service.location.LocationShareService
 import com.varad.unstoppableash.feature.map.OsmMap
 import com.varad.unstoppableash.feature.map.MapViewModel
@@ -70,7 +80,16 @@ import kotlinx.coroutines.launch
 
 /** Root: onboarding until the orbit is confirmed, then the four-tab shell. */
 @Composable
-fun AshGoApp(container: AppContainer, requestGoogleIdToken: suspend () -> Outcome<String>) {
+/**
+ * [openRequest] comes from a notification tap ("chat", "map", "safety", "home", "partnerSos"); [onOpenHandled]
+ * clears it so rotation doesn't replay it.
+ */
+fun AshGoApp(
+    container: AppContainer,
+    openRequest: String? = null,
+    onOpenHandled: () -> Unit = {},
+    requestGoogleIdToken: suspend () -> Outcome<String>,
+) {
     val onboarding: OnboardingViewModel = viewModel(factory = viewModelFactory { initializer { OnboardingViewModel(container.auth, container.pairs) } })
     val ob by onboarding.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -111,11 +130,11 @@ fun AshGoApp(container: AppContainer, requestGoogleIdToken: suspend () -> Outcom
         )
         return
     }
-    MainShell(container)
+    MainShell(container, openRequest, onOpenHandled)
 }
 
 @Composable
-private fun MainShell(container: AppContainer) {
+private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandled: () -> Unit) {
     val home: HomeViewModel = viewModel(factory = viewModelFactory {
         initializer {
             HomeViewModel(container.pairs, container.presence, container.location, container.chat, container.events, container.sos, container.trips, container.rtdb, container.clock, container.sosController.state)
@@ -136,6 +155,13 @@ private fun MainShell(container: AppContainer) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showContacts by rememberSaveable { mutableStateOf(false) }
     var showPartnerSos by rememberSaveable { mutableStateOf(false) }
+    var showReliability by rememberSaveable { mutableStateOf(false) }
+
+    if (showReliability) {
+        BackHandler { showReliability = false }
+        ReliabilityOverlay(container, onBack = { showReliability = false })
+        return
+    }
 
     if (showContacts) {
         BackHandler { showContacts = false }
@@ -159,10 +185,36 @@ private fun MainShell(container: AppContainer) {
                 onLeave = settingsVm::leave,
                 onSignOut = settingsVm::signOut,
                 onDismissFailure = settingsVm::clearFailure,
+                onOpenReliability = { showReliability = true },
             ),
             Modifier.safeDrawingPadding(),
         )
         return
+    }
+    LaunchedEffect(openRequest) {
+        when (openRequest) {
+            AndroidNotifier.OPEN_CHAT -> tab = Tab.CHAT
+            AndroidNotifier.OPEN_MAP -> tab = Tab.MAP
+            AndroidNotifier.OPEN_SAFETY -> tab = Tab.SAFETY
+            AndroidNotifier.OPEN_HOME -> tab = Tab.HOME
+            OPEN_PARTNER_SOS -> showPartnerSos = true
+        }
+        if (openRequest != null) onOpenHandled()
+    }
+    // Paired: keep the connection that carries alerts (no push server on Spark), and ask once to be allowed to notify.
+    LaunchedEffect(Unit) {
+        Channels.create(context)
+        StayConnectedService.start(context)
+        HeartbeatWorker.schedule(context)
+    }
+    val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val settingsNow by container.settings.settings.collectAsStateWithLifecycle(null)
+    LaunchedEffect(settingsNow?.askedNotifications) {
+        val s = settingsNow ?: return@LaunchedEffect
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !s.askedNotifications && !granted(context, Manifest.permission.POST_NOTIFICATIONS)) {
+            container.settings.update { it.copy(askedNotifications = true) }
+            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
     // If I was already sharing (or on a timed pause) when the app opened, make sure the service is running.
     LaunchedEffect(homeState.mySharing) {
@@ -245,6 +297,24 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
         ),
         map = { pins, focus, onLongPress, m -> OsmMap(pins, focus, onLongPress, m) },
         modifier = modifier,
+    )
+}
+
+const val OPEN_PARTNER_SOS = "partnerSos"
+
+@Composable
+private fun ReliabilityOverlay(container: AppContainer, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val vm: ReliabilityViewModel = viewModel(factory = viewModelFactory {
+        initializer { ReliabilityViewModel({ readReliability(context.applicationContext) }, container.rtdb.connected()) }
+    })
+    val items by vm.items.collectAsStateWithLifecycle()
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(lifecycleState) { if (lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) vm.refresh() }
+    ReliabilityScreen(
+        items,
+        ReliabilityActions(onBack = onBack, onFix = { openFix(context, it) }, onTest = { Channels.create(context); AndroidNotifier(context).postTest() }),
+        Modifier.safeDrawingPadding(),
     )
 }
 

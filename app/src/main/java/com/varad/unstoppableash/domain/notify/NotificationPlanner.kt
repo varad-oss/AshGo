@@ -31,7 +31,8 @@ data class PlannerInput(
     val now: Long,
 )
 
-data class PlannedNotification(val kind: NotificationKind, val tag: String, val itemId: String, val count: Int = 1, val text: String? = null)
+/** [detail] is an event kind (e.g. "home_safe"); [text] is free text (a message or a custom note). */
+data class PlannedNotification(val kind: NotificationKind, val tag: String, val itemId: String, val count: Int = 1, val text: String? = null, val detail: String? = null)
 
 data class Plan(val post: List<PlannedNotification>, val cancel: List<String>, val seen: Map<String, String>)
 
@@ -71,7 +72,7 @@ object NotificationPlanner {
             val events = input.events.filter { partner(it.from) && it.type == type }
             val fresh = events.filter { it.at in newSince(key, events.map { e -> e.at }) }
             if (fresh.isEmpty()) continue
-            if (on) fresh.forEach { post += PlannedNotification(kind, "$key:${it.id}", it.id, text = it.kind) }
+            if (on) fresh.forEach { post += PlannedNotification(kind, "$key:${it.id}", it.id, text = it.text, detail = it.kind) }
             seen[key] = fresh.maxOf { it.at }.toString()
         }
 

@@ -66,6 +66,7 @@ class LocationShareService : Service() {
                 FusedLocationUpdates(this), batteryLevels(), container.clock,
             )
             engine = scope.launch { e.run() }
+            scope.launch { container.settings.update { it.copy(sharingActive = true) } }
             scope.launch { stopWhenNotSharing() }
         }
         return START_STICKY
@@ -84,6 +85,8 @@ class LocationShareService : Service() {
     }
 
     override fun onDestroy() {
+        val container = (application as AshGoApplication).container
+        container.appScope.launch { container.settings.update { it.copy(sharingActive = false) } }
         scope.cancel()
         super.onDestroy()
     }

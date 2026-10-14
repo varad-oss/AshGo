@@ -38,6 +38,7 @@ data class SettingsActions(
     val onLeave: () -> Unit = {},
     val onSignOut: () -> Unit = {},
     val onDismissFailure: () -> Unit = {},
+    val onOpenReliability: () -> Unit = {},
 )
 
 /** Stage 5 settings shell; the remaining sections (contacts, reliability, privacy…) arrive in Stages 7–10. */
@@ -69,6 +70,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
                 FilterChip(selected = state.themeMode == mode, onClick = { actions.onTheme(mode) }, label = { Text(stringResource(label)) })
             }
         }
+        OrbitButton(stringResource(R.string.settings_reliability), actions.onOpenReliability, style = OrbitButtonStyle.Secondary)
         if (state.pairId != null) {
             OrbitButton(stringResource(R.string.settings_leave), { confirmLeave = true }, style = OrbitButtonStyle.Secondary, loading = state.busy)
         }

@@ -1,6 +1,9 @@
 package com.varad.unstoppableash
 
+import android.content.Intent
 import android.os.Bundle
+import androidx.compose.runtime.mutableStateOf
+import com.varad.unstoppableash.service.notify.AndroidNotifier
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,7 +26,16 @@ import com.varad.unstoppableash.ui.theme.ThemeMode
  * MainActivity stays the release launcher.
  */
 class V2Activity : ComponentActivity() {
+    /** Where a notification tap asked to go; consumed once by the app. */
+    private val openRequest = mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openRequest.value = intent.getStringExtra(AndroidNotifier.EXTRA_OPEN)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (savedInstanceState == null) openRequest.value = intent.getStringExtra(AndroidNotifier.EXTRA_OPEN)
         super.onCreate(savedInstanceState)
         val container = (application as AshGoApplication).container
         DevBackend.apply(this, container)
@@ -45,7 +57,7 @@ class V2Activity : ComponentActivity() {
             }
             OrbitTheme(mode) {
                 Surface(color = Orbit.colors.background) {
-                    AshGoApp(container) { GoogleSignIn.idToken(this@V2Activity) }
+                    AshGoApp(container, openRequest.value, onOpenHandled = { openRequest.value = null }) { GoogleSignIn.idToken(this@V2Activity) }
                 }
             }
         }
