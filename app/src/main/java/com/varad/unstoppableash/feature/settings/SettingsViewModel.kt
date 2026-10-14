@@ -80,7 +80,12 @@ class SettingsViewModel(
         local.update { it.copy(signingOut = true, failure = null) }
         viewModelScope.launch {
             val uid = auth.current()?.uid
-            if (uid != null && pairId != null) withTimeoutOrNull(OFFLINE_GRACE_MS) { presence.goOffline(pairId, uid) }
+            if (uid != null && pairId != null) withTimeoutOrNull(OFFLINE_GRACE_MS) {
+                // Signing out stops sharing: nobody expects a signed-out phone to keep reporting where it is.
+                presence.setSharing(pairId, uid, com.varad.unstoppableash.domain.model.SharingMode.OFF, null)
+                presence.goOffline(pairId, uid)
+            }
+            settings.update { it.copy(shareFromThisPhone = false) }
             auth.signOut()
             local.update { it.copy(signingOut = false) }
         }

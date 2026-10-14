@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -78,7 +79,8 @@ class LocationShareEngine(
                 expiredPause = me.sharingUntil
                 launch { presence.setSharing(pid, uid, SharingMode.LIVE, null) }
             }
-            val active = trip?.takeIf { it.state == TripState.ACTIVE }
+            // Overdue is still a trip in progress: keep the trip cadence and arrival detection exactly then.
+            val active = trip?.takeIf { it.state == TripState.ACTIVE || it.state == TripState.OVERDUE }
             Plan(CadencePolicy.cadenceFor(effective, active != null, batt?.pct, batt?.charging), active)
         }.distinctUntilChanged().shareIn(this, SharingStarted.Eagerly, replay = 1) // one set of listeners for both uses
 
@@ -88,7 +90,10 @@ class LocationShareEngine(
         plans.map { it.cadence }.distinctUntilChanged().collectLatest { cadence ->
             log("cadence ${cadence?.intervalMs}")
             if (cadence == null) return@collectLatest // paused/off: no GPS, no writes
-            updates.updates(cadence).collect { fix ->
+            // Conflated, and old fixes dropped: after an offline spell the partner must not see a backlog of
+            // stale points each stamped "just now" by the server.
+            updates.updates(cadence).conflate().collect { fix ->
+                if (clock.now() - fix.at > STALE_FIX_MS) return@collect
                 log("fix (acc ${fix.accuracyM})") // never the coordinates
                 location.write(pid, uid, fix.lat, fix.lng, fix.accuracyM)
                 currentTrip?.let { trip ->
@@ -136,6 +141,7 @@ class LocationShareEngine(
 
     companion object {
         const val ARRIVED_KIND = "arrived"
+        private const val STALE_FIX_MS = 2 * 60_000L
         private const val LEAVE_RADIUS_M = 300.0
         private const val LEAVE_ACCURACY_M = 200f
     }

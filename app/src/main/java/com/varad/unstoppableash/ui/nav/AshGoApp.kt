@@ -1,6 +1,7 @@
 package com.varad.unstoppableash.ui.nav
 
 import androidx.activity.compose.BackHandler
+import com.varad.unstoppableash.domain.location.SharingPlan
 import com.varad.unstoppableash.feature.settings.readReliability
 import com.varad.unstoppableash.feature.settings.openFix
 import com.varad.unstoppableash.feature.settings.ReliabilityViewModel
@@ -217,8 +218,13 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
         }
     }
     // If I was already sharing (or on a timed pause) when the app opened, make sure the service is running.
-    LaunchedEffect(homeState.mySharing) {
-        if (homeState.mySharing == com.varad.unstoppableash.domain.model.SharingMode.LIVE) LocationShareService.start(context)
+    // Restarts it too when it stopped underneath us (sharingActive false), but only if sharing was chosen on this phone.
+    val shareHere = settingsNow?.shareFromThisPhone == true
+    val serviceUp by LocationShareService.running.collectAsStateWithLifecycle()
+    LaunchedEffect(homeState.mySharing, homeState.mySharingUntil, shareHere, serviceUp, homeState.loading) {
+        if (!homeState.loading && !serviceUp && SharingPlan.runHere(true, homeState.mySharing, homeState.mySharingUntil, shareHere)) {
+            LocationShareService.start(context)
+        }
     }
     if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
     MainScaffold(tab, homeState.unread, onSelect = { tab = it }) { padding ->
@@ -273,23 +279,31 @@ private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
 private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val vm: MapViewModel = viewModel(factory = viewModelFactory {
-        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.clock) }
+        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.settings, container.clock) }
     })
     val state by vm.state.collectAsStateWithLifecycle()
-    // Sharing live needs location permission first; the service only starts once it's granted.
+    // Sharing live needs location permission first; the service only starts once it's granted. Notifications are
+    // asked for too: the ongoing "sharing your location" notice is how sharing stays visible (review 8 I4).
     val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.any { it }) { vm.shareLive(); LocationShareService.start(context) }
+        if (result.filterKeys { it != Manifest.permission.POST_NOTIFICATIONS }.values.any { it }) { vm.shareLive(); LocationShareService.start(context) }
     }
+    val sharePermissions = buildList {
+        add(Manifest.permission.ACCESS_FINE_LOCATION); add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+    }.toTypedArray()
+    val needsAsk = { !LocationShareService.hasLocationPermission(context) || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(context, Manifest.permission.POST_NOTIFICATIONS)) }
     MapScreen(
         state,
         MapActions(
             onShareLive = {
-                if (LocationShareService.hasLocationPermission(context)) { vm.shareLive(); LocationShareService.start(context) }
-                else askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                if (!needsAsk()) { vm.shareLive(); LocationShareService.start(context) } else askLocation.launch(sharePermissions)
             },
             onPause = vm::pause,
             onStopSharing = vm::stopSharing,
-            onStartTrip = { d, e, n, t -> vm.startTrip(d, e, n, t); LocationShareService.start(context) },
+            onStartTrip = { d, e, n, t, share ->
+                vm.startTrip(d, e, n, t, share)
+                if (share) { if (needsAsk()) askLocation.launch(sharePermissions) else LocationShareService.start(context) }
+            },
             onExtendTrip = vm::extendTrip,
             onArrive = vm::arrive,
             onEndTrip = vm::endTrip,

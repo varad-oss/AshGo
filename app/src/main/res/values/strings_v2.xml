@@ -337,12 +337,16 @@
     <string name="trip_note">Note (optional)</string>
     <string name="trip_tell_partner">Tell %1$s I\'ve started</string>
     <string name="trip_go">Start</string>
+    <string name="trip_share">Share my location during this trip</string>
+    <string name="trip_share_off_hint">Without sharing, arrival can\'t be noticed and %1$s won\'t see where you are.</string>
+    <string name="sharing_elsewhere">Sharing is on for your account, but not from this phone</string>
+    <string name="sharing_share_here">Share from this phone</string>
     <string name="overdue_me_title">Are you okay? Your trip is past its time.</string>
     <string name="overdue_me_safe">I\'m safe</string>
     <string name="overdue_me_help">Get help</string>
     <string name="overdue_partner">%1$s\'s trip is %2$s overdue</string>
     <string name="overdue_partner_location">Last location %1$s</string>
-    <string name="overdue_partner_help">Raise SOS for them</string>
+    <string name="overdue_partner_help">Get help</string>
 
     <!-- ===== Notifications (Stage 9) ===== -->
     <string name="channel_sos">SOS alerts</string>

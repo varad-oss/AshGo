@@ -132,4 +132,16 @@ class LocationShareEngineTest {
         val kinds = (db.read("pairs/p1/events") as? Map<*, *>)?.values?.map { (it as Map<*, *>)["kind"] }
         assertEquals(listOf("arrived"), kinds)
     }
+
+    @Test fun oldFixesFromAnOfflineSpellAreNotWrittenAsNew() = runTest(main.dispatcher) {
+        seed(); engine(); settle()
+        fixes.emit(LocationFix(18.7, 73.8, 10f, base - 10 * 60_000)); settle()
+        assertNull("a 10-minute-old fix would read 'just now' to the partner", db.read("pairs/p1/location/alice"))
+    }
+
+    @Test fun anOverdueTripStillTracksAndDetectsArrival() = runTest(main.dispatcher) {
+        seed(); engine(); settle()
+        db.set("pairs/p1/trips/alice", mapOf("state" to "overdue", "startedAt" to base, "notifyPartner" to false, "dest" to mapOf("lat" to 18.5, "lng" to 73.8))); settle()
+        assertEquals(15_000L, requested.last().intervalMs)
+    }
 }

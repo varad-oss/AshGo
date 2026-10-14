@@ -2,6 +2,8 @@ package com.varad.unstoppableash.feature.map
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,7 +35,7 @@ class MapScreenTest {
         OrbitTheme(ThemeMode.LIGHT) {
             MapScreen(
                 state,
-                MapActions(onShareLive = { shared++ }, onPause = { pauses += it }, onGetHelp = { help++ }, onStartTrip = { d, e, n, t -> started = listOf(d, e, n, t) }),
+                MapActions(onShareLive = { shared++ }, onPause = { pauses += it }, onGetHelp = { help++ }, onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }),
                 map = { p, _, _, m -> pins = p; Box(m) },
             )
         }
@@ -72,7 +74,7 @@ class MapScreenTest {
         show(base)
         rule.onNodeWithText("Start a trip").performScrollTo().performClick()
         rule.onNodeWithText("Start").performClick()
-        rule.runOnIdle { assertEquals(listOf(null, now + 3_600_000, null, true), started) }
+        rule.runOnIdle { assertEquals("not sharing yet: the trip turns sharing on by default", listOf(null, now + 3_600_000, null, true, true), started) }
     }
 
     @Test fun myOverdueTripAsksFirst() {
@@ -87,5 +89,31 @@ class MapScreenTest {
         val trip = Trip(TripState.ACTIVE, null, now - 25 * 60_000, null, null, true, now - 3_600_000, null)
         show(base.copy(partnerTrip = trip, partnerTripPhase = OverduePhase.ALERT_PARTNER))
         rule.onNodeWithText("Bob's trip is 25 min overdue").assertExists()
+    }
+
+    @Test fun aTripWhileSharingDoesNotAskAgain() {
+        show(base.copy(mySharing = SharingMode.LIVE))
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onAllNodesWithText("Share my location during this trip").assertCountEquals(0)
+    }
+
+    @Test fun noDeadlineNoPlus15() {
+        val trip = Trip(TripState.ACTIVE, null, null, null, null, true, now - 60_000, null)
+        show(base.copy(myTrip = trip))
+        rule.onAllNodesWithText("+15 min").assertCountEquals(0)
+    }
+
+    @Test fun sharingOnElsewhereButNotHereIsSaid() {
+        show(base.copy(mySharing = SharingMode.LIVE, sharingFromThisPhone = false))
+        rule.onNodeWithText("Sharing is on for your account, but not from this phone").assertExists()
+        rule.onNodeWithText("Share from this phone").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, shared) }
+    }
+
+    @Test fun partnerOverdueHelpIsNotMislabelled() {
+        val trip = Trip(TripState.ACTIVE, null, now - 25 * 60_000, null, null, true, now - 3_600_000, null)
+        show(base.copy(partnerTrip = trip, partnerTripPhase = OverduePhase.ALERT_PARTNER))
+        rule.onAllNodesWithText("Raise SOS for them").assertCountEquals(0)
+        rule.onNodeWithText("Get help").assertExists()
     }
 }

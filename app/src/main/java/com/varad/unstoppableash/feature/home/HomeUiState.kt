@@ -33,6 +33,7 @@ data class HomeUiState(
     val partnerCharging: Boolean? = null,
     val partnerLocation: LocationFix? = null,
     val mySharing: SharingMode = SharingMode.OFF,
+    val mySharingUntil: Long? = null,
     val unread: Int = 0,
     val latestPartnerCheckIn: OrbitEvent? = null,
     val partnerSos: SosRecord? = null,

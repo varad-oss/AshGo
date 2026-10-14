@@ -31,7 +31,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 
@@ -56,10 +59,15 @@ class LocationShareService : Service() {
         }
         if (!hasLocationPermission(this)) { stopSelf(); return START_NOT_STICKY }
         ensureChannel()
-        ServiceCompat.startForeground(
-            this, NOTIFICATION_ID, notification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
-        )
+        // Android refuses a location FGS started from the background (e.g. a restart); then we simply don't run.
+        val started = runCatching {
+            ServiceCompat.startForeground(
+                this, NOTIFICATION_ID, notification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
+            )
+        }.isSuccess
+        if (!started) { stopSelf(); return START_NOT_STICKY }
+        running.value = true
         if (engine == null) {
             val e = LocationShareEngine(
                 container.pairs, container.presence, container.location, container.trips, container.events,
@@ -69,22 +77,30 @@ class LocationShareService : Service() {
             scope.launch { container.settings.update { it.copy(sharingActive = true) } }
             scope.launch { stopWhenNotSharing() }
         }
-        return START_STICKY
+        // Not sticky: a system restart would be a background start, which Android refuses for location. The app
+        // restarts sharing when it's next opened, and after a reboot it says so (BootReceiver).
+        return START_NOT_STICKY
     }
 
-    /** Off, or paused with no end time: nothing for this service to do, so the notification goes too. */
+    /**
+     * Stops (and the notification goes) the moment this phone shouldn't share: signed out, out of the orbit, off,
+     * an open-ended pause, or sharing no longer chosen on this phone. collectLatest so a sign-out is never stuck
+     * behind the old orbit's listener (review 8 I1).
+     */
     private suspend fun stopWhenNotSharing() {
         val container = (application as AshGoApplication).container
-        container.pairs.pairState().collect { state ->
-            val p = state as? PairState.Paired ?: return@collect stopSelf()
-            container.presence.snapshot(p.meta.pairId, p.myUid).first { s ->
-                s.sharing == SharingMode.OFF || s.sharing == null || (s.sharing == SharingMode.PAUSED && s.sharingUntil == null)
+        combine(container.pairs.pairState(), container.settings.settings.map { it.shareFromThisPhone }) { s, chosen -> s to chosen }
+            .collectLatest { (state, chosen) ->
+                val p = state as? PairState.Paired
+                if (p == null || !chosen) { stopSelf(); return@collectLatest }
+                container.presence.snapshot(p.meta.pairId, p.myUid).collect { s ->
+                    if (!SharingPlan.runHere(true, s.sharing ?: SharingMode.OFF, s.sharingUntil, chosen)) stopSelf()
+                }
             }
-            stopSelf()
-        }
     }
 
     override fun onDestroy() {
+        running.value = false
         val container = (application as AshGoApplication).container
         container.appScope.launch { container.settings.update { it.copy(sharingActive = false) } }
         scope.cancel()
@@ -125,6 +141,8 @@ class LocationShareService : Service() {
         .build()
 
     companion object {
+        /** In this process only: whether the service is actually running now (persisted flags survive death; this doesn't). */
+        val running = kotlinx.coroutines.flow.MutableStateFlow(false)
         const val CHANNEL = "service"
         private const val NOTIFICATION_ID = 41
         private const val ACTION_PAUSE = "com.varad.unstoppableash.PAUSE_SHARING"

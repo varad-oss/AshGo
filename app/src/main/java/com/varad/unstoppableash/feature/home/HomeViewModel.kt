@@ -116,7 +116,7 @@ class HomeViewModel(
             listOf(
                 partnerSnapshot.map<PresenceSnapshot, PresenceSnapshot?> { it }.onStart { emit(null) },
                 location.observe(pid, p.partnerUid).onStart { emit(null) },
-                presence.snapshot(pid, p.myUid).map { it.sharing ?: SharingMode.OFF }.onStart { emit(SharingMode.OFF) },
+                presence.snapshot(pid, p.myUid).map { (it.sharing ?: SharingMode.OFF) to it.sharingUntil }.onStart { emit(SharingMode.OFF to null) },
                 chat.unreadCount(pid, p.myUid).onStart { emit(0) },
                 events.events(pid).map { list -> list.lastOrNull { it.from == p.partnerUid && it.type == EventType.CHECKIN } }.onStart { emit(null) },
                 sos.partnerActiveSos(pid, p.myUid).onStart { emit(null) },
@@ -138,7 +138,8 @@ class HomeViewModel(
                 partnerBattery = snapshot?.battery,
                 partnerCharging = snapshot?.charging,
                 partnerLocation = v[1] as LocationFix?,
-                mySharing = v[2] as SharingMode,
+                mySharing = (v[2] as Pair<*, *>).first as SharingMode,
+                mySharingUntil = (v[2] as Pair<*, *>).second as Long?,
                 unread = v[3] as Int,
                 latestPartnerCheckIn = v[4] as OrbitEvent?,
                 partnerSos = v[5] as SosRecord?,

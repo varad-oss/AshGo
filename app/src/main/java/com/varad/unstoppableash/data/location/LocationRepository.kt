@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.map
 /** Latest-point-only location (D-14). Time is always the server's. */
 class LocationRepository(private val db: RtdbClient) {
 
+    /** Stop sharing removes the last point too (unlike pause, which keeps it visible as paused — D-14). */
+    suspend fun clear(pairId: String, uid: String): Outcome<Unit> = db.remove(DbPaths.location(pairId, uid))
+
     suspend fun write(pairId: String, uid: String, lat: Double, lng: Double, accuracyM: Float?): Outcome<Unit> {
         val value = buildMap<String, Any?> {
             put("lat", lat)

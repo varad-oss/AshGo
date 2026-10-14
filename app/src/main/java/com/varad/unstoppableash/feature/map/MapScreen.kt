@@ -59,7 +59,7 @@ data class MapActions(
     val onShareLive: () -> Unit = {},
     val onPause: (PauseChoice) -> Unit = {},
     val onStopSharing: () -> Unit = {},
-    val onStartTrip: (dest: TripDestination?, expectBy: Long?, note: String?, notifyPartner: Boolean) -> Unit = { _, _, _, _ -> },
+    val onStartTrip: (dest: TripDestination?, expectBy: Long?, note: String?, notifyPartner: Boolean, shareDuringTrip: Boolean) -> Unit = { _, _, _, _, _ -> },
     val onExtendTrip: () -> Unit = {},
     val onArrive: () -> Unit = {},
     val onEndTrip: () -> Unit = {},
@@ -103,7 +103,7 @@ fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier:
         }
     }
     if (tripSheet) {
-        TripSheet(state, picked, onStart = { d, e, n, t -> actions.onStartTrip(d, e, n, t); tripSheet = false; picked = null }, onDismiss = { tripSheet = false })
+        TripSheet(state, picked, onStart = { d, e, n, t, sh -> actions.onStartTrip(d, e, n, t, sh); tripSheet = false; picked = null }, onDismiss = { tripSheet = false })
     }
 }
 
@@ -181,7 +181,8 @@ private fun Trip(state: MapUiState, actions: MapActions, onStartTrip: () -> Unit
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         OrbitButton(stringResource(R.string.trip_arrived_button), actions.onArrive)
-        OrbitButton(stringResource(R.string.trip_extend), actions.onExtendTrip, style = OrbitButtonStyle.Secondary)
+        // "+15 min" only extends a real deadline; on an open trip it would invent an overdue alert.
+        if (deadline != null) OrbitButton(stringResource(R.string.trip_extend), actions.onExtendTrip, style = OrbitButtonStyle.Secondary)
         OrbitButton(stringResource(R.string.trip_end), actions.onEndTrip, style = OrbitButtonStyle.Quiet)
     }
 }
@@ -189,6 +190,11 @@ private fun Trip(state: MapUiState, actions: MapActions, onStartTrip: () -> Unit
 @Composable
 private fun Sharing(state: MapUiState, actions: MapActions) {
     val until = state.mySharingUntil
+    if (state.mySharing == SharingMode.LIVE && !state.sharingFromThisPhone) {
+        Text(stringResource(R.string.sharing_elsewhere), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text)
+        OrbitButton(stringResource(R.string.sharing_share_here), actions.onShareLive)
+        return
+    }
     Text(
         when (state.mySharing) {
             SharingMode.LIVE -> stringResource(R.string.sharing_live)
@@ -213,7 +219,9 @@ private enum class DestChoice { NONE, HERE, MAP }
 private enum class ExpectChoice(val minutes: Long?) { NONE(null), M30(30), H1(60), H2(120) }
 
 @Composable
-private fun TripSheet(state: MapUiState, picked: TripDestination?, onStart: (TripDestination?, Long?, String?, Boolean) -> Unit, onDismiss: () -> Unit) {
+private fun TripSheet(state: MapUiState, picked: TripDestination?, onStart: (TripDestination?, Long?, String?, Boolean, Boolean) -> Unit, onDismiss: () -> Unit) {
+    val sharingNow = state.mySharing == SharingMode.LIVE && state.sharingFromThisPhone
+    var share by rememberSaveable { mutableStateOf(true) }
     var dest by rememberSaveable { mutableStateOf(if (picked != null) DestChoice.MAP else DestChoice.NONE) }
     var expect by rememberSaveable { mutableStateOf(ExpectChoice.H1) }
     var note by rememberSaveable { mutableStateOf("") }
@@ -242,13 +250,20 @@ private fun TripSheet(state: MapUiState, picked: TripDestination?, onStart: (Tri
                 Text(stringResource(R.string.trip_tell_partner, state.partnerName), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text, modifier = Modifier.weight(1f))
                 Switch(tell, { tell = it })
             }
+            if (!sharingNow) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.trip_share), style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text, modifier = Modifier.weight(1f))
+                    Switch(share, { share = it })
+                }
+                if (!share) Text(stringResource(R.string.trip_share_off_hint, state.partnerName), style = MaterialTheme.typography.bodySmall, color = Orbit.colors.warnInk)
+            }
             OrbitButton(stringResource(R.string.trip_go), {
                 val d = when (dest) {
                     DestChoice.NONE -> null
                     DestChoice.HERE -> state.myFix?.let { TripDestination(it.lat, it.lng, null) }
                     DestChoice.MAP -> picked
                 }
-                onStart(d, expect.minutes?.let { state.nowMs + it * 60_000 }, note.trim().ifEmpty { null }, tell)
+                onStart(d, expect.minutes?.let { state.nowMs + it * 60_000 }, note.trim().ifEmpty { null }, tell, !sharingNow && share)
             }, Modifier.fillMaxWidth())
         }
     }

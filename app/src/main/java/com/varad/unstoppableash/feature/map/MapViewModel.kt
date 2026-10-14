@@ -54,6 +54,7 @@ data class MapUiState(
     val myTripPhase: OverduePhase = OverduePhase.NOT_DUE,
     val partnerTripPhase: OverduePhase = OverduePhase.NOT_DUE,
     val nowMs: Long = 0L,
+    val sharingFromThisPhone: Boolean = true,
 )
 
 /** Map tab (REDESIGN_SPEC §Map, J6, J9): both pins as they really are, my sharing controls, and trips. */
@@ -63,6 +64,7 @@ class MapViewModel(
     private val presence: PresenceRepository,
     private val location: LocationRepository,
     private val trips: TripRepository,
+    private val settings: com.varad.unstoppableash.data.local.SettingsStore,
     private val clock: Clock,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
@@ -88,6 +90,7 @@ class MapViewModel(
                 trips.observe(pid, p.myUid).onStart { emit(null) },
                 trips.observe(pid, p.partnerUid).onStart { emit(null) },
                 ticker().map { clock.now() },
+                settings.settings.map { it.shareFromThisPhone }.onStart { emit(true) },
             ),
         ) { v ->
             val partner = v[0] as PresenceSnapshot?
@@ -112,26 +115,42 @@ class MapViewModel(
                 myTripPhase = OverdueEvaluator.evaluate(myTrip?.snapshot, now),
                 partnerTripPhase = OverdueEvaluator.evaluate(partnerTrip?.snapshot, now),
                 nowMs = now,
+                sharingFromThisPhone = v[7] as Boolean,
             )
         }
     }
 
-    fun shareLive() = withPair { presence.setSharing(it.meta.pairId, it.myUid, SharingMode.LIVE, null) }
+    /** Sharing is chosen per phone: this one runs it from now on (review 8 I6). */
+    fun shareLive() = withPair {
+        settings.update { s -> s.copy(shareFromThisPhone = true) }
+        presence.setSharing(it.meta.pairId, it.myUid, SharingMode.LIVE, null)
+    }
 
     fun pause(choice: PauseChoice) = withPair {
         presence.setSharing(it.meta.pairId, it.myUid, SharingMode.PAUSED, SharingPlan.pauseUntil(choice, clock.now(), zone))
     }
 
-    fun stopSharing() = withPair { presence.setSharing(it.meta.pairId, it.myUid, SharingMode.OFF, null) }
+    /** Stop means stopped: off, not chosen here any more, and the last point removed from their map. */
+    fun stopSharing() = withPair {
+        settings.update { s -> s.copy(shareFromThisPhone = false) }
+        presence.setSharing(it.meta.pairId, it.myUid, SharingMode.OFF, null)
+        location.clear(it.meta.pairId, it.myUid)
+    }
 
-    fun startTrip(dest: TripDestination?, expectBy: Long?, note: String?, notifyPartner: Boolean) = withPair {
+    /** A trip without sharing can't detect arrival; the sheet asks, and this honours the answer. */
+    fun startTrip(dest: TripDestination?, expectBy: Long?, note: String?, notifyPartner: Boolean, shareDuringTrip: Boolean) = withPair {
+        if (shareDuringTrip) {
+            settings.update { s -> s.copy(shareFromThisPhone = true) }
+            presence.setSharing(it.meta.pairId, it.myUid, SharingMode.LIVE, null)
+        }
         trips.start(it.meta.pairId, it.myUid, dest, expectBy, note, notifyPartner)
     }
 
     /** "+15 min": from the current deadline, or from now if that has already passed. */
     fun extendTrip() = withPair { p ->
         val trip = state.value.myTrip ?: return@withPair
-        val deadline = trip.extendedTo ?: trip.expectBy ?: clock.now()
+        // No deadline, nothing to extend: inventing one would later raise an overdue alert nobody asked for.
+        val deadline = trip.extendedTo ?: trip.expectBy ?: return@withPair
         trips.extend(p.meta.pairId, p.myUid, maxOf(deadline, clock.now()) + EXTEND_MS)
     }
 

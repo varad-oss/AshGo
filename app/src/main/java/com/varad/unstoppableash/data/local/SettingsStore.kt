@@ -23,6 +23,8 @@ data class Settings(
     val partnerPhone: String? = null,
     /** This phone was sharing live when last checked, so a reboot can say "open AshGo to resume sharing". */
     val sharingActive: Boolean = false,
+    /** The person pressed Share live on this phone (not just on another of their devices). */
+    val shareFromThisPhone: Boolean = false,
     /** We asked for notification permission once already; Reliability asks again on request. */
     val askedNotifications: Boolean = false,
 )

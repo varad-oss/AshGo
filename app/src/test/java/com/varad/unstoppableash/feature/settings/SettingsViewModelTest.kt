@@ -70,6 +70,7 @@ class SettingsViewModelTest {
         vm.state.first { it.signedOut }
         assertEquals(false, db.read("pairs/p1/presence/alice/online"))
         assertNull(db.onDisconnectWrites["pairs/p1/presence/alice"])
+        assertEquals("signing out stops sharing", "off", db.read("pairs/p1/presence/alice/sharing"))
         assertNull(auth.current())
     }
     @Test fun signOutFinishesEvenWhenTheServerIsUnreachable() = runTest(main.dispatcher) {
