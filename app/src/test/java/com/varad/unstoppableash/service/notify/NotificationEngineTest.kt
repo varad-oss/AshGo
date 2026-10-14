@@ -33,7 +33,11 @@ class NotificationEngineTest {
     class FakeNotifier : Notifier {
         val posted = mutableListOf<Pair<PlannedNotification, String>>()
         val cancelled = mutableListOf<String>()
-        override fun post(n: PlannedNotification, partnerName: String) { posted += n to partnerName }
+        var enabled = true
+        override fun post(n: PlannedNotification, partnerName: String): Boolean {
+            if (!enabled) return false
+            posted += n to partnerName; return true
+        }
         override fun cancel(tag: String) { cancelled += tag }
     }
 
@@ -90,5 +94,23 @@ class NotificationEngineTest {
         assertTrue("inside the grace the traveller is asked first", notifier.posted.isEmpty())
         settle(6 * 60_000L)
         assertEquals(listOf(NotificationKind.PARTNER_OVERDUE), notifier.posted.map { it.first.kind })
+    }
+
+    @Test fun anSosThatCouldNotBeShownAlertsOnceNotificationsAreOn() = runTest(main.dispatcher) {
+        seed(); start(); settle()
+        notifier.enabled = false
+        db.set("pairs/p1/sos/s1", mapOf("from" to "bob", "state" to "active", "at" to base)); settle()
+        assertTrue(notifier.posted.isEmpty())
+        notifier.enabled = true
+        settle(31_000) // the next tick
+        assertEquals(listOf(NotificationKind.PARTNER_SOS), notifier.posted.map { it.first.kind })
+    }
+
+    @Test fun leavingTheOrbitTakesItsSosAlertDown() = runTest(main.dispatcher) {
+        seed(); start(); settle()
+        db.set("pairs/p1/sos/s1", mapOf("from" to "bob", "state" to "active", "at" to base)); settle()
+        assertEquals(1, notifier.posted.size)
+        db.remove("userPairs/alice"); settle()
+        assertTrue("sos:s1" in notifier.cancelled)
     }
 }

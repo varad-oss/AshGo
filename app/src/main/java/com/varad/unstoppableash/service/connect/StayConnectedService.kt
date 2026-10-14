@@ -30,6 +30,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -58,6 +62,7 @@ class StayConnectedService : Service() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0,
             )
         }.onFailure { stopSelf(); return START_NOT_STICKY }
+        _running.value = true
         if (!started) {
             started = true
             scope.launch { run() }
@@ -68,16 +73,17 @@ class StayConnectedService : Service() {
     private suspend fun run() {
         val c = (application as AshGoApplication).container
         val engine = NotificationEngine(c.pairs, c.chat, c.events, c.sos, c.trips, c.settings, AndroidNotifier(this), c.clock)
+        // The engine watches the pair itself, so leaving or signing out also takes its alerts down.
+        scope.launch { engine.run() }
         c.pairs.pairState()
-            .map { it as? PairState.Paired }
-            .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid }
-            .collectLatest { p ->
-                if (p == null) { stopSelf(); return@collectLatest }
+            .distinctUntilChanged { a, b -> a is PairState.Paired && b is PairState.Paired && a.meta.pairId == b.meta.pairId && a.myUid == b.myUid || (a !is PairState.Paired && a == b) }
+            .collectLatest { state ->
+                StopPolicy.stopAfterMs(state)?.let { delay(it); stopSelf(); return@collectLatest }
+                val p = state as PairState.Paired
                 coroutineScope {
                     // onDisconnect handlers are consumed when the connection drops: register again on every reconnect.
                     launch { c.rtdb.connected().filter { it }.collect { c.presence.goOnline(p.meta.pairId, p.myUid) } }
                     launch { batteryLevels().collect { (pct, charging) -> c.presence.reportBattery(p.meta.pairId, p.myUid, pct, charging) } }
-                    launch { engine.run() }
                 }
             }
     }
@@ -97,12 +103,16 @@ class StayConnectedService : Service() {
     }
 
     override fun onDestroy() {
+        _running.value = false
         scope.cancel()
         super.onDestroy()
     }
 
     companion object {
         private const val NOTIFICATION_ID = 42
+        private val _running = MutableStateFlow(false)
+        /** Whether alerts can reach this phone with AshGo closed (Reliability shows it). */
+        val running: StateFlow<Boolean> = _running.asStateFlow()
 
         /** From the foreground, boot, or a heartbeat; Android may refuse a background start — that's not an error. */
         fun start(context: Context) {

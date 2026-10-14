@@ -11,11 +11,16 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 
 /** Re-reads Android's settings whenever the screen comes back (the person may have just fixed something). */
-class ReliabilityViewModel(private val probe: () -> ReliabilityChecks, connected: Flow<Boolean>) : ViewModel() {
+class ReliabilityViewModel(
+    private val probe: () -> ReliabilityChecks,
+    connected: Flow<Boolean>,
+    /** The background "stay connected" service: without it, nothing arrives with AshGo closed. */
+    serviceRunning: Flow<Boolean>,
+) : ViewModel() {
     private val checks = MutableStateFlow(probe())
 
-    val items: StateFlow<List<ReliabilityItem>> = combine(checks, connected.onStart { emit(false) }) { c, online ->
-        reliabilityItems(c.copy(connected = online))
+    val items: StateFlow<List<ReliabilityItem>> = combine(checks, connected.onStart { emit(false) }, serviceRunning) { c, online, running ->
+        reliabilityItems(c.copy(connected = online && running))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), reliabilityItems(probe()))
 
     fun refresh() { checks.value = probe() }

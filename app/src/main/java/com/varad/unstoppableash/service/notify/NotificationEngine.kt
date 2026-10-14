@@ -31,8 +31,11 @@ import kotlinx.coroutines.flow.onStart
 
 /** Posts and cancels; the Android implementation builds the actual notifications. */
 interface Notifier {
-    fun post(n: PlannedNotification, partnerName: String)
+    /** False when Android wouldn't show it (notifications off, permission revoked). */
+    fun post(n: PlannedNotification, partnerName: String): Boolean
     fun cancel(tag: String)
+    /** Tags on screen now, or null when that can't be known. */
+    fun showing(): Set<String>? = null
 }
 
 /**
@@ -53,13 +56,27 @@ class NotificationEngine(
 ) {
     private data class Snapshot(
         val chat: List<ChatMessage>, val events: List<OrbitEvent>, val sos: List<SosRecord>,
-        val partnerTrip: Trip?, val myTrip: Trip?, val now: Long,
+        val partnerTrip: Trip?, val myTrip: Trip?, val now: Long, val loaded: Boolean,
     )
+
+    /** Stand-in until a listener has really answered, so "nothing yet" is never read as "gone". */
+    private object NotLoaded
 
     suspend fun run() {
         pairs.pairState().map { it as? PairState.Paired }
             .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid && a?.partner?.name == b?.partner?.name }
-            .collectLatest { p -> if (p != null) runFor(p) }
+            .collectLatest { p -> if (p != null) runFor(p) else takeDownSafetyAlerts() }
+    }
+
+    /** Left the orbit or signed out: an SOS or overdue alert from that orbit must not stay on screen. */
+    private suspend fun takeDownSafetyAlerts() {
+        val overdueKeys = setOf(NotificationPlanner.KEY_PARTNER_OVERDUE, NotificationPlanner.KEY_MY_OVERDUE)
+        val shown = settings.settings.first().lastNotified.filter { (k, v) ->
+            (k.startsWith("sos:") && v == "posted") || (k in overdueKeys && !v.endsWith(NotificationPlanner.CLEARED))
+        }
+        if (shown.isEmpty()) return
+        shown.keys.forEach(notifier::cancel)
+        settings.update { s: Settings -> s.copy(lastNotified = s.lastNotified - shown.keys) }
     }
 
     private suspend fun runFor(p: PairState.Paired) {
@@ -67,13 +84,17 @@ class NotificationEngine(
         combine(
             chat.messages(pid, 30).onStart { emit(emptyList()) },
             events.events(pid, 30).onStart { emit(emptyList()) },
-            sos.records(pid).onStart { emit(emptyList()) },
-            trips.observe(pid, p.partnerUid).onStart { emit(null) },
-            trips.observe(pid, p.myUid).onStart { emit(null) },
+            sos.records(pid).map<List<SosRecord>, Any> { it }.onStart { emit(NotLoaded) },
+            trips.observe(pid, p.partnerUid).map<Trip?, Any?> { it }.onStart { emit(NotLoaded) },
+            trips.observe(pid, p.myUid).map<Trip?, Any?> { it }.onStart { emit(NotLoaded) },
             ticker(), // overdue becomes due by time alone
         ) { v ->
+            val loaded = v[2] !== NotLoaded && v[3] !== NotLoaded && v[4] !== NotLoaded
             @Suppress("UNCHECKED_CAST")
-            Snapshot(v[0] as List<ChatMessage>, v[1] as List<OrbitEvent>, v[2] as List<SosRecord>, v[3] as Trip?, v[4] as Trip?, clock.now())
+            Snapshot(
+                v[0] as List<ChatMessage>, v[1] as List<OrbitEvent>, (v[2] as? List<SosRecord>).orEmpty(),
+                v[3] as? Trip, v[4] as? Trip, clock.now(), loaded,
+            )
         }.collect { snap ->
             // Read-modify-write of the "already notified" map, one snapshot at a time (collect is sequential).
             val prefs = settings.settings.first()
@@ -83,13 +104,18 @@ class NotificationEngine(
                     partnerTrip = snap.partnerTrip?.let { alertOf(p.partnerUid, it, snap.now) },
                     myTrip = snap.myTrip?.let { alertOf(p.myUid, it, snap.now) },
                     toggles = Toggles(chat = prefs.notifyChat, nudges = prefs.notifyNudges, checkins = prefs.notifyCheckins),
-                    seen = prefs.lastNotified, now = snap.now,
+                    seen = prefs.lastNotified, now = snap.now, showing = notifier.showing(), loaded = snap.loaded,
                 ),
             )
             val name = p.partner?.name.orEmpty()
             plan.cancel.forEach(notifier::cancel)
-            plan.post.forEach { notifier.post(it, name) }
-            if (plan.seen != prefs.lastNotified) settings.update { s: Settings -> s.copy(lastNotified = plan.seen) }
+            // Only what Android actually showed counts as notified; the rest is tried again on the next run.
+            val seen = plan.seen.toMutableMap()
+            plan.post.filterNot { notifier.post(it, name) }.forEach { n ->
+                val before = prefs.lastNotified[n.seenKey]
+                if (before == null) seen.remove(n.seenKey) else seen[n.seenKey] = before
+            }
+            if (seen != prefs.lastNotified) settings.update { s: Settings -> s.copy(lastNotified = seen) }
         }
     }
 

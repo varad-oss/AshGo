@@ -21,7 +21,8 @@ class NotificationPlannerTest {
     private fun plan(
         chat: List<ChatMessage> = emptyList(), events: List<OrbitEvent> = emptyList(), sos: List<SosRecord> = emptyList(),
         partnerTrip: TripAlert? = null, myTrip: TripAlert? = null, toggles: Toggles = Toggles(), seen: Map<String, String> = emptyMap(),
-    ) = NotificationPlanner.plan(PlannerInput(me, chat, events, sos, partnerTrip, myTrip, toggles, seen, now))
+        showing: Set<String>? = null, loaded: Boolean = true,
+    ) = NotificationPlanner.plan(PlannerInput(me, chat, events, sos, partnerTrip, myTrip, toggles, seen, now, showing, loaded))
 
     @Test fun aPartnerMessageNotifiesOnce() {
         val first = plan(chat = listOf(msg("m1")))
@@ -73,5 +74,34 @@ class NotificationPlannerTest {
     @Test fun everyKindHasARegisteredChannel() {
         NotificationKind.entries.forEach { assertTrue("$it", it.channel in Channel.entries) }
         assertEquals(Channel.entries.size, Channel.entries.map { it.id }.toSet().size)
+    }
+
+    @Test fun anActiveSosMissingFromTheShadeIsPostedAgain() {
+        val raised = plan(sos = listOf(sos("s1")))
+        assertTrue("still showing: nothing to do", plan(sos = listOf(sos("s1")), seen = raised.seen, showing = setOf("sos:s1")).post.isEmpty())
+        val afterReboot = plan(sos = listOf(sos("s1")), seen = raised.seen, showing = emptySet())
+        assertEquals(listOf(NotificationKind.PARTNER_SOS), afterReboot.post.map { it.kind })
+    }
+
+    @Test fun anAcknowledgedSosIsNotRaisedAgain() {
+        val raised = plan(sos = listOf(sos("s1")))
+        val acked = sos("s1").copy(ackBy = mapOf(me to now))
+        assertTrue(plan(sos = listOf(acked), seen = raised.seen, showing = emptySet()).post.isEmpty())
+    }
+
+    @Test fun anSosWhoseRecordVanishedIsCancelled() {
+        val raised = plan(sos = listOf(sos("s1")))
+        assertTrue("not loaded yet proves nothing", plan(sos = emptyList(), seen = raised.seen, loaded = false).cancel.isEmpty())
+        val gone = plan(sos = emptyList(), seen = raised.seen)
+        assertEquals(listOf("sos:s1"), gone.cancel)
+        assertTrue("forgotten, so the map doesn't grow", "sos:s1" !in gone.seen)
+    }
+
+    @Test fun anOverdueNotificationClearsWhenTheTripIsNoLongerDue() {
+        val alerted = plan(partnerTrip = TripAlert("bob@1", OverduePhase.ALERT_PARTNER), myTrip = TripAlert("alice@1", OverduePhase.ASK_TRAVELLER))
+        val arrived = plan(partnerTrip = null, myTrip = TripAlert("alice@1", OverduePhase.NOT_DUE), seen = alerted.seen)
+        assertEquals(setOf(NotificationPlanner.KEY_PARTNER_OVERDUE, NotificationPlanner.KEY_MY_OVERDUE), arrived.cancel.toSet())
+        assertTrue("cancelled once", plan(seen = arrived.seen).cancel.isEmpty())
+        assertTrue("not loaded yet: keep it", plan(seen = alerted.seen, loaded = false).cancel.isEmpty())
     }
 }

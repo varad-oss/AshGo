@@ -29,10 +29,18 @@ data class PlannerInput(
     val toggles: Toggles,
     val seen: Map<String, String>,
     val now: Long,
+    /** Tags Android is showing right now; null when unknown (then a posted item is assumed still shown). */
+    val showing: Set<String>? = null,
+    /** False until SOS and trips have really loaded: an empty first emission proves nothing is gone. */
+    val loaded: Boolean = true,
 )
 
 /** [detail] is an event kind (e.g. "home_safe"); [text] is free text (a message or a custom note). */
-data class PlannedNotification(val kind: NotificationKind, val tag: String, val itemId: String, val count: Int = 1, val text: String? = null, val detail: String? = null)
+data class PlannedNotification(
+    val kind: NotificationKind, val tag: String, val itemId: String, val count: Int = 1, val text: String? = null, val detail: String? = null,
+    /** The [Plan.seen] entry this post advanced; rolled back when Android didn't show it. */
+    val seenKey: String = tag,
+)
 
 data class Plan(val post: List<PlannedNotification>, val cancel: List<String>, val seen: Map<String, String>)
 
@@ -72,14 +80,18 @@ object NotificationPlanner {
             val events = input.events.filter { partner(it.from) && it.type == type }
             val fresh = events.filter { it.at in newSince(key, events.map { e -> e.at }) }
             if (fresh.isEmpty()) continue
-            if (on) fresh.forEach { post += PlannedNotification(kind, "$key:${it.id}", it.id, text = it.text, detail = it.kind) }
+            if (on) fresh.forEach { post += PlannedNotification(kind, "$key:${it.id}", it.id, text = it.text, detail = it.kind, seenKey = key) }
             seen[key] = fresh.maxOf { it.at }.toString()
         }
 
-        input.sos.filter { partner(it.from) }.forEach { r ->
+        val partnerSos = input.sos.filter { partner(it.from) }
+        partnerSos.forEach { r ->
             val key = "sos:${r.id}"
+            val missing = seen[key] == POSTED && input.showing != null && key !in input.showing
             when {
-                r.state == SosRecordState.ACTIVE && seen[key] == null -> {
+                // An active SOS I haven't acknowledged is (re)shown whenever it isn't on screen: after a reboot,
+                // or after notifications were off when it arrived.
+                r.state == SosRecordState.ACTIVE && input.myUid !in r.ackBy && (seen[key] == null || missing) -> {
                     post += PlannedNotification(NotificationKind.PARTNER_SOS, key, r.id); seen[key] = POSTED
                 }
                 r.state == SosRecordState.CANCELLED && seen[key] == POSTED -> {
@@ -87,13 +99,25 @@ object NotificationPlanner {
                 }
             }
         }
+        // A record that's gone (they left the orbit, or it was cleaned up) can't keep claiming someone needs help.
+        if (input.loaded) {
+            val ids = partnerSos.map { "sos:${it.id}" }.toSet()
+            seen.keys.filter { it.startsWith("sos:") && it !in ids }.forEach { key ->
+                if (seen[key] == POSTED) cancel += key
+                seen.remove(key)
+            }
+        }
 
-        input.partnerTrip?.takeIf { it.phase == OverduePhase.ALERT_PARTNER && seen[KEY_PARTNER_OVERDUE] != it.key }?.let {
-            post += PlannedNotification(NotificationKind.PARTNER_OVERDUE, KEY_PARTNER_OVERDUE, it.key); seen[KEY_PARTNER_OVERDUE] = it.key
+        fun overdue(trip: TripAlert?, due: Boolean, key: String, kind: NotificationKind) {
+            val current = seen[key]
+            if (trip != null && due) {
+                if (current != trip.key) { post += PlannedNotification(kind, key, trip.key); seen[key] = trip.key }
+            } else if (input.loaded && current != null && !current.endsWith(CLEARED)) {
+                cancel += key; seen[key] = current + CLEARED
+            }
         }
-        input.myTrip?.takeIf { it.phase != OverduePhase.NOT_DUE && seen[KEY_MY_OVERDUE] != it.key }?.let {
-            post += PlannedNotification(NotificationKind.MY_OVERDUE, KEY_MY_OVERDUE, it.key); seen[KEY_MY_OVERDUE] = it.key
-        }
+        overdue(input.partnerTrip, input.partnerTrip?.phase == OverduePhase.ALERT_PARTNER, KEY_PARTNER_OVERDUE, NotificationKind.PARTNER_OVERDUE)
+        overdue(input.myTrip, input.myTrip?.phase?.let { it != OverduePhase.NOT_DUE } == true, KEY_MY_OVERDUE, NotificationKind.MY_OVERDUE)
         return Plan(post, cancel, seen)
     }
 
@@ -106,4 +130,6 @@ object NotificationPlanner {
     const val KEY_MY_OVERDUE = "myOverdue"
     private const val POSTED = "posted"
     private const val CANCELLED = "cancelled"
+    /** Suffix on an overdue key whose notification was taken down because the trip is no longer due. */
+    const val CLEARED = "|cleared"
 }

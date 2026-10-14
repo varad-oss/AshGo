@@ -385,7 +385,7 @@
     <string name="rel_battery">Not restricted by battery saving</string>
     <string name="rel_location">Precise location allowed</string>
     <string name="rel_sms">SMS allowed for SOS</string>
-    <string name="rel_connection">Connected to your orbit</string>
+    <string name="rel_connection">Connected, even with AshGo closed</string>
     <string name="rel_problem">%1$s: needs attention</string>
     <string name="rel_ok_cd">%1$s: OK</string>
     <string name="rel_test">Send a test notification</string>

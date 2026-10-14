@@ -16,9 +16,9 @@ import com.varad.unstoppableash.feature.safety.PartnerSosActivity
 /** Builds AshGo's notifications. Message text is hidden on the lock screen; safety alerts are not. */
 class AndroidNotifier(private val context: Context) : Notifier {
 
-    override fun post(n: PlannedNotification, partnerName: String) {
+    override fun post(n: PlannedNotification, partnerName: String): Boolean {
         val nm = NotificationManagerCompat.from(context)
-        if (!nm.areNotificationsEnabled()) return // Reliability shows this; nothing to do here
+        if (!nm.areNotificationsEnabled()) return false // Reliability shows this; the engine tries again later
         val b = NotificationCompat.Builder(context, n.kind.channel.id)
             .setSmallIcon(R.drawable.ic_orbit_glyph)
             .setAutoCancel(true)
@@ -45,8 +45,9 @@ class AndroidNotifier(private val context: Context) : Notifier {
                 .setContentText(context.getString(R.string.n_my_overdue_body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(activityIntent(V2Activity::class.java, OPEN_MAP, 12))
-                .addAction(0, context.getString(R.string.overdue_me_safe), TripActionReceiver.intent(context, TripActionReceiver.ARRIVE))
-                .addAction(0, context.getString(R.string.trip_extend), TripActionReceiver.intent(context, TripActionReceiver.EXTEND))
+                // Ending or extending a trip from the lock screen needs an unlock, like cancelling an SOS (review I5).
+                .addAction(tripAction(R.string.overdue_me_safe, TripActionReceiver.ARRIVE))
+                .addAction(tripAction(R.string.trip_extend, TripActionReceiver.EXTEND))
                 // "Get help" only opens Safety: sending SOS always needs the hold.
                 .addAction(0, context.getString(R.string.overdue_me_help), activityIntent(V2Activity::class.java, OPEN_SAFETY, 13))
             NotificationKind.CHAT -> {
@@ -71,8 +72,21 @@ class AndroidNotifier(private val context: Context) : Notifier {
                 .setContentText(KindText.of(context, n.detail.orEmpty(), n.text))
                 .setContentIntent(activityIntent(V2Activity::class.java, OPEN_CHAT, 16))
         }
-        safeNotify(context, n.tag, ID, b.build())
+        return safeNotify(context, n.tag, ID, b.build())
     }
+
+    /** On Android 12+ the system asks for an unlock first; older versions open AshGo instead of acting from the lock screen. */
+    private fun tripAction(label: Int, action: String): NotificationCompat.Action =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            NotificationCompat.Action.Builder(0, context.getString(label), TripActionReceiver.intent(context, action))
+                .setAuthenticationRequired(true).build()
+        } else {
+            NotificationCompat.Action.Builder(0, context.getString(label), activityIntent(V2Activity::class.java, OPEN_MAP, if (action == TripActionReceiver.ARRIVE) 17 else 18)).build()
+        }
+
+    override fun showing(): Set<String>? = runCatching {
+        context.getSystemService(android.app.NotificationManager::class.java).activeNotifications.mapNotNull { it.tag }.toSet()
+    }.getOrNull()
 
     override fun cancel(tag: String) = NotificationManagerCompat.from(context).cancel(tag, ID)
 

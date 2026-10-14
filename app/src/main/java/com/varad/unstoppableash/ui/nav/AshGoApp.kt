@@ -421,7 +421,7 @@ private fun FakeCallOverlay(container: AppContainer, onBack: () -> Unit) {
 private fun ReliabilityOverlay(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: ReliabilityViewModel = viewModel(factory = viewModelFactory {
-        initializer { ReliabilityViewModel({ readReliability(context.applicationContext) }, container.rtdb.connected()) }
+        initializer { ReliabilityViewModel({ readReliability(context.applicationContext) }, container.rtdb.connected(), StayConnectedService.running) }
     })
     val items by vm.items.collectAsStateWithLifecycle()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
