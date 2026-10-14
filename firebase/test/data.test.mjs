@@ -106,6 +106,23 @@ test('media over 205 000 chars rejected; within limit accepted', async () => {
   await assertSucceeds(set(ref(a, pp('media/x2')), { from: A, data: 'x'.repeat(205_000), w: 10, h: 10, at: now() }));
 });
 
+test('photo and its message in one multi-path update (app sends both atomically)', async () => {
+  await assertSucceeds(update(ref(a, pp('')), {
+    'media/p1': { from: A, data: 'abc', w: 4, h: 3, at: now() },
+    'chat/p1': { from: A, mediaId: 'p1', at: now() },
+  }));
+  // Atomic: one bad child fails the lot, so no orphaned photo.
+  await assertFails(update(ref(a, pp('')), {
+    'media/p2': { from: A, data: 'abc', w: 4, h: 3, at: now() },
+    'chat/p2': { from: B, mediaId: 'p2', at: now() },
+  }));
+  const orphan = await get(ref(a, pp('media/p2')));
+  if (orphan.exists()) throw new Error('media written although its message was rejected');
+  // The read marker may be set to a past message time.
+  await assertSucceeds(set(ref(a, pp(`profiles/${A}`)), { name: 'Alice' }));
+  await assertSucceeds(set(ref(a, pp(`profiles/${A}/lastReadAt`)), Date.now() - 60_000));
+});
+
 // ---- events (check-ins, nudges) ----
 test('partner sets own delivered/seen receipts; sender cannot set its own', async () => {
   await assertSucceeds(set(ref(a, pp('events/e1')), { from: A, type: 'checkin', kind: 'home_safe', at: now() }));

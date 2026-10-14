@@ -97,9 +97,16 @@ class ChatViewModel(
     private val photos = HashMap<String, EncodedPhoto>() // kept for retry until the send succeeds
     @Volatile private var current: PairState.Paired? = null
 
+    /** Identity only: a profile change (the partner's read marker lives there) must not rebuild every listener. */
     private val paired: Flow<PairState.Paired?> = pairs.pairState()
         .map { it as? PairState.Paired }
-        .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid && a?.partner == b?.partner }
+        .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid && a?.partnerUid == b?.partnerUid }
+
+    private data class Names(val partnerName: String, val partnerAvatar: String?, val greeting: Boolean)
+
+    private val names: Flow<Names> = pairs.pairState()
+        .map { (it as? PairState.Paired).let { p -> Names(p?.partner?.name.orEmpty(), p?.partner?.avatar, p?.me?.greeting ?: true) } }
+        .distinctUntilChanged()
 
     init {
         viewModelScope.launch { rtdb.readFailures.collect { r -> local.update { it.copy(error = r) } } }
@@ -129,6 +136,7 @@ class ChatViewModel(
                 ticker().map { clock.now() },
                 local,
                 limit,
+                names,
             ),
         ) { v ->
             @Suppress("UNCHECKED_CAST") val (n, list) = v[0] as Pair<Int, List<ChatMessage>>
@@ -136,16 +144,17 @@ class ChatViewModel(
             val partnerRead = v[2] as Long?
             val snapshot = v[3] as PresenceSnapshot?
             val l = v[5] as Local
+            val who = v[7] as Names
             val hasMore = list.size >= n
             // While older messages remain unloaded, don't show events from before the oldest loaded message.
             val since = if (hasMore) list.firstOrNull()?.at ?: Long.MIN_VALUE else Long.MIN_VALUE
             ChatUiState(
                 loading = false,
-                partnerName = p.partner?.name.orEmpty(),
-                partnerAvatar = p.partner?.avatar,
+                partnerName = who.partnerName,
+                partnerAvatar = who.partnerAvatar,
                 partnerPresence = snapshot?.let { PresenceCalculator.compute(it, v[4] as Long) } ?: PresenceState.Unknown,
                 relationship = p.meta.relationship,
-                greetingEnabled = p.me?.greeting ?: true,
+                greetingEnabled = who.greeting,
                 items = buildTimeline(list, evs.filter { it.at >= since }, l.outbox, p.myUid, partnerRead, zone),
                 sending = l.sending,
                 encodingPhoto = l.encodingPhoto,
@@ -166,7 +175,10 @@ class ChatViewModel(
         if (body.isEmpty() || local.value.sending) return
         val entry = OutboxEntry(chat.newMessageId(p.meta.pairId), body, null, clock.now(), OutboxStatus.SENDING)
         local.update { it.copy(sending = true, outbox = it.outbox + entry, notice = null) }
-        deliver(p, entry, releasesComposer = true)
+        deliver(p, entry)
+        // The guard only has to outlast a double tap; the per-message id prevents duplicates after that.
+        // Waiting for the server ack instead would lock the composer for as long as the phone is offline.
+        viewModelScope.launch { delay(SEND_GUARD_MS); local.update { it.copy(sending = false) } }
     }
 
     fun sendPhoto(uri: String) {
@@ -183,7 +195,7 @@ class ChatViewModel(
             photos[id] = encoded
             val entry = OutboxEntry(id, null, id, clock.now(), OutboxStatus.SENDING)
             local.update { it.copy(encodingPhoto = false, outbox = it.outbox + entry) }
-            deliver(p, entry, releasesComposer = false)
+            deliver(p, entry)
         }
     }
 
@@ -192,7 +204,7 @@ class ChatViewModel(
         val entry = local.value.outbox.firstOrNull { it.id == id && it.status == OutboxStatus.FAILED } ?: return
         val again = entry.copy(status = OutboxStatus.SENDING)
         local.update { l -> l.copy(outbox = l.outbox.map { if (it.id == id) again else it }) }
-        deliver(p, again, releasesComposer = false)
+        deliver(p, again)
     }
 
     fun nudge(kind: String) {
@@ -216,7 +228,7 @@ class ChatViewModel(
     /** Photo data for a bubble; the screen decodes it off the main thread. */
     fun photo(mediaId: String): Flow<String?> = current?.let { chat.media(it.meta.pairId, mediaId) } ?: emptyFlow()
 
-    private fun deliver(p: PairState.Paired, entry: OutboxEntry, releasesComposer: Boolean) {
+    private fun deliver(p: PairState.Paired, entry: OutboxEntry) {
         viewModelScope.launch {
             val pid = p.meta.pairId
             val r = if (entry.mediaId != null) {
@@ -228,11 +240,11 @@ class ChatViewModel(
             if (local.value.pairId != pid) return@launch
             local.update { l ->
                 val outbox = when (r) {
-                    // The listener already has it (local writes are reflected immediately), so the outbox copy goes.
+                    // Confirmed by the server: from now on the listener's copy is the truth.
                     is Outcome.Success -> l.outbox.filterNot { it.id == entry.id }
                     is Outcome.Failure -> l.outbox.map { if (it.id == entry.id) it.copy(status = OutboxStatus.FAILED) else it }
                 }
-                l.copy(outbox = outbox, sending = if (releasesComposer) false else l.sending)
+                l.copy(outbox = outbox)
             }
             if (r is Outcome.Success) photos.remove(entry.id)
         }
@@ -243,7 +255,7 @@ class ChatViewModel(
         combine(visible, chat.messages(pid, PAGE), chat.lastReadAt(pid, p.myUid), events.events(pid)) { v, msgs, myRead, evs ->
             if (!v) return@combine
             val newest = msgs.lastOrNull { it.from != p.myUid }?.at
-            if (newest != null && newest > (myRead ?: 0L)) chat.markRead(pid, p.myUid)
+            if (newest != null && newest > (myRead ?: 0L)) chat.markRead(pid, p.myUid, upTo = newest)
             evs.filter { it.from != p.myUid && p.myUid !in it.seenBy }.forEach { events.markSeen(pid, it, p.myUid) }
         }.collect {}
     }
@@ -254,5 +266,6 @@ class ChatViewModel(
 
     companion object {
         const val PAGE = 50
+        const val SEND_GUARD_MS = 600L
     }
 }

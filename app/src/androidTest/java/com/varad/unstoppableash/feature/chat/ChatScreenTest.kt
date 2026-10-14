@@ -4,7 +4,10 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -106,5 +109,21 @@ class ChatScreenTest {
         val newest = rule.onNodeWithText("newest").fetchSemanticsNode().boundsInRoot
         val gap = with(rule.density) { (list.bottom - newest.bottom).toDp() }
         assertTrue("newest message sits at the bottom, gap was $gap", gap < 64.dp)
+    }
+
+    @Test fun aNewMessageInALongChatComesIntoView() {
+        var items by androidx.compose.runtime.mutableStateOf((0 until 40).map { bubble("m$it", it % 2 == 0, "message $it", BubbleStatus.SENT) })
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) { ChatScreen(base.copy(items = items), ChatActions(photo = { flowOf(null) })) }
+        }
+        rule.onNodeWithText("message 39").assertIsDisplayed()
+        rule.runOnIdle { items = items + bubble("new", false, "just arrived", BubbleStatus.NONE) }
+        rule.onNodeWithText("just arrived").assertIsDisplayed()
+    }
+
+    @Test fun aPhotoThatIsGoneSaysSoInsteadOfSpinning() {
+        val gone = TimelineItem.Bubble("p", false, null, "p", at, BubbleStatus.NONE, showTime = true)
+        show(base.copy(items = listOf(gone)))
+        rule.onNodeWithText("Photo no longer available").assertExists()
     }
 }

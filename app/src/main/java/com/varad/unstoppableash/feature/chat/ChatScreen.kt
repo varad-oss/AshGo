@@ -282,21 +282,30 @@ private fun Bubble(b: TimelineItem.Bubble, partnerName: String, actions: ChatAct
     }
 }
 
+private sealed interface PhotoLoad {
+    data object Loading : PhotoLoad
+    data object Unavailable : PhotoLoad
+    data class Ready(val bitmap: ImageBitmap) : PhotoLoad
+}
+
 @Composable
 private fun Photo(mediaId: String, source: (String) -> Flow<String?>, onOpen: (ImageBitmap) -> Unit) {
-    val data by produceState<String?>(null, mediaId) { source(mediaId).collect { value = it } }
-    // Decoding a 150 KB JPEG is cheap but not free: never on the main thread.
-    val bitmap by produceState<ImageBitmap?>(null, data) {
-        value = data?.let { d -> withContext(Dispatchers.Default) { decode(d) } }
+    // Loaded-and-absent (expired after 3 days, D-14) or undecodable is "unavailable", never an endless spinner.
+    val load by produceState<PhotoLoad>(PhotoLoad.Loading, mediaId) {
+        source(mediaId).collect { data ->
+            value = data?.let { d -> withContext(Dispatchers.Default) { decode(d) } }?.let { PhotoLoad.Ready(it) } ?: PhotoLoad.Unavailable
+        }
     }
     val open = stringResource(R.string.chat_open_photo)
-    val image = bitmap
-    if (image == null) {
-        Box(Modifier.size(160.dp), contentAlignment = Alignment.Center) { LoadingOrbit(size = LoadingOrbitSize.SMALL) }
-    } else {
-        Image(
-            image, contentDescription = null, contentScale = ContentScale.Fit,
-            modifier = Modifier.widthIn(max = 240.dp).clickable(onClickLabel = open) { onOpen(image) },
+    when (val l = load) {
+        PhotoLoad.Loading -> Box(Modifier.size(160.dp), contentAlignment = Alignment.Center) { LoadingOrbit(size = LoadingOrbitSize.SMALL) }
+        PhotoLoad.Unavailable -> Text(
+            stringResource(R.string.chat_photo_unavailable), style = MaterialTheme.typography.bodyMedium, color = Orbit.colors.textSecondary,
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        )
+        is PhotoLoad.Ready -> Image(
+            l.bitmap, contentDescription = null, contentScale = ContentScale.Fit,
+            modifier = Modifier.widthIn(max = 240.dp).clickable(onClickLabel = open) { onOpen(l.bitmap) },
         )
     }
 }

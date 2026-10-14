@@ -35,13 +35,15 @@ class TimelineTest {
         assertEquals(mapOf("a" to false, "b" to true, "c" to true, "d" to true), shown)
     }
 
-    @Test fun anOutboxEntryAlreadyOnTheServerIsShownOnce() {
+    @Test fun anOutboxEntryAlreadyInTheListenerIsShownOnceAndStillUnconfirmed() {
+        // The SDK echoes local writes into listeners before the server acks; only the outbox knows the truth.
         val items = build(
             messages = listOf(msg("x", "me", at(13, 10, 0))),
             outbox = listOf(OutboxEntry("x", "x", null, at(13, 10, 0), OutboxStatus.SENDING)),
+            partnerReadAt = Long.MAX_VALUE,
         )
         assertEquals(1, items.filterIsInstance<TimelineItem.Bubble>().size)
-        assertEquals(BubbleStatus.SENT, items.filterIsInstance<TimelineItem.Bubble>().single().status)
+        assertEquals(BubbleStatus.SENDING, items.filterIsInstance<TimelineItem.Bubble>().single().status)
     }
 
     @Test fun pendingAndFailedSendsSitAtTheEnd() {

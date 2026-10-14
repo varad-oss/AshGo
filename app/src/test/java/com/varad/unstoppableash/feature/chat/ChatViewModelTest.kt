@@ -121,7 +121,7 @@ class ChatViewModelTest {
         assertNull("nothing is read while the chat isn't on screen", db.read("pairs/p1/profiles/alice/lastReadAt"))
         vm.setVisible(true)
         settle()
-        assertEquals(base, db.read("pairs/p1/profiles/alice/lastReadAt"))
+        assertEquals(base - 10, db.read("pairs/p1/profiles/alice/lastReadAt"))
         assertEquals(base, db.read("pairs/p1/events/e1/seenBy/alice"))
     }
 
@@ -151,5 +151,49 @@ class ChatViewModelTest {
         vm.nudge("call_me"); settle(100)
         assertEquals(ChatNotice.Failed(FailureReason.RATE_LIMITED), vm.state.value.notice)
         assertEquals(1, (db.read("pairs/p1/events") as Map<*, *>).size)
+    }
+
+    @Test fun anUnconfirmedSendShowsSendingNotSent() = runTest(main.dispatcher) {
+        val vm = started()
+        db.ackHeld.value = true
+        vm.send("on my way"); settle()
+        assertEquals("the listener already has it, but the server hasn't confirmed", BubbleStatus.SENDING, vm.bubbles().single().status)
+        db.ackHeld.value = false; settle()
+        assertEquals(BubbleStatus.SENT, vm.bubbles().single().status)
+    }
+
+    @Test fun offlineTheComposerStaysUsable() = runTest(main.dispatcher) {
+        val vm = started()
+        db.ackHeld.value = true
+        vm.send("one"); settle()
+        assertFalse("composer not locked by an unconfirmed send", vm.state.value.sending)
+        vm.send("two"); settle()
+        assertEquals(2, chatIds().size)
+    }
+
+    @Test fun readMarkerCoversOnlyWhatWasShown() = runTest(main.dispatcher) {
+        db.set("pairs/p1/chat/m1", mapOf("from" to "bob", "text" to "hey", "at" to base - 10))
+        val vm = started()
+        vm.setVisible(true); settle()
+        assertEquals("the newest shown message, not server time", base - 10, db.read("pairs/p1/profiles/alice/lastReadAt"))
+    }
+
+    @Test fun thePartnerReadingDoesNotRebuildTheChat() = runTest(main.dispatcher) {
+        val vm = started()
+        settle()
+        val before = db.subscriptions
+        db.set("pairs/p1/profiles/bob/lastReadAt", base + 1); settle()
+        assertEquals("no listener torn down and rebuilt", before, db.subscriptions)
+        assertFalse(vm.state.value.loading)
+    }
+
+    @Test fun aPhotoIsNeverStoredWithoutItsMessage() = runTest(main.dispatcher) {
+        val vm = started()
+        photo = EncodedPhoto(ByteArray(10) { it.toByte() }, 4, 3)
+        db.ackHeld.value = true
+        vm.sendPhoto("content://picked/3"); settle()
+        val id = chatIds().singleOrNull() as String?
+        assertNotNull("message issued together with its media, not after the media ack", id)
+        assertNotNull(db.read("pairs/p1/media/$id/data"))
     }
 }

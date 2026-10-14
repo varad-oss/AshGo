@@ -206,6 +206,7 @@
     <string name="chat_today">Today</string>
     <string name="chat_yesterday">Yesterday</string>
     <string name="chat_open_photo">Open photo</string>
+    <string name="chat_photo_unavailable">Photo no longer available</string>
     <string name="chat_close_photo">Close photo</string>
     <string name="chat_loading_older">Loading older messages</string>
 

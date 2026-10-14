@@ -39,20 +39,31 @@ class ChatRepository(private val db: RtdbClient) {
         // The media id is the message id, so a retry finds the photo it already uploaded instead of orphaning it.
         val mediaPath = DbPaths.media(pairId, id)
         val mediaStored = ((db.get(mediaPath) as? Outcome.Success)?.value as? Map<*, *>)?.string("from") == uid
-        val media = if (mediaStored) Outcome.Success(Unit) else {
+        val message = mapOf("from" to uid, "mediaId" to id, "at" to db.serverTimestamp)
+        // One multi-path update: the photo and its message land together or not at all, so an offline send
+        // can't leave an orphaned photo (quota) or a message the person thinks went (review 6 I6).
+        val write = if (mediaStored) db.set(DbPaths.chatMessage(pairId, id), message) else {
             val data = Base64.getEncoder().encodeToString(jpeg)
-            db.set(mediaPath, mapOf("from" to uid, "data" to data, "w" to width, "h" to height, "at" to db.serverTimestamp))
+            db.update(
+                DbPaths.pair(pairId),
+                mapOf(
+                    "media/$id" to mapOf("from" to uid, "data" to data, "w" to width, "h" to height, "at" to db.serverTimestamp),
+                    "chat/$id" to message,
+                ),
+            )
         }
-        return media
-            .then { db.set(DbPaths.chatMessage(pairId, id), mapOf("from" to uid, "mediaId" to id, "at" to db.serverTimestamp)) }
-            .orIfTrue { alreadySent(pairId, uid, id) }
+        return write.orIfTrue { alreadySent(pairId, uid, id) }
     }
 
     fun media(pairId: String, mediaId: String): Flow<String?> =
         db.observe(DbPaths.media(pairId, mediaId)).map { (it as? Map<*, *>)?.string("data") }.resilient()
 
-    suspend fun markRead(pairId: String, uid: String): Outcome<Unit> =
-        db.set(DbPaths.profile(pairId, uid) + "/lastReadAt", db.serverTimestamp)
+    /**
+     * [upTo] is the `at` of the newest message actually shown. Server time would also cover messages that
+     * arrived after the screen was drawn (or while the write sat queued offline) — and mark them Seen.
+     */
+    suspend fun markRead(pairId: String, uid: String, upTo: Long): Outcome<Unit> =
+        db.set(DbPaths.profile(pairId, uid) + "/lastReadAt", upTo)
 
     /** Written only by that person's own phone, so it is the honest source of "Seen". */
     fun lastReadAt(pairId: String, uid: String): Flow<Long?> =

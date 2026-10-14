@@ -31,12 +31,19 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     val connectedState = MutableStateFlow(true)
     /** When false, writes wait for the server like the real SDK does offline (they never fail, they just don't finish). */
     val serverReachable = MutableStateFlow(true)
+    /**
+     * When true, writes behave like the real SDK offline: listeners see them at once (latency compensation),
+     * but the call doesn't return until [ackHeld] goes false.
+     */
+    val ackHeld = MutableStateFlow(false)
     val offset = MutableStateFlow(0L)
     val onDisconnectWrites = mutableMapOf<String, Map<String, Any?>>()
     val writeLog = mutableListOf<String>()
     /** Every write handed to the "SDK", including ones still waiting for the server. */
     val issued = mutableListOf<String>()
     var activeObservers = 0
+    /** Total listener subscriptions ever started; a jump means listeners were torn down and rebuilt. */
+    var subscriptions = 0
         private set
 
     fun failWrites(pathPrefix: String, reason: FailureReason) { writeFailures[pathPrefix] = reason }
@@ -70,10 +77,13 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
         root = writeAt(root, segments(path), resolve(value))
     }
 
-    override suspend fun update(path: String, values: Map<String, Any?>): Outcome<Unit> =
-        write("update $path ${values.keys.sorted()}", path) {
+    /** Multi-path updates are atomic, as in the SDK: a failure on any child path fails the whole update. */
+    override suspend fun update(path: String, values: Map<String, Any?>): Outcome<Unit> {
+        values.keys.firstNotNullOfOrNull { rel -> failureFor("$path/$rel") }?.let { return Outcome.Failure(it) }
+        return write("update $path ${values.keys.sorted()}", path) {
             values.forEach { (rel, v) -> root = writeAt(root, segments(path) + segments(rel), resolve(v)) }
         }
+    }
 
     override suspend fun remove(path: String): Outcome<Unit> = write("remove $path", path) {
         root = writeAt(root, segments(path), null)
@@ -104,14 +114,21 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     private suspend inline fun write(log: String, path: String, block: () -> Unit): Outcome<Unit> {
         issued += log
         serverReachable.first { it }
-        writeFailures.entries.firstOrNull { path == it.key || path.startsWith(it.key + "/") }?.let {
-            return Outcome.Failure(it.value)
+        if (ackHeld.value) {
+            block(); version.value++
+            ackHeld.first { !it }
+            writeLog += log
+            return Outcome.Success(Unit)
         }
+        failureFor(path)?.let { return Outcome.Failure(it) }
         block()
         writeLog += log
         version.value++
         return Outcome.Success(Unit)
     }
+
+    private fun failureFor(path: String): FailureReason? =
+        writeFailures.entries.firstOrNull { path == it.key || path.startsWith(it.key + "/") }?.value
 
     private fun checkRead(path: String) {
         if (readFailurePaths.any { path == it || path.startsWith("$it/") }) {
@@ -121,7 +138,7 @@ class FakeRtdb(var nowMs: Long = 1_000_000L) : RtdbClient {
     }
 
     private fun counted(source: Flow<Any?>): Flow<Any?> = flow {
-        activeObservers++
+        activeObservers++; subscriptions++
         try { emitAll(source.distinctUntilChanged()) } finally { activeObservers-- }
     }
 

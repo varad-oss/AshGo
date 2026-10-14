@@ -49,30 +49,31 @@ class ChatRepositoryTest {
         assertTrue(db.writeLog.isEmpty())
     }
 
-    @Test fun photoGoesToMediaThenMessage() = runTest {
+    @Test fun photoAndMessageAreWrittenTogether() = runTest {
         val bytes = byteArrayOf(1, 2, 3)
         assertTrue(chat.sendPhoto(p, "alice", "m9", bytes, 640, 480) is Outcome.Success)
         val msg = db.read("pairs/p1/chat/m9") as Map<*, *>
         val mediaId = msg["mediaId"] as String
         assertEquals("m9", mediaId)
         assertEquals(mapOf("from" to "alice", "data" to Base64.getEncoder().encodeToString(bytes), "w" to 640L, "h" to 480L, "at" to 100_000L), db.read("pairs/p1/media/$mediaId"))
-        assertEquals(listOf("set pairs/p1/media/$mediaId", "set pairs/p1/chat/m9"), db.writeLog)
+        assertEquals(listOf("update pairs/p1 [chat/m9, media/m9]"), db.writeLog)
         assertEquals(Base64.getEncoder().encodeToString(bytes), chat.media(p, mediaId).first())
     }
 
     @Test fun photoRetryReusesMediaIdAndSkipsRewrite() = runTest {
         db.failWrites("pairs/p1/chat", FailureReason.OFFLINE)
         assertTrue(chat.sendPhoto(p, "alice", "m7", byteArrayOf(9), 1, 1) is Outcome.Failure)
+        assertEquals("all or nothing: no orphaned photo", null, db.read("pairs/p1/media"))
         db.clearFailures()
         assertTrue(chat.sendPhoto(p, "alice", "m7", byteArrayOf(9), 1, 1) is Outcome.Success)
         assertEquals("m7", (db.read("pairs/p1/chat/m7") as Map<*, *>)["mediaId"])
-        assertEquals(1, db.writeLog.count { it.startsWith("set pairs/p1/media/") })
+        assertEquals(1, db.writeLog.count { "media/m7" in it })
         assertEquals(setOf("m7"), (db.read("pairs/p1/media") as Map<*, *>).keys)
     }
 
-    @Test fun markReadUsesServerTime() = runTest {
-        chat.markRead(p, "alice")
-        assertEquals(100_000L, db.read("pairs/p1/profiles/alice/lastReadAt"))
+    @Test fun markReadRecordsTheNewestShownMessage() = runTest {
+        chat.markRead(p, "alice", upTo = 42L)
+        assertEquals(42L, db.read("pairs/p1/profiles/alice/lastReadAt"))
     }
 
     @Test fun unreadCountsPartnerMessagesAfterLastRead() = runTest {

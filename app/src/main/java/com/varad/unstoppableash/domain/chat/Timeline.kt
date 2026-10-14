@@ -40,11 +40,16 @@ fun buildTimeline(
     zone: ZoneId,
 ): List<TimelineItem> {
     val onServer = messages.mapTo(HashSet()) { it.id }
+    // The SDK shows my writes in listeners before the server confirms them; until the send call returns
+    // success, the outbox — not the listener — decides the status (never a ✓ the server didn't give).
+    val unconfirmed = outbox.associateBy { it.id }
     val server: List<Pair<Long, TimelineItem>> =
         messages.map { m ->
             val mine = m.from == myUid
+            val pending = unconfirmed[m.id]
             val status = when {
                 !mine -> BubbleStatus.NONE
+                pending != null -> if (pending.status == OutboxStatus.FAILED) BubbleStatus.FAILED else BubbleStatus.SENDING
                 partnerLastReadAt != null && partnerLastReadAt >= m.at -> BubbleStatus.SEEN
                 else -> BubbleStatus.SENT
             }
