@@ -1,5 +1,11 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.service.sos.SosController
+import com.varad.unstoppableash.service.sos.SmsDispatcher
+import com.varad.unstoppableash.service.sos.AndroidSmsDispatcher
+import com.varad.unstoppableash.service.location.LocationSource
+import com.varad.unstoppableash.service.location.FusedLocationSource
+import android.os.BatteryManager
 import android.app.Application
 import android.content.Context
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
@@ -83,6 +89,20 @@ class AppContainer(private val app: Application) {
     val sos by lazy { SosRepository(rtdb, clock) }
     val trips by lazy { TripRepository(rtdb) }
     val photoEncoder: PhotoEncoder by lazy { AndroidPhotoEncoder(app.contentResolver) }
+    val smsDispatcher: SmsDispatcher by lazy { AndroidSmsDispatcher(app) }
+    val locationSource: LocationSource by lazy { FusedLocationSource(app) }
+
+    /** App-scoped so an SOS outlives every screen; started on first use, restoring any SOS in progress. */
+    val sosController: SosController by lazy {
+        SosController(
+            appScope, pairs, sos, contacts, activeSos, smsDispatcher, locationSource, clock,
+            battery = { batteryPercent() }, fallbackName = { auth.current()?.displayName },
+        ).also { it.start() }
+    }
+
+    private fun batteryPercent(): Int? =
+        (app.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager)
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 }
 
     val contacts by lazy { EmergencyContactsStore(app.contactsStore) }
     val settings by lazy { SettingsStore(app.settingsStore) }
