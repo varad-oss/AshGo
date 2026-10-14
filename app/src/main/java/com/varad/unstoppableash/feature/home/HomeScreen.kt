@@ -1,5 +1,8 @@
 package com.varad.unstoppableash.feature.home
 
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -77,7 +80,15 @@ data class HomeActions(
 @Composable
 fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Modifier) {
     var sheet by remember { mutableStateOf<HomeSheet?>(null) }
-    Column(modifier.fillMaxSize().background(Orbit.colors.background)) {
+    Box(modifier.fillMaxSize().background(Orbit.colors.background)) {
+    // A low watercolour tulip bed behind everything (owner's design). Its edges are the page colour, so no seam.
+    Image(
+        painterResource(if (Orbit.colors.isDark) R.drawable.home_tulips_dark else R.drawable.home_tulips_light),
+        contentDescription = null,
+        contentScale = ContentScale.FillWidth,
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+    )
+    Column(Modifier.fillMaxSize()) {
         if (state.connectionProblem != null) OfflineBar()
         // Safety first: a partner SOS and a read error show even before everything else has loaded.
         if (state.partnerSos != null || state.error != null) {
@@ -177,6 +188,7 @@ fun HomeScreen(state: HomeUiState, actions: HomeActions, modifier: Modifier = Mo
 
             if (!state.watcher) SosRow(state.mySosActive, actions.onOpenSafety)
         }
+    }
     }
     when (sheet) {
         HomeSheet.CHECK_IN -> CheckInSheet(state.partnerName, onSend = { k, t -> actions.onCheckIn(k, t); sheet = null }, onDismiss = { sheet = null })

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tulip garden preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#FFF7F5; --ink:#382637; --ink2:#6E5A6C; --plum:#8B405F; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#EFE7EA; font-family:'Nunito',system-ui,sans-serif; color:var(--ink); }
+  .stage { display:flex; flex-wrap:wrap; gap:40px; justify-content:center; padding:40px 16px 56px; }
+  figure { margin:0; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  figcaption { font-size:14px; color:#6E5A6C; font-weight:600; letter-spacing:.2px; }
+  .phone { width:360px; height:760px; border-radius:44px; padding:10px; background:#1b1418; box-shadow:0 30px 60px -20px rgba(60,20,40,.35), 0 0 0 1px rgba(0,0,0,.25); }
+  .screen { position:relative; width:100%; height:100%; border-radius:36px; overflow:hidden; background:var(--paper); }
+  .screen.dark { background:#1E151D; color:#F3E8F1; }
+  .art { position:absolute; left:0; bottom:58px; width:100%; height:auto; pointer-events:none; isolation:isolate; }
+  .screen.light .art { mix-blend-mode:multiply; opacity:.55; }
+  .screen.dark .art { opacity:.29; }
+  .ui { position:relative; height:100%; display:flex; flex-direction:column; }
+  .status { display:flex; justify-content:space-between; padding:14px 26px 0; font-size:13px; font-weight:700; }
+  .content { flex:1; padding:14px 22px 0; display:flex; flex-direction:column; gap:14px; }
+  .greet { display:flex; justify-content:space-between; align-items:center; }
+  .greet h1 { margin:0; font-size:22px; font-weight:800; letter-spacing:-.2px; }
+  .me { width:44px; height:44px; border-radius:50%; background:#F6DDE8; display:grid; place-items:center; font-weight:800; color:var(--plum); }
+  .dark .me { background:#4A2B3B; color:#F2B3CB; }
+  .hero { display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:6px; }
+  .ring { width:132px; height:132px; border-radius:50%; padding:5px; background:conic-gradient(#3E8A5C 0 100%); }
+  .dark .ring { background:#9FD3B0; }
+  .ring > div { width:100%; height:100%; border-radius:50%; border:4px solid var(--paper); background:#F2D3E0; display:grid; place-items:center; font-size:40px; font-weight:800; color:var(--plum); }
+  .dark .ring > div { border-color:#1E151D; background:#4A2B3B; color:#F2B3CB; }
+  .name { font-size:24px; font-weight:800; margin-top:4px; }
+  .pill { background:#DFF1E4; color:#2E6B45; font-weight:700; font-size:13px; padding:5px 14px; border-radius:99px; display:flex; gap:6px; align-items:center; }
+  .pill i { width:8px; height:8px; border-radius:50%; background:#2E6B45; display:block; }
+  .dark .pill { background:#1F3527; color:#9FD3B0; } .dark .pill i { background:#9FD3B0; }
+  .sub { font-size:13px; color:var(--ink2); }
+  .dark .sub { color:#CBB8C8; }
+  .card { background:rgba(255,255,255,.86); backdrop-filter:blur(2px); border-radius:20px; padding:14px 16px; box-shadow:0 1px 0 rgba(56,38,55,.06), 0 6px 18px -10px rgba(139,64,95,.25); }
+  .dark .card { background:rgba(42,32,41,.9); box-shadow:none; }
+  .card b { display:block; font-size:16px; font-weight:800; }
+  .card span { font-size:13px; color:var(--ink2); }
+  .dark .card span { color:#CBB8C8; }
+  .row { display:flex; gap:10px; }
+  .btn { flex:none; padding:12px 26px; border-radius:99px; background:var(--plum); color:#fff; font-weight:800; font-size:15px; }
+  .dark .btn { background:#F2B3CB; color:#3A1426; }
+  .btn.ghost { background:rgba(255,255,255,.75); color:var(--plum); box-shadow:inset 0 0 0 1.5px rgba(139,64,95,.35); }
+  .dark .btn.ghost { background:transparent; color:#F2B3CB; box-shadow:inset 0 0 0 1.5px rgba(242,179,203,.4); }
+  .nav { height:58px; display:flex; justify-content:space-around; align-items:center; background:rgba(255,255,255,.94); border-top:1px solid rgba(56,38,55,.07); font-size:12px; font-weight:700; color:var(--ink2); position:relative; }
+  .dark .nav { background:#2A2029; border-color:rgba(243,232,241,.08); color:#CBB8C8; }
+  .nav .on { color:var(--plum); } .dark .nav .on { color:#F2B3CB; }
+  .nav div { display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .nav svg { width:22px; height:22px; }
+  .art-only { width:360px; height:760px; border-radius:36px; overflow:hidden; background:var(--paper); position:relative; box-shadow:0 30px 60px -20px rgba(60,20,40,.25); }
+  .art-only .art { bottom:0; mix-blend-mode:multiply; opacity:.55; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <figure><div class="phone"><div class="screen light" id="s1"></div></div><figcaption>Home, light</figcaption></figure>
+  <figure><div class="phone"><div class="screen dark" id="s2"></div></div><figcaption>Home, dark</figcaption></figure>
+  <figure><div class="art-only" id="s3"></div><figcaption>The painting on its own</figcaption></figure>
+</div>
+
+<template id="ui">
+  <div class="ui">
+    <div class="status"><span>9:41</span><span>●●● 82%</span></div>
+    <div class="content">
+      <div class="greet"><h1>Good evening, love</h1><div class="me">V</div></div>
+      <div class="hero">
+        <div class="ring"><div>A</div></div>
+        <div class="name">Ash</div>
+        <div class="pill"><i></i>Live · now</div>
+        <div class="sub">Battery 64% · charging</div>
+      </div>
+      <div class="card"><b>On a trip · expected by 9:30 PM</b><span>Going to Home</span></div>
+      <div class="row"><div class="btn">Nudge</div><div class="btn ghost">Map</div></div>
+    </div>
+    <div class="nav">
+      <div class="on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 3 10v10a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1V10z"/></svg>Home</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>Map</div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chat</div>
+    </div>
+  </div>
+</template>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+
+// Theme-harmonised pigments: plum, blush and a lavender-mauve (the app's lavender), sage leaves.
+const PAL = {
+  plum:     { hi:'#F3D2E1', light:'#DDA0BD', mid:'#B5658A', deep:'#7A2F52', core:'#5C1F3C' },
+  blush:    { hi:'#FBE7EF', light:'#F0C1D5', mid:'#D592B1', deep:'#A6587D', core:'#84405F' },
+  mauve:    { hi:'#EFE4F8', light:'#D2BCEA', mid:'#A889CB', deep:'#6E4E98', core:'#55377B' },
+  rose:     { hi:'#F8DDE6', light:'#E7A9C0', mid:'#C77394', deep:'#8F3E62', core:'#6E2848' },
+};
+const LEAF = { hi:'#DCE6D5', light:'#B9CBB0', mid:'#93AB8A', deep:'#6C8766' };
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function defs(svg, uid) {
+  const d = el('defs', {}, svg);
+  // Petal watercolour: organic edge, pigment pooled at the rim, faint paper tooth inside.
+  const f = el('filter', { id:`wc${uid}`, x:'-20%', y:'-20%', width:'140%', height:'140%', 'color-interpolation-filters':'sRGB' }, d);
+  el('feTurbulence', { type:'fractalNoise', baseFrequency:'0.03', numOctaves:'3', seed:'7', result:'n' }, f);
+  el('feDisplacementMap', { in:'SourceGraphic', in2:'n', scale:'5', xChannelSelector:'R', yChannelSelector:'G', result:'d' }, f);
+  el('feGaussianBlur', { in:'d', stdDeviation:'0.35', result:'b' }, f);
+  el('feMorphology', { in:'b', operator:'erode', radius:'1.2', result:'er' }, f);
+  el('feComposite', { in:'b', in2:'er', operator:'out', result:'rim' }, f);
+  el('feGaussianBlur', { in:'rim', stdDeviation:'1.5', result:'rimb' }, f);
+  el('feColorMatrix', { in:'rimb', type:'matrix', values:'0.62 0 0 0 0  0 0.55 0 0 0  0 0 0.66 0 0  0 0 0 0.7 0', result:'rimd' }, f);
+  el('feTurbulence', { type:'fractalNoise', baseFrequency:'0.32', numOctaves:'2', seed:'3', result:'g' }, f);
+  el('feColorMatrix', { in:'g', type:'matrix', values:'0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -0.45 0.16', result:'gw' }, f);
+  el('feComposite', { in:'gw', in2:'b', operator:'in', result:'grain' }, f);
+  const m = el('feMerge', {}, f);
+  el('feMergeNode', { in:'b' }, m); el('feMergeNode', { in:'grain' }, m); el('feMergeNode', { in:'rimd' }, m);
+
+  // Stems and leaves: just a soft, slightly irregular edge.
+  const sf = el('filter', { id:`soft${uid}`, x:'-20%', y:'-5%', width:'140%', height:'110%' }, d);
+  el('feTurbulence', { type:'fractalNoise', baseFrequency:'0.025', numOctaves:'2', seed:'5', result:'n' }, sf);
+  el('feDisplacementMap', { in:'SourceGraphic', in2:'n', scale:'1.6', xChannelSelector:'R', yChannelSelector:'G', result:'d' }, sf);
+  el('feGaussianBlur', { in:'d', stdDeviation:'0.45' }, sf);
+
+  const w = el('filter', { id:`wash${uid}`, x:'-30%', y:'-60%', width:'160%', height:'220%' }, d);
+  el('feTurbulence', { type:'fractalNoise', baseFrequency:'0.014', numOctaves:'5', seed:'11', result:'n' }, w);
+  el('feDisplacementMap', { in:'SourceGraphic', in2:'n', scale:'56', xChannelSelector:'R', yChannelSelector:'G', result:'d' }, w);
+  el('feGaussianBlur', { in:'d', stdDeviation:'1.6' }, w);
+
+  for (const [name, p] of Object.entries(PAL)) {
+    grad(d, `${name}L${uid}`, [[0, p.hi], [0.5, p.light], [1, p.mid]], 0.2, 0, 0.55, 1);
+    grad(d, `${name}M${uid}`, [[0, p.light], [0.5, p.mid], [1, p.deep]], 0.85, 0, 0.25, 1);
+    grad(d, `${name}D${uid}`, [[0, p.deep], [1, p.core]], 0.5, 0, 0.5, 1);
+  }
+  grad(d, `leafA${uid}`, [[0, LEAF.hi], [0.55, LEAF.light], [1, LEAF.mid]], 0, 0, 1, 1);
+  grad(d, `leafB${uid}`, [[0, LEAF.light], [0.6, LEAF.mid], [1, LEAF.deep]], 1, 0, 0, 1);
+}
+
+function grad(d, id, stops, x1, y1, x2, y2) {
+  const g = el('linearGradient', { id, x1, y1, x2, y2 }, d);
+  for (const [o, c] of stops) el('stop', { offset:o, 'stop-color':c }, g);
+}
+
+function path(parent, dStr, attrs) { return el('path', { d:dStr, ...attrs }, parent); }
+const MUL = 'mix-blend-mode:multiply';
+
+// Broad, long leaf from (x,y): length L, half-width W, leaning by angle (deg), tip drifting by `curl`.
+function leaf(g, uid, x, y, L, W, angle, curl) {
+  const lg = el('g', { transform:`translate(${x} ${y}) rotate(${angle})`, filter:`url(#soft${uid})` }, g);
+  const tx = curl, ty = -L;
+  path(lg, `M0 0 C ${-W*1.2} ${-L*0.26}, ${-W*1.0+tx*0.35} ${-L*0.7}, ${tx} ${ty} C ${tx*0.45-W*0.1} ${-L*0.62}, ${-W*0.05} ${-L*0.3}, 0 0Z`, { fill:`url(#leafA${uid})`, opacity:.8, style:MUL });
+  path(lg, `M0 0 C ${W*0.9} ${-L*0.3}, ${W*0.75+tx*0.55} ${-L*0.74}, ${tx} ${ty} C ${tx*0.6} ${-L*0.58}, ${W*0.1} ${-L*0.28}, 0 0Z`, { fill:`url(#leafB${uid})`, opacity:.72, style:MUL });
+  path(lg, `M0 -3 C ${tx*0.1} ${-L*0.35}, ${tx*0.45} ${-L*0.7}, ${tx} ${ty+2}`, { stroke:LEAF.deep, 'stroke-width':1, fill:'none', opacity:.3 });
+  path(lg, `M${-W*0.45} ${-L*0.22} C ${-W*0.55} ${-L*0.42}, ${-W*0.35+tx*0.2} ${-L*0.6}, ${tx*0.4} ${-L*0.78}`, { stroke:'#FFFFFF', 'stroke-width':1.6, fill:'none', opacity:.35, 'stroke-linecap':'round' });
+}
+
+function stem(g, uid, x1, y1, x2, y2, bow) {
+  const sg = el('g', { filter:`url(#soft${uid})` }, g);
+  const c1x = x1 + bow, c1y = y1 + (y2 - y1) * 0.35, c2x = x2 + bow * 0.4, c2y = y1 + (y2 - y1) * 0.75;
+  path(sg, `M${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`, { stroke:LEAF.mid, 'stroke-width':4.6, fill:'none', 'stroke-linecap':'round', opacity:.85, style:MUL });
+  path(sg, `M${x1+1.2} ${y1+6} C ${c1x+1} ${c1y}, ${c2x+1} ${c2y}, ${x2+1} ${y2}`, { stroke:LEAF.deep, 'stroke-width':1.2, fill:'none', 'stroke-linecap':'round', opacity:.35 });
+  path(sg, `M${x1-1} ${y1+6} C ${c1x-1.2} ${c1y}, ${c2x-1.2} ${c2y}, ${x2-1.2} ${y2}`, { stroke:LEAF.hi, 'stroke-width':1.2, fill:'none', 'stroke-linecap':'round', opacity:.55 });
+}
+
+// Painterly streaks fanning from the petal base: what makes a wash read as a petal.
+function streaks(h, color, pts) {
+  for (const d of pts) path(h, d, { stroke:color, 'stroke-width':0.9, fill:'none', opacity:.22, 'stroke-linecap':'round' });
+}
+
+function head(g, uid, kind, pal, x, y, s, rot, fade = 1) {
+  const p = PAL[pal];
+  const h = el('g', { transform:`translate(${x} ${y}) rotate(${rot}) scale(${s})`, filter:`url(#wc${uid})`, opacity:fade }, g);
+  const L = `url(#${pal}L${uid})`, M = `url(#${pal}M${uid})`, D = `url(#${pal}D${uid})`;
+  if (kind === 'bud') {
+    path(h, 'M0 31 C15 29 20 10 17 -8 C15 -21 9 -29 3 -34 C6 -18 6 5 0 31Z', { fill:M, opacity:.9, style:MUL });
+    path(h, 'M2 33 C-14 31 -20 12 -18 -6 C-16 -21 -8 -31 0 -35 C5 -26 9 -12 9 2 C9 16 6 27 2 33Z', { fill:L, opacity:.92, style:MUL });
+    path(h, 'M3 -30 C7 -18 10 -2 7 14 C6 22 4 28 2 32', { stroke:p.deep, 'stroke-width':1.8, fill:'none', opacity:.6, 'stroke-linecap':'round' });
+    streaks(h, p.deep, ['M-4 30 C-10 14 -12 -4 -8 -22', 'M0 31 C-4 14 -4 -6 -2 -26', 'M10 26 C14 12 15 -4 12 -18']);
+    path(h, 'M-12 -16 C-14 -2 -11 13 -5 25', { stroke:'#FFFFFF', 'stroke-width':3.4, fill:'none', opacity:.45, 'stroke-linecap':'round' });
+  } else if (kind === 'cup') {
+    path(h, 'M-12 -8 C-13 -20 -9 -29 -3 -34 C-1 -25 1 -16 1 -8Z', { fill:M, opacity:.55, style:MUL });
+    path(h, 'M14 -8 C15 -20 11 -29 5 -34 C3 -25 1 -16 1 -8Z', { fill:M, opacity:.5, style:MUL });
+    path(h, 'M-3 -33 C0 -22 1 -14 1 -6', { stroke:p.deep, 'stroke-width':1, fill:'none', opacity:.3 });
+    path(h, 'M0 30 C-21 28 -29 8 -27 -12 C-26 -25 -21 -31 -14 -33 C-16 -18 -12 4 0 30Z', { fill:M, opacity:.88, style:MUL });
+    path(h, 'M0 30 C21 28 29 8 27 -12 C26 -25 21 -31 14 -33 C16 -18 12 4 0 30Z', { fill:M, opacity:.84, style:MUL });
+    path(h, 'M0 33 C-17 32 -22 14 -21 -4 C-20 -19 -12 -29 -2 -32 C7 -29 14 -21 16 -6 C18 12 14 31 0 33Z', { fill:L, opacity:.92, style:MUL });
+    streaks(h, p.deep, ['M-2 31 C-10 16 -13 -2 -10 -22', 'M2 31 C4 14 6 -6 4 -26', 'M8 28 C13 14 15 -2 12 -18', 'M-8 29 C-15 16 -18 0 -16 -14']);
+    path(h, 'M-2 -30 C2 -14 3 6 1 30', { stroke:p.deep, 'stroke-width':1.4, fill:'none', opacity:.45 });
+    path(h, 'M-14 -14 C-16 0 -12 14 -6 25', { stroke:'#FFFFFF', 'stroke-width':3.6, fill:'none', opacity:.42, 'stroke-linecap':'round' });
+  } else {
+    path(h, 'M-8 14 C-12 -2 -9 -20 -2 -29 C1 -18 2 -4 1 14Z', { fill:M, opacity:.5, style:MUL });
+    path(h, 'M9 14 C12 -2 9 -20 3 -29 C0 -18 0 -4 1 14Z', { fill:M, opacity:.45, style:MUL });
+    path(h, 'M2 28 C-19 28 -35 13 -37 -7 C-37 -19 -31 -27 -25 -29 C-21 -14 -12 6 2 28Z', { fill:M, opacity:.88, style:MUL });
+    path(h, 'M-2 28 C19 28 35 13 37 -7 C37 -19 31 -27 25 -29 C21 -14 12 6 -2 28Z', { fill:M, opacity:.85, style:MUL });
+    path(h, 'M4 31 C-12 31 -23 18 -25 1 C-26 -13 -20 -23 -12 -27 C-6 -15 -1 6 4 31Z', { fill:L, opacity:.92, style:MUL });
+    path(h, 'M-4 31 C12 31 23 18 25 1 C26 -13 20 -23 12 -27 C6 -15 1 6 -4 31Z', { fill:L, opacity:.88, style:MUL });
+    streaks(h, p.deep, ['M2 29 C-8 18 -16 4 -20 -12', 'M-2 29 C8 18 16 4 20 -12', 'M0 30 C-2 14 -4 -2 -6 -16', 'M0 30 C2 14 4 -2 6 -16']);
+    path(h, 'M-18 -12 C-18 1 -13 14 -5 24', { stroke:'#FFFFFF', 'stroke-width':3.2, fill:'none', opacity:.4, 'stroke-linecap':'round' });
+    path(h, 'M15 -14 C15 -2 11 10 5 20', { stroke:'#FFFFFF', 'stroke-width':2, fill:'none', opacity:.28, 'stroke-linecap':'round' });
+  }
+}
+
+function painting(uid) {
+  const svg = el('svg', { viewBox:'0 0 360 230', class:'art', 'aria-hidden':'true' });
+  defs(svg, uid);
+  const g = el('g', {}, svg);
+  const G = 230; // ground line
+
+  const wash = el('g', { filter:`url(#wash${uid})`, style:MUL }, g);
+  el('ellipse', { cx:70, cy:G + 4, rx:170, ry:34, fill:'#EDBFD3', opacity:.55 }, wash);
+  el('ellipse', { cx:250, cy:G + 8, rx:150, ry:26, fill:'#D9C6EE', opacity:.55 }, wash);
+  el('ellipse', { cx:150, cy:G - 6, rx:60, ry:16, fill:'#E9C6D8', opacity:.4 }, wash);
+
+  // Back: paler, smaller.
+  stem(g, uid, 246, 132, 248, G, -5);
+  head(g, uid, 'bud', 'mauve', 246, 108, 0.85, 8, .7);
+  stem(g, uid, 320, 178, 316, G, 4);
+  head(g, uid, 'bud', 'blush', 320, 158, 0.72, 16, .75);
+  leaf(g, uid, 254, G, 100, 13, 14, 14);
+  leaf(g, uid, 322, G, 70, 11, 32, 10);
+
+  // Middle.
+  leaf(g, uid, 110, G, 170, 18, -4, 20);
+  stem(g, uid, 96, 76, 104, G, -9);
+  head(g, uid, 'bud', 'blush', 95, 46, 1.1, -3);
+  leaf(g, uid, 60, G, 140, 17, -15, -16);
+  stem(g, uid, 168, 112, 162, G, 7);
+  head(g, uid, 'cup', 'plum', 168, 80, 1.12, 5);
+  leaf(g, uid, 172, G, 130, 16, 10, 18);
+
+  // Front: richest colour.
+  stem(g, uid, 30, 94, 44, G, 11);
+  head(g, uid, 'open', 'rose', 30, 66, 1.15, -9);
+  leaf(g, uid, 38, G, 120, 17, 20, 22);
+  stem(g, uid, 58, 160, 60, G, -4);
+  head(g, uid, 'cup', 'mauve', 58, 130, 1.0, -4);
+  stem(g, uid, 128, 178, 130, G, 5);
+  head(g, uid, 'bud', 'plum', 128, 152, 0.95, -7);
+  leaf(g, uid, 134, G, 80, 13, 28, 12);
+  stem(g, uid, 212, 182, 208, G, -4);
+  head(g, uid, 'bud', 'rose', 213, 158, 0.9, 10);
+  leaf(g, uid, 226, G, 80, 12, 30, 12);
+  stem(g, uid, 282, 190, 280, G, 3);
+  head(g, uid, 'bud', 'rose', 283, 170, 0.75, -6, .85);
+  leaf(g, uid, 14, G, 100, 15, -26, -10);
+  leaf(g, uid, 292, G, 60, 10, -18, -6);
+  return svg;
+}
+
+for (const [id, uid] of [['s1', 'a'], ['s2', 'b']]) {
+  const s = document.getElementById(id);
+  s.appendChild(painting(uid));
+  s.appendChild(document.getElementById('ui').content.cloneNode(true));
+}
+document.getElementById('s3').appendChild(painting('c'));
+
+// ?render=light|dark: just the bed, blended onto the app background, for exporting the in-app images.
+const mode = new URLSearchParams(location.search).get('render');
+if (mode) {
+  document.body.innerHTML = '';
+  document.body.style.margin = '0';
+  const box = document.createElement('div');
+  box.id = 'box';
+  box.style.cssText = `width:1350px;height:862px;position:relative;overflow:hidden;background:${mode === 'dark' ? '#1E151D' : '#FFF7F5'}`;
+  const art = painting('r');
+  art.style.cssText = 'position:absolute;left:0;bottom:0;width:100%;height:100%;isolation:isolate;' + (mode === 'dark' ? 'opacity:.29' : 'mix-blend-mode:multiply;opacity:.55');
+  box.appendChild(art);
+  document.body.appendChild(box);
+}
+</script>
+</body>
+</html>

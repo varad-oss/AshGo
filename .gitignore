@@ -26,3 +26,8 @@ firebase/node_modules/
 firebase/*.log
 firebase/.firebase/
 dist/
+
+# Local design previews and browser-automation output
+.playwright-mcp/
+design/*.png
+design/shots/
