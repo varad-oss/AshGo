@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "You" on the map: a plum dot with a white ring (original artwork). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28">
+    <path android:fillColor="#FFFFFF" android:pathData="M14,2a12,12 0,1 1,0 24a12,12 0,1 1,0 -24z" />
+    <path android:fillColor="#8B405F" android:pathData="M14,6a8,8 0,1 1,0 16a8,8 0,1 1,0 -16z" />
+</vector>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Trip destination: a small flag (original artwork). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp" android:height="32dp" android:viewportWidth="28" android:viewportHeight="32">
+    <path android:fillColor="#382637" android:pathData="M6,2h2v28h-2z" />
+    <path android:fillColor="#8B405F" android:pathData="M8,3h16l-4,6 4,6H8z" />
+</vector>
