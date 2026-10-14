@@ -47,28 +47,17 @@ class LoudNudge(private val sound: SoundControl) {
     }
 }
 
-/** AshGo's own nudge sound: three quick two-tone triple beeps (~3 s), unlike any notification sound. Generated, not bundled. */
+/** AshGo's own nudge sound: one clear 0.7 s beep, unlike any notification sound. Generated, not bundled. */
 object BeepTone {
-    private const val BEEP_MS = 120
-    private const val GAP_MS = 80
-    private const val PAUSE_MS = 400
-    private const val GROUPS = 3
+    private const val HZ = 1800.0
+    private const val MS = 700
 
     fun pcm(sampleRate: Int = 22_050): ShortArray {
-        val out = ArrayList<Short>(sampleRate * 3)
-        fun silence(ms: Int) = repeat(sampleRate * ms / 1000) { out += 0 }
-        fun tone(hz: Double, ms: Int) {
-            val n = sampleRate * ms / 1000
-            val fade = sampleRate / 200 // 5 ms ramps: no clicks
-            for (i in 0 until n) {
-                val ramp = min(1.0, min(i, n - 1 - i).toDouble() / fade)
-                out += (sin(2 * PI * hz * i / sampleRate) * ramp * 0.9 * Short.MAX_VALUE).toInt().toShort()
-            }
+        val n = sampleRate * MS / 1000
+        val fade = sampleRate / 100 // 10 ms ramps: no clicks
+        return ShortArray(n) { i ->
+            val ramp = min(1.0, min(i, n - 1 - i).toDouble() / fade)
+            (sin(2 * PI * HZ * i / sampleRate) * ramp * 0.9 * Short.MAX_VALUE).toInt().toShort()
         }
-        repeat(GROUPS) {
-            listOf(1800.0, 2400.0, 1800.0).forEach { hz -> tone(hz, BEEP_MS); silence(GAP_MS) }
-            silence(PAUSE_MS)
-        }
-        return out.toShortArray()
     }
 }

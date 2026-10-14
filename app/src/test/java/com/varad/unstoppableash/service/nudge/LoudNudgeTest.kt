@@ -59,11 +59,15 @@ class LoudNudgeTest {
         assertEquals("never 'restores' to the raised volume", 1, s.volume)
     }
 
-    @Test fun theBeepIsAudibleAndBounded() {
+    @Test fun theBeepIsOneLoudBeep() {
         val pcm = BeepTone.pcm(sampleRate = 22_050)
         val seconds = pcm.size / 22_050.0
-        assertTrue("about 3 s, got $seconds", seconds in 2.5..3.5)
+        assertTrue("one beep, under a second, got $seconds", seconds in 0.4..1.0)
         assertTrue("loud", pcm.maxOf { it.toInt() } > Short.MAX_VALUE / 2)
-        assertTrue("has gaps between beeps", pcm.count { it.toInt() == 0 } > 22_050 / 4)
+        // One beep: sound never stops and starts again (no silent run longer than 20 ms inside it).
+        val sr = 22_050; val core = pcm.copyOfRange(sr / 100, pcm.size - sr / 100)
+        var run = 0; var longest = 0
+        for (x in core) { run = if (kotlin.math.abs(x.toInt()) < 50) run + 1 else 0; longest = maxOf(longest, run) }
+        assertTrue("no gaps, longest quiet run $longest samples", longest < sr / 50)
     }
 }

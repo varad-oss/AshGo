@@ -49,7 +49,7 @@ class AndroidSoundControl(context: Context) : SoundControl {
             track.write(pcm, 0, pcm.size)
             track.play()
             runCatching {
-                app.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200, 100, 200, 400, 200, 100, 200, 100, 200), -1))
+                app.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createOneShot(700, VibrationEffect.DEFAULT_AMPLITUDE))
             }
             delay(pcm.size * 1000L / SAMPLE_RATE + 100)
         } finally {
