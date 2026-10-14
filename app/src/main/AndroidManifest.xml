@@ -63,6 +63,11 @@
                 android:resource="@xml/sos_widget_info" />
         </receiver>
 
+        <!-- v2: SMS sent/delivered callbacks for SOS. Not exported; only AshGo's own PendingIntents reach it. -->
+        <receiver
+            android:name=".service.sos.SmsResultReceiver"
+            android:exported="false" />
+
         <service
             android:name=".SosAccessibilityService"
             android:exported="true"
