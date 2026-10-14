@@ -328,7 +328,12 @@
     <string name="trip_dest_none">No destination</string>
     <string name="trip_dest_here">Where I am now</string>
     <string name="trip_dest_map">Chosen on the map</string>
-    <string name="trip_dest_hint">Tip: long-press the map to pick a destination.</string>
+    <string name="trip_dest_hint">Search for a place above, or long-press the map.</string>
+    <string name="trip_search_label">Search for a place</string>
+    <string name="trip_search">Search</string>
+    <string name="trip_search_none">No places found. Try adding the area or city.</string>
+    <string name="trip_search_failed">Couldn\'t search right now. Check you\'re online and try again.</string>
+    <string name="trip_search_unavailable">Place search isn\'t available on this phone. Long-press the map instead.</string>
     <string name="trip_expect">Expect me back</string>
     <string name="trip_expect_none">No time</string>
     <string name="trip_expect_30">In 30 min</string>

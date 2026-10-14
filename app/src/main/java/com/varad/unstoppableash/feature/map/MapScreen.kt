@@ -1,5 +1,10 @@
 package com.varad.unstoppableash.feature.map
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import com.varad.unstoppableash.data.places.Place
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,12 +70,15 @@ data class MapActions(
     val onEndTrip: () -> Unit = {},
     /** Opens Safety: help is always a deliberate hold there, never sent from here. */
     val onGetHelp: () -> Unit = {},
+    /** Trip destination by name; results arrive as [MapScreen]'s `places`. */
+    val onSearchPlace: (String) -> Unit = {},
+    val onClearPlaceSearch: () -> Unit = {},
 )
 
 typealias MapContent = @Composable (pins: MapPins, focus: MapFocus?, onLongPress: (Double, Double) -> Unit, modifier: Modifier) -> Unit
 
 @Composable
-fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier: Modifier = Modifier) {
+fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier: Modifier = Modifier, places: PlaceSearchState = PlaceSearchState.Idle) {
     var focus by remember { mutableStateOf<MapFocus?>(null) }
     var picked by remember { mutableStateOf<TripDestination?>(null) }
     var tripSheet by rememberSaveable { mutableStateOf(false) }
@@ -103,7 +111,17 @@ fun MapScreen(state: MapUiState, actions: MapActions, map: MapContent, modifier:
         }
     }
     if (tripSheet) {
-        TripSheet(state, picked, onStart = { d, e, n, t, sh -> actions.onStartTrip(d, e, n, t, sh); tripSheet = false; picked = null }, onDismiss = { tripSheet = false })
+        TripSheet(
+            state, picked, places,
+            onSearch = actions.onSearchPlace,
+            onPick = { place ->
+                picked = place.toDestination()
+                focus = MapFocus(place.lat, place.lng, System.nanoTime())
+                actions.onClearPlaceSearch()
+            },
+            onStart = { d, e, n, t, sh -> actions.onStartTrip(d, e, n, t, sh); tripSheet = false; picked = null; actions.onClearPlaceSearch() },
+            onDismiss = { tripSheet = false; actions.onClearPlaceSearch() },
+        )
     }
 }
 
@@ -219,21 +237,33 @@ private enum class DestChoice { NONE, HERE, MAP }
 private enum class ExpectChoice(val minutes: Long?) { NONE(null), M30(30), H1(60), H2(120) }
 
 @Composable
-private fun TripSheet(state: MapUiState, picked: TripDestination?, onStart: (TripDestination?, Long?, String?, Boolean, Boolean) -> Unit, onDismiss: () -> Unit) {
+private fun TripSheet(
+    state: MapUiState, picked: TripDestination?, places: PlaceSearchState,
+    onSearch: (String) -> Unit, onPick: (Place) -> Unit,
+    onStart: (TripDestination?, Long?, String?, Boolean, Boolean) -> Unit, onDismiss: () -> Unit,
+) {
     val sharingNow = state.mySharing == SharingMode.LIVE && state.sharingFromThisPhone
     var share by rememberSaveable { mutableStateOf(true) }
     var dest by rememberSaveable { mutableStateOf(if (picked != null) DestChoice.MAP else DestChoice.NONE) }
     var expect by rememberSaveable { mutableStateOf(ExpectChoice.H1) }
     var note by rememberSaveable { mutableStateOf("") }
     var tell by rememberSaveable { mutableStateOf(true) }
+    var query by rememberSaveable { mutableStateOf("") }
+    // A place found by search (or a long-press) becomes the chosen destination.
+    LaunchedEffect(picked) { if (picked != null) dest = DestChoice.MAP }
     OrbitSheet(onDismiss) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Text(stringResource(R.string.trip_sheet_title), style = MaterialTheme.typography.titleLarge, color = Orbit.colors.text)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 FilterChip(dest == DestChoice.NONE, { dest = DestChoice.NONE }, { Text(stringResource(R.string.trip_dest_none)) })
                 if (state.myFix != null) FilterChip(dest == DestChoice.HERE, { dest = DestChoice.HERE }, { Text(stringResource(R.string.trip_dest_here)) })
-                if (picked != null) FilterChip(dest == DestChoice.MAP, { dest = DestChoice.MAP }, { Text(stringResource(R.string.trip_dest_map)) })
+                if (picked != null) FilterChip(dest == DestChoice.MAP, { dest = DestChoice.MAP }, { Text(picked.label ?: stringResource(R.string.trip_dest_map)) })
             }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OrbitTextField(query, { query = it }, stringResource(R.string.trip_search_label), Modifier.weight(1f), maxLength = 100)
+                OrbitButton(stringResource(R.string.trip_search), { onSearch(query) }, enabled = query.isNotBlank(), loading = places == PlaceSearchState.Searching, style = OrbitButtonStyle.Secondary)
+            }
+            PlaceResults(places, onPick)
             if (picked == null) Text(stringResource(R.string.trip_dest_hint), style = MaterialTheme.typography.bodySmall, color = Orbit.colors.textSecondary)
             Text(stringResource(R.string.trip_expect), style = MaterialTheme.typography.labelLarge, color = Orbit.colors.text)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -265,6 +295,30 @@ private fun TripSheet(state: MapUiState, picked: TripDestination?, onStart: (Tri
                 }
                 onStart(d, expect.minutes?.let { state.nowMs + it * 60_000 }, note.trim().ifEmpty { null }, tell, !sharingNow && share)
             }, Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun PlaceResults(places: PlaceSearchState, onPick: (Place) -> Unit) {
+    val note = when (places) {
+        PlaceSearchState.NoResults -> R.string.trip_search_none
+        PlaceSearchState.Failed -> R.string.trip_search_failed
+        PlaceSearchState.Unavailable -> R.string.trip_search_unavailable
+        else -> null
+    }
+    note?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = Orbit.colors.textSecondary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+    if (places is PlaceSearchState.Results) {
+        Column {
+            places.places.forEach { p ->
+                Column(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { onPick(p) }.padding(vertical = Spacing.xs),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(p.name, style = MaterialTheme.typography.bodyLarge, color = Orbit.colors.text)
+                    p.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Orbit.colors.textSecondary, maxLines = 2) }
+                }
+            }
         }
     }
 }

@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
+import com.varad.unstoppableash.data.places.PlaceSearch
+import com.varad.unstoppableash.data.places.SearchResult
 
 data class MapUiState(
     val loading: Boolean = true,
@@ -67,7 +69,13 @@ class MapViewModel(
     private val settings: com.varad.unstoppableash.data.local.SettingsStore,
     private val clock: Clock,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    places: PlaceSearch = PlaceSearch { SearchResult.Unavailable },
 ) : ViewModel() {
+
+    private val placeFinder = PlaceFinder(places, viewModelScope)
+    val placeSearch: StateFlow<PlaceSearchState> = placeFinder.state
+    fun searchPlace(query: String) = placeFinder.search(query)
+    fun clearPlaceSearch() = placeFinder.clear()
 
     @Volatile private var current: PairState.Paired? = null
 

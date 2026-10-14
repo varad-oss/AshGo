@@ -18,6 +18,9 @@ import com.varad.unstoppableash.domain.trips.OverduePhase
 import com.varad.unstoppableash.ui.theme.OrbitTheme
 import com.varad.unstoppableash.ui.theme.ThemeMode
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import org.junit.Rule
 import org.junit.Test
 
@@ -115,5 +118,28 @@ class MapScreenTest {
         show(base.copy(partnerTrip = trip, partnerTripPhase = OverduePhase.ALERT_PARTNER))
         rule.onAllNodesWithText("Raise SOS for them").assertCountEquals(0)
         rule.onNodeWithText("Get help").assertExists()
+    }
+
+    @Test fun aSearchedPlaceBecomesTheTripDestination() {
+        val searched = mutableListOf<String>()
+        val cafe = com.varad.unstoppableash.data.places.Place("Blue Tokai, Bandra", "Mumbai", 19.06, 72.83)
+        var places by androidx.compose.runtime.mutableStateOf<PlaceSearchState>(PlaceSearchState.Idle)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(
+                    base,
+                    MapActions(onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }, onSearchPlace = { searched += it; places = PlaceSearchState.Results(listOf(cafe)) }),
+                    map = { p, _, _, m -> pins = p; Box(m) },
+                    places = places,
+                )
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Search for a place").performTextInput("blue tokai")
+        rule.onNodeWithText("Search").performClick()
+        rule.runOnIdle { assertEquals(listOf("blue tokai"), searched) }
+        rule.onNodeWithText("Blue Tokai, Bandra").performClick()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle { assertEquals(com.varad.unstoppableash.domain.model.TripDestination(19.06, 72.83, "Blue Tokai, Bandra"), started!![0]) }
     }
 }

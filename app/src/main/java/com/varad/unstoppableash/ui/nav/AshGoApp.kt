@@ -87,6 +87,7 @@ import com.varad.unstoppableash.feature.fakecall.FakeCallActions
 import com.varad.unstoppableash.feature.fakecall.FakeCallScreen
 import com.varad.unstoppableash.feature.fakecall.FakeCallViewModel
 import android.os.SystemClock
+import com.varad.unstoppableash.data.places.AndroidPlaceSearch
 import androidx.compose.ui.res.stringResource
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.feature.settings.PrivacyScreen
@@ -294,8 +295,9 @@ private fun ChatTab(vm: ChatViewModel, modifier: Modifier) {
 private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val vm: MapViewModel = viewModel(factory = viewModelFactory {
-        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.settings, container.clock) }
+        initializer { MapViewModel(container.pairs, container.presence, container.location, container.trips, container.settings, container.clock, places = AndroidPlaceSearch(context.applicationContext)) }
     })
+    val placeSearch by vm.placeSearch.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     // Sharing live needs location permission first; the service only starts once it's granted. Notifications are
     // asked for too: the ongoing "sharing your location" notice is how sharing stays visible (review 8 I4).
@@ -320,12 +322,15 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
                 if (share) { if (needsAsk()) askLocation.launch(sharePermissions) else LocationShareService.start(context) }
             },
             onExtendTrip = vm::extendTrip,
+            onSearchPlace = vm::searchPlace,
+            onClearPlaceSearch = vm::clearPlaceSearch,
             onArrive = vm::arrive,
             onEndTrip = vm::endTrip,
             onGetHelp = onGetHelp,
         ),
         map = { pins, focus, onLongPress, m -> OsmMap(pins, focus, onLongPress, m) },
         modifier = modifier,
+        places = placeSearch,
     )
 }
 
