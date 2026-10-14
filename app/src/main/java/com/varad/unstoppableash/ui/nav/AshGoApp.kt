@@ -83,6 +83,7 @@ import com.varad.unstoppableash.feature.fakecall.FakeCallActions
 import com.varad.unstoppableash.feature.fakecall.FakeCallScreen
 import com.varad.unstoppableash.feature.fakecall.FakeCallViewModel
 import android.os.SystemClock
+import androidx.compose.ui.res.stringResource
 import com.varad.unstoppableash.R
 import com.varad.unstoppableash.feature.settings.PrivacyScreen
 import com.varad.unstoppableash.feature.settings.UpdatesScreen
@@ -390,8 +391,9 @@ private fun FakeCallOverlay(container: AppContainer, onBack: () -> Unit) {
             is CallPhase.InCall -> vm.end()
         }
     }
+    val voiceLabel = stringResource(R.string.fake_call_voice)
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { vm.addVoice(s.caller.ifBlank { context.getString(R.string.fake_call_voice) + " " + (s.voices.size + 1) }, it.toString()) }
+        uri?.let { vm.addVoice(s.caller.ifBlank { "$voiceLabel ${s.voices.size + 1}" }, it.toString()) }
     }
     FakeCallScreen(
         s,

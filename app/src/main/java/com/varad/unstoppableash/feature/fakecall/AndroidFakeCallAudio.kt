@@ -64,7 +64,7 @@ class AndroidFakeCallAudio(context: Context) : FakeCallAudio {
         fun copyIn(context: Context, source: String, id: String): String? = runCatching {
             val dir = File(context.filesDir, "voices").apply { mkdirs() }
             val target = File(dir, id.filter { it.isLetterOrDigit() || it == '-' })
-            val uri = Uri.parse(source)
+            val uri = source.toUri()
             val input = context.contentResolver.openInputStream(uri) ?: return null
             input.use { inp ->
                 target.outputStream().use { out ->
@@ -79,6 +79,6 @@ class AndroidFakeCallAudio(context: Context) : FakeCallAudio {
             Uri.fromFile(target).toString()
         }.getOrNull()
 
-        fun delete(uri: String) { runCatching { Uri.parse(uri).path?.let { File(it).takeIf { f -> f.path.contains("/voices/") }?.delete() } } }
+        fun delete(uri: String) { runCatching { uri.toUri().path?.let { File(it).takeIf { f -> f.path.contains("/voices/") }?.delete() } } }
     }
 }
