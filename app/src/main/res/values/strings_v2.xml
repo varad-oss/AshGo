@@ -449,6 +449,10 @@
     </plurals>
     <string name="updates_installed">Installed: %1$s</string>
     <string name="updates_check">Check for updates</string>
+    <string name="update_prompt_title">Update available</string>
+    <string name="update_prompt_body">AshGo %1$s is ready to install.</string>
+    <string name="update_prompt_update">Update</string>
+    <string name="update_prompt_later">Later</string>
     <string name="updates_up_to_date">You have the latest version.</string>
     <string name="updates_cannot_check">Couldn\'t check right now. Try again when you\'re online.</string>
     <string name="updates_found">Version %1$s is ready.</string>

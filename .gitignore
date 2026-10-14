@@ -25,3 +25,4 @@ app/src/test/resources/forbidden_names.txt
 firebase/node_modules/
 firebase/*.log
 firebase/.firebase/
+dist/

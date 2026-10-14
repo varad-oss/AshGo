@@ -87,6 +87,7 @@ import com.varad.unstoppableash.feature.fakecall.FakeCallActions
 import com.varad.unstoppableash.feature.fakecall.FakeCallScreen
 import com.varad.unstoppableash.feature.fakecall.FakeCallViewModel
 import android.os.SystemClock
+import com.varad.unstoppableash.ui.components.OrbitDialog
 import com.varad.unstoppableash.data.places.AndroidPlaceSearch
 import androidx.compose.ui.res.stringResource
 import com.varad.unstoppableash.R
@@ -179,6 +180,22 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
     var showPartnerSos by rememberSaveable { mutableStateOf(false) }
     var showReliability by rememberSaveable { mutableStateOf(false) }
     var showFakeCall by rememberSaveable { mutableStateOf(false) }
+    var settingsStartPage by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+
+    // Every app open: is a newer AshGo published? Quiet unless there is (D-10; owner's ask).
+    val updatesVm: UpdatesViewModel = viewModel(factory = viewModelFactory { initializer { UpdatesViewModel(container.updater) } })
+    LaunchedEffect(Unit) { updatesVm.checkOnOpen() }
+    val updatePrompt by updatesVm.prompt.collectAsStateWithLifecycle()
+    updatePrompt?.let { info ->
+        OrbitDialog(
+            title = stringResource(R.string.update_prompt_title),
+            text = stringResource(R.string.update_prompt_body, info.versionName ?: info.versionCode.toString()) + (info.notes?.let { "\n\n$it" } ?: ""),
+            confirmLabel = stringResource(R.string.update_prompt_update),
+            onConfirm = { updatesVm.download(); settingsStartPage = SettingsPage.UPDATES; showSettings = true },
+            dismissLabel = stringResource(R.string.update_prompt_later),
+            onDismiss = updatesVm::later,
+        )
+    }
 
     if (showFakeCall) {
         FakeCallOverlay(container, onBack = { showFakeCall = false })
@@ -203,8 +220,11 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
     }
 
     if (showSettings) {
-        BackHandler { showSettings = false }
-        SettingsOverlay(container, settingsVm, onBack = { showSettings = false }, onOpenReliability = { showReliability = true }, onOpenContacts = { showContacts = true })
+        BackHandler { showSettings = false; settingsStartPage = null }
+        SettingsOverlay(
+            container, settingsVm, onBack = { showSettings = false; settingsStartPage = null },
+            onOpenReliability = { showReliability = true }, onOpenContacts = { showContacts = true }, startPage = settingsStartPage,
+        )
         return
     }
     LaunchedEffect(openRequest) {
@@ -337,10 +357,13 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
 const val OPEN_PARTNER_SOS = "partnerSos"
 
 @Composable
-private fun SettingsOverlay(container: AppContainer, vm: SettingsViewModel, onBack: () -> Unit, onOpenReliability: () -> Unit, onOpenContacts: () -> Unit) {
+private fun SettingsOverlay(
+    container: AppContainer, vm: SettingsViewModel, onBack: () -> Unit, onOpenReliability: () -> Unit, onOpenContacts: () -> Unit,
+    startPage: SettingsPage? = null,
+) {
     val context = LocalContext.current
     val s by vm.state.collectAsStateWithLifecycle()
-    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    var page by rememberSaveable { mutableStateOf(startPage) }
     val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { vm.setAvatar(it.toString()) } }
     val m = Modifier.safeDrawingPadding()
     page?.let { current ->

@@ -54,4 +54,30 @@ class UpdatesViewModelTest {
         vm2.check(); settle()
         assertTrue(vm2.state.value is UpdatesState.CannotCheck)
     }
+
+    @Test fun openingTheAppPromptsOnlyWhenANewerVersionIsPublished() = runTest(main.dispatcher) {
+        val src = FakeSource(UpdateCheck.Available(info), Outcome.Success(file))
+        val vm = UpdatesViewModel(src)
+        vm.checkOnOpen(); settle()
+        assertEquals(info, vm.prompt.value)
+        vm.download(); settle()
+        assertEquals("Update from the prompt installs it", file, src.installed)
+    }
+
+    @Test fun theOpenCheckIsQuietWhenUpToDateOrOffline() = runTest(main.dispatcher) {
+        for (result in listOf(UpdateCheck.UpToDate, UpdateCheck.Unavailable)) {
+            val vm = UpdatesViewModel(FakeSource(result, Outcome.Success(file)))
+            vm.checkOnOpen(); settle()
+            assertEquals(null, vm.prompt.value)
+            assertEquals("no 'couldn't check' on every launch", UpdatesState.Idle, vm.state.value)
+        }
+    }
+
+    @Test fun laterHidesThePromptButSettingsStillOffersIt() = runTest(main.dispatcher) {
+        val vm = UpdatesViewModel(FakeSource(UpdateCheck.Available(info), Outcome.Success(file)))
+        vm.checkOnOpen(); settle()
+        vm.later()
+        assertEquals(null, vm.prompt.value)
+        assertEquals(UpdatesState.Found(info), vm.state.value)
+    }
 }

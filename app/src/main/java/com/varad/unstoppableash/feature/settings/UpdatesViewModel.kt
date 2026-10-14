@@ -40,7 +40,29 @@ class UpdatesViewModel(private val source: UpdateSource) : ViewModel() {
         }
     }
 
+    private var checkedOnOpen = false
+    private val _prompt = MutableStateFlow<UpdateInfo?>(null)
+    /** Set when opening the app found a newer version; the app shows "Update available" for it. */
+    val prompt: StateFlow<UpdateInfo?> = _prompt.asStateFlow()
+
+    /** On every app open: quiet unless there's something newer (no "couldn't check" nagging on each launch). */
+    fun checkOnOpen() {
+        if (checkedOnOpen || _state.value !is UpdatesState.Idle) return
+        checkedOnOpen = true
+        viewModelScope.launch {
+            val r = source.check()
+            if (r is UpdateCheck.Available && _state.value is UpdatesState.Idle) {
+                _state.value = UpdatesState.Found(r.info)
+                _prompt.value = r.info
+            }
+        }
+    }
+
+    /** "Later": hidden until the next open; Settings → Updates still offers it. */
+    fun later() { _prompt.value = null }
+
     fun download() {
+        _prompt.value = null
         val info = (_state.value as? UpdatesState.Found)?.info ?: return
         _state.value = UpdatesState.Downloading(info, null)
         viewModelScope.launch {
