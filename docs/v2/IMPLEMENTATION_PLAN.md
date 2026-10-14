@@ -1126,3 +1126,113 @@ Overdue in the app:
   - a trip to a destination → arrival → a check-in chip in Chat;
   - Bob's overdue trip → the Home card.
 - Then the fresh review.
+
+---
+
+## Stage 9 — Stay connected, notifications, reliability (detailed, written 2026-10-14)
+
+**Spec:** FEATURE_OPPORTUNITY_MATRIX B-1 (channel registry), REDESIGN_SPEC §Notifications and deep links, USER_JOURNEYS J9/J10/J12, ARCHITECTURE §8 (heartbeat, onDisconnect).
+
+**Constraint:** Spark plan, so there is no FCM send. Alerts come from the app's own long-lived RTDB connection in a foreground service.
+
+**Rulings carried in:**
+- **StayConnectedService uses FGS type `specialUse`,** subtype "partner safety alerts without a push server". `dataSync`, which v1 uses, is capped at 6 h per day on Android 15.
+- **Location sharing stays in its own service** (Stage 8). Merging the two ongoing notifications is revisited at cutover.
+- **After a reboot,** Android 14+ forbids starting a `location` FGS from BOOT_COMPLETED. StayConnected starts. If I was sharing, it posts "Open AshGo to resume sharing your location". That is honest, and sharing never resumes silently.
+- **`deliveredTo` on an SOS** is still written only when the PartnerSos screen is really shown (Stage 7 copy "Shown on X's phone"). The full-screen notification opens that screen.
+- **Registration:** debug manifest until Stage 11, like every v2 entry point.
+
+### Task 9.1 — Channel registry (pure + Android)
+`service/notify/Channels.kt` registers six channels:
+
+| Channel | Importance | Settings |
+|---|---|---|
+| `sos` | high | alarm sound, vibration, bypass DND requested, lockscreen public |
+| `overdue` | high | |
+| `chat` | default | |
+| `checkins` | default | |
+| `nudges` | default | |
+| `service` | low | |
+
+`NotificationKind` → channel.
+
+**Test:** every `NotificationKind` maps to a registered channel; ids are unique. B-1: "no notification posted to an unknown channel".
+
+### Task 9.2 — NotificationPlanner (pure)
+`domain/notify/NotificationPlanner.kt`. Input: partner chat messages, partner events, partner SOS records, partner trip + overdue phase, my trip phase, settings toggles, last-notified ids per kind, and now. Output:
+- `List<PlannedNotification(kind, key, title args, deepLink)>`
+- the new last-notified ids
+
+Rules:
+- never my own items;
+- once per item (dedupe by id; the first run after install doesn't replay history — anything older than 10 min is skipped);
+- SOS ignores the toggles; cancelling an SOS cancels its notification;
+- chat collapses to one notification per conversation with a count;
+- overdue: partner ALERT_PARTNER once per trip deadline; mine ASK_TRAVELLER once per deadline, with actions.
+
+**Tests:** each rule.
+
+### Task 9.3 — Notifier (Android)
+`service/notify/Notifier.kt` builds the notifications.
+
+Partner SOS:
+- full-screen intent → `PartnerSosActivity` (`showWhenLocked`, wraps PartnerSosScreen);
+- category ALARM;
+- if full-screen intents aren't allowed (Android 14 `canUseFullScreenIntent`), a heads-up notification instead.
+
+My overdue: actions I'm safe / +15 min / Get help, through `TripActionReceiver`. Get help opens Safety, never sends.
+
+Deep links: `V2Activity` extra `open=chat|map|safety|home|partnerSos`.
+
+**Instrumented test:** each kind posts on its channel (NotificationManager active notifications); the SOS notification has a full-screen intent.
+
+### Task 9.4 — StayConnectedService (FGS specialUse)
+While paired it:
+- goes online, with onDisconnect;
+- writes battery on a 5 % change or a charging flip (PresenceRepository.reportBattery);
+- runs `NotificationEngine`, which feeds repository flows into the planner, the Notifier and the dedupe store (SettingsStore.markNotified);
+- re-registers presence on reconnect.
+
+It stops on sign-out or leave. Home's view-model goOnline duty moves here (Stage 5 ruling).
+
+**Tests:**
+- NotificationEngine JVM tests with FakeRtdb and a fake notifier: a partner message posts once; a restart doesn't repost; my own posts nothing; an SOS while chat is muted still posts; SOS cancelled → cancel.
+- The service is checked by hand.
+
+### Task 9.5 — Boot + heartbeat
+- `BootReceiver` (BOOT_COMPLETED, MY_PACKAGE_REPLACED) → StayConnectedService, plus the resume-sharing notification when sharing was LIVE.
+- `HeartbeatWorker` (WorkManager, 15 min periodic): writes presence `heartbeatAt` and restarts the service if it has died.
+
+**Tests:** the worker's logic through an extracted `heartbeat()` function (JVM).
+
+### Task 9.6 — Reliability screen (J12)
+`feature/settings/ReliabilityScreen.kt` + VM, a checklist with a status and a Fix action per item:
+- notifications allowed
+- the SOS channel not muted
+- full-screen alerts allowed
+- battery optimisation off
+- location precise
+- SMS allowed
+- service running
+- last sync time
+
+Plus "Send a test notification" (local, on the checkins channel).
+
+**Tests:** the VM maps each check; UI tests for the rows and Fix callbacks.
+
+### Task 9.7 — Wire-up
+- The POST_NOTIFICATIONS request after pairing (and again from Reliability).
+- Deep-link routing in AshGoApp.
+- Settings → Reliability.
+- The service is started when Paired.
+
+### Task 9.8 — Manual verification + review
+On the emulator against the emulators, with the app backgrounded and the screen locked:
+- Bob chat → one notification → tap opens Chat;
+- Bob nudge → nudges channel;
+- Bob SOS → full-screen over the lock screen → Acknowledge;
+- Bob overdue → alert;
+- my overdue → actions work;
+- reboot → service back, plus the resume-sharing prompt.
+
+Then the fresh review.
