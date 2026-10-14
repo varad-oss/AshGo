@@ -21,6 +21,9 @@ import java.io.ByteArrayOutputStream
 class AndroidPhotoEncoder(
     private val resolver: ContentResolver,
     private val onWorkThread: () -> Unit = {},
+    private val maxEdge: Int = ImageBudget.MAX_EDGE_PX,
+    private val targetBytes: Int = ImageBudget.TARGET_BYTES,
+    private val hardLimitBytes: Int = ImageBudget.HARD_LIMIT_BYTES,
 ) : PhotoEncoder {
 
     override suspend fun encode(uri: String): EncodedPhoto? = withContext(Dispatchers.Default) {
@@ -43,12 +46,12 @@ class AndroidPhotoEncoder(
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= ImageBudget.MAX_EDGE_PX) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
         val decoded = resolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         } ?: return null
 
-        val (w, h) = ImageBudget.scaledSize(decoded.width, decoded.height, ImageBudget.MAX_EDGE_PX)
+        val (w, h) = ImageBudget.scaledSize(decoded.width, decoded.height, maxEdge)
         val scaled = if (w == decoded.width && h == decoded.height) decoded else decoded.scale(w, h)
         val upright = rotate(scaled, rotationOf(uri))
 
@@ -56,7 +59,7 @@ class AndroidPhotoEncoder(
         fun jpegAt(q: Int) = encoded.getOrPut(q) {
             ByteArrayOutputStream().also { upright.compress(Bitmap.CompressFormat.JPEG, q, it) }.toByteArray()
         }
-        val quality = ImageBudget.chooseQuality({ jpegAt(it).size }, ImageBudget.TARGET_BYTES, ImageBudget.HARD_LIMIT_BYTES) ?: return null
+        val quality = ImageBudget.chooseQuality({ jpegAt(it).size }, targetBytes, hardLimitBytes) ?: return null
         return EncodedPhoto(jpegAt(quality), upright.width, upright.height)
     }
 

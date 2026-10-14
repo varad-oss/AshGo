@@ -76,6 +76,13 @@ import com.varad.unstoppableash.feature.onboarding.OnboardingViewModel
 import com.varad.unstoppableash.feature.settings.SettingsActions
 import com.varad.unstoppableash.feature.settings.SettingsScreen
 import com.varad.unstoppableash.feature.settings.SettingsViewModel
+import com.varad.unstoppableash.feature.settings.SettingsPage
+import com.varad.unstoppableash.feature.settings.PrivacyScreen
+import com.varad.unstoppableash.feature.settings.UpdatesScreen
+import com.varad.unstoppableash.feature.settings.UpdatesViewModel
+import com.varad.unstoppableash.feature.settings.HelpScreen
+import com.varad.unstoppableash.feature.settings.AboutScreen
+import com.varad.unstoppableash.feature.settings.Fix
 import com.varad.unstoppableash.ui.components.LoadingOrbit
 import com.varad.unstoppableash.ui.components.LoadingOrbitSize
 import kotlinx.coroutines.launch
@@ -143,7 +150,7 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
         }
     })
     val settingsVm: SettingsViewModel = viewModel(factory = viewModelFactory {
-        initializer { SettingsViewModel(container.pairs, container.presence, container.auth, container.settings) }
+        initializer { SettingsViewModel(container.pairs, container.presence, container.auth, container.settings, container.avatarEncoder, deleteMyMessages = { container.cleanup.deleteMyMessages() }) }
     })
     val chatVm: ChatViewModel = viewModel(factory = viewModelFactory {
         initializer { ChatViewModel(container.pairs, container.chat, container.events, container.presence, container.photoEncoder, container.rtdb, container.clock) }
@@ -178,19 +185,7 @@ private fun MainShell(container: AppContainer, openRequest: String?, onOpenHandl
 
     if (showSettings) {
         BackHandler { showSettings = false }
-        val s by settingsVm.state.collectAsStateWithLifecycle()
-        SettingsScreen(
-            s,
-            SettingsActions(
-                onBack = { showSettings = false },
-                onTheme = { settingsVm.setTheme(it) },
-                onLeave = settingsVm::leave,
-                onSignOut = settingsVm::signOut,
-                onDismissFailure = settingsVm::clearFailure,
-                onOpenReliability = { showReliability = true },
-            ),
-            Modifier.safeDrawingPadding(),
-        )
+        SettingsOverlay(container, settingsVm, onBack = { showSettings = false }, onOpenReliability = { showReliability = true }, onOpenContacts = { showContacts = true })
         return
     }
     LaunchedEffect(openRequest) {
@@ -317,6 +312,55 @@ private fun MapTab(container: AppContainer, onGetHelp: () -> Unit, modifier: Mod
 }
 
 const val OPEN_PARTNER_SOS = "partnerSos"
+
+@Composable
+private fun SettingsOverlay(container: AppContainer, vm: SettingsViewModel, onBack: () -> Unit, onOpenReliability: () -> Unit, onOpenContacts: () -> Unit) {
+    val context = LocalContext.current
+    val s by vm.state.collectAsStateWithLifecycle()
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { vm.setAvatar(it.toString()) } }
+    val m = Modifier.safeDrawingPadding()
+    page?.let { current ->
+        BackHandler { page = null }
+        val back = { page = null }
+        when (current) {
+            SettingsPage.PRIVACY -> PrivacyScreen(s, back, vm::deleteMyMessages, m)
+            SettingsPage.UPDATES -> {
+                val updates: UpdatesViewModel = viewModel(factory = viewModelFactory { initializer { UpdatesViewModel(container.updater) } })
+                val u by updates.state.collectAsStateWithLifecycle()
+                UpdatesScreen(u, container.versionName, back, updates::check, updates::download, m)
+            }
+            SettingsPage.HELP -> HelpScreen(back, m)
+            SettingsPage.ABOUT -> AboutScreen(container.versionName, back, m)
+            SettingsPage.CONTACTS, SettingsPage.RELIABILITY -> Unit
+        }
+        return
+    }
+    SettingsScreen(
+        s,
+        SettingsActions(
+            onBack = onBack,
+            onTheme = { vm.setTheme(it) },
+            onLeave = vm::leave,
+            onSignOut = vm::signOut,
+            onDismissFailure = vm::clearFailure,
+            onOpen = {
+                when (it) {
+                    SettingsPage.CONTACTS -> onOpenContacts()
+                    SettingsPage.RELIABILITY -> onOpenReliability()
+                    else -> page = it
+                }
+            },
+            onRename = vm::rename,
+            onPickAvatar = { pickAvatar.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onRemoveAvatar = vm::removeAvatar,
+            onGreeting = vm::setGreeting,
+            onNotify = vm::setNotify,
+            onOpenSosChannel = { openFix(context, Fix.SOS_CHANNEL_SETTINGS) },
+        ),
+        m,
+    )
+}
 
 @Composable
 private fun ReliabilityOverlay(container: AppContainer, onBack: () -> Unit) {

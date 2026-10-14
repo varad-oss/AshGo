@@ -27,6 +27,7 @@ class SettingsViewModelTest {
 
     private val db = FakeRtdb(nowMs = 1_000L)
     private val auth = FakeAuthGateway(FakeAuthGateway.google("alice"))
+    private var deleted = 0
 
     private fun seed() = runBlocking {
         db.set("userPairs/alice", "p1")
@@ -37,7 +38,11 @@ class SettingsViewModelTest {
 
     private fun kotlinx.coroutines.test.TestScope.vm(): SettingsViewModel {
         val store = SettingsStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { tmp.root.resolve("s.preferences_pb") }))
-        return SettingsViewModel(PairRepository(db, auth, Clock { db.nowMs }), PresenceRepository(db), auth, store)
+        return SettingsViewModel(
+            PairRepository(db, auth, Clock { db.nowMs }), PresenceRepository(db), auth, store,
+            avatarEncoder = { uri -> if (uri == "bad") null else com.varad.unstoppableash.data.media.EncodedPhoto(byteArrayOf(1, 2, 3), 256, 256) },
+            deleteMyMessages = { deleted++; 4 },
+        )
     }
 
     @Test fun showsProfileAndPartner() = runTest(main.dispatcher) {
@@ -98,5 +103,68 @@ class SettingsViewModelTest {
         testScheduler.advanceTimeBy(SettingsViewModel.LEAVE_TIMEOUT_MS + 1); testScheduler.runCurrent()
         val s = vm.state.first { !it.busy }
         assertEquals(FailureReason.OFFLINE, s.failure)
+    }
+
+    @Test fun renameWritesMyProfileAndRefusesBlankOrLongNames() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.state.first { it.pairId != null }
+        vm.rename("  ")
+        vm.rename("x".repeat(41))
+        testScheduler.runCurrent()
+        assertEquals("Alice", db.read("pairs/p1/profiles/alice/name"))
+        vm.rename("  Ally ")
+        vm.state.first { it.myName == "Ally" }
+        assertEquals("Ally", db.read("pairs/p1/profiles/alice/name"))
+        assertEquals("email untouched", "alice@example.com", db.read("pairs/p1/profiles/alice/email"))
+    }
+
+    @Test fun greetingToggleWritesMyProfile() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        vm.state.first { it.pairId != null && it.greeting }
+        vm.setGreeting(false)
+        vm.state.first { !it.greeting }
+        assertEquals(false, db.read("pairs/p1/profiles/alice/greeting"))
+    }
+
+    @Test fun notificationTogglesAreRememberedOnThisPhone() = runTest(main.dispatcher) {
+        val vm = vm()
+        vm.setNotify(NotifyToggle.CHAT, false)
+        vm.setNotify(NotifyToggle.CHECKINS, false)
+        val s = vm.state.first { !it.notifyChat && !it.notifyCheckins }
+        assertEquals(true, s.notifyNudges)
+    }
+
+    @Test fun avatarIsEncodedSmallAndStoredAsBase64() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        vm.state.first { it.pairId != null }
+        vm.setAvatar("content://pic")
+        vm.state.first { it.myAvatar != null }
+        assertEquals(java.util.Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3)), db.read("pairs/p1/profiles/alice/avatar"))
+        vm.removeAvatar()
+        vm.state.first { it.myAvatar == null }
+        assertNull(db.read("pairs/p1/profiles/alice/avatar"))
+    }
+
+    @Test fun unreadableAvatarSaysSo() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.state.first { it.pairId != null }
+        vm.setAvatar("bad")
+        assertEquals(FailureReason.INVALID, vm.state.first { it.failure != null }.failure)
+        assertNull(db.read("pairs/p1/profiles/alice/avatar"))
+    }
+
+    @Test fun deleteMyMessagesReportsHowManyWentAway() = runTest(main.dispatcher) {
+        seed()
+        val vm = vm()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.deleteMyMessages()
+        assertEquals(4, vm.state.first { it.deletedCount != null }.deletedCount)
+        assertEquals(1, deleted)
     }
 }

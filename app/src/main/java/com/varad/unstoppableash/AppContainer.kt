@@ -1,5 +1,8 @@
 package com.varad.unstoppableash
 
+import com.varad.unstoppableash.domain.media.ImageBudget
+import com.varad.unstoppableash.service.cleanup.Cleanup
+import com.varad.unstoppableash.data.update.Updater
 import com.varad.unstoppableash.service.sos.SosController
 import com.varad.unstoppableash.service.sos.SmsDispatcher
 import com.varad.unstoppableash.service.sos.AndroidSmsDispatcher
@@ -89,6 +92,15 @@ class AppContainer(private val app: Application) {
     val sos by lazy { SosRepository(rtdb, clock) }
     val trips by lazy { TripRepository(rtdb) }
     val photoEncoder: PhotoEncoder by lazy { AndroidPhotoEncoder(app.contentResolver) }
+    val avatarEncoder: PhotoEncoder by lazy {
+        AndroidPhotoEncoder(app.contentResolver, maxEdge = ImageBudget.AVATAR_EDGE_PX, targetBytes = ImageBudget.AVATAR_MAX_BYTES, hardLimitBytes = ImageBudget.AVATAR_MAX_BYTES)
+    }
+    val cleanup by lazy { Cleanup(rtdb, pairs, clock) }
+    val updater by lazy {
+        Updater(app, rtdb) { app.packageManager.getPackageInfo(app.packageName, 0).let { androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(it).toInt() } }
+    }
+    val versionName: String get() = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull() ?: "?"
+
     val smsDispatcher: SmsDispatcher by lazy { AndroidSmsDispatcher(app) }
     val locationSource: LocationSource by lazy { FusedLocationSource(app) }
 

@@ -157,6 +157,10 @@ class PairRepository(
         return pairId.takeIf { meta.memberA == uid }
     }
 
+    /** My own profile fields only (name, avatar, greeting); a null value removes the field. */
+    suspend fun updateProfile(pairId: String, uid: String, fields: Map<String, Any?>): Outcome<Unit> =
+        db.update(DbPaths.profile(pairId, uid), fields)
+
     private suspend fun writeProfile(pairId: String, user: AuthUser, name: String) = db.set(
         DbPaths.profile(pairId, user.uid),
         mapOf("name" to name, "email" to user.email, "greeting" to true),
