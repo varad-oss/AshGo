@@ -210,6 +210,58 @@
     <string name="chat_close_photo">Close photo</string>
     <string name="chat_loading_older">Loading older messages</string>
 
+    <!-- ===== Safety / SOS (Stage 7). Neutral copy only: no hearts, no relationship tone. ===== -->
+    <string name="safety_title">Safety</string>
+    <string name="sos_hold_label">Hold for 3 seconds to send SOS</string>
+    <string name="sos_hold_visible">SOS</string>
+    <string name="what_happens">What happens when you send SOS</string>
+    <string name="wh_partner_alert">%1$s gets an alert in AshGo</string>
+    <string name="wh_no_orbit">No orbit yet: no in-app alert</string>
+    <plurals name="wh_sms_contacts">
+        <item quantity="one">SMS to %1$d emergency contact</item>
+        <item quantity="other">SMS to %1$d emergency contacts</item>
+    </plurals>
+    <string name="wh_no_contacts">No emergency contacts yet</string>
+    <string name="wh_sms_off">SMS off: allow AshGo to send SMS</string>
+    <string name="wh_location_precise">Your location is included</string>
+    <string name="wh_location_approx">Approximate location only</string>
+    <string name="wh_location_off">Location off</string>
+    <string name="action_add">Add</string>
+    <string name="action_allow">Allow</string>
+    <string name="action_fix">Fix</string>
+    <string name="call_112">Call 112</string>
+    <string name="call_partner">Call %1$s</string>
+    <string name="add_partner_number">Add %1$s\'s number</string>
+    <string name="emergency_contacts">Emergency contacts</string>
+    <plurals name="emergency_contacts_count">
+        <item quantity="one">%1$d contact</item>
+        <item quantity="other">%1$d contacts</item>
+    </plurals>
+    <string name="sos_sent">SOS sent</string>
+    <string name="sos_sent_at">at %1$s</string>
+    <string name="sos_cancel_label">I\'m safe: cancel SOS</string>
+    <string name="sos_cancel_visible">I\'m safe</string>
+    <string name="sos_cancel_hint">Hold for 1.5 seconds</string>
+    <string name="rcpt_saved">Saved to AshGo</string>
+    <string name="rcpt_saving_retry">Saving to AshGo (retrying)</string>
+    <string name="rcpt_no_orbit">No orbit: not saved to AshGo</string>
+    <string name="rcpt_delivered">Delivered to %1$s\'s phone</string>
+    <string name="rcpt_seen">%1$s has seen it</string>
+    <string name="rcpt_sms">SMS to %1$s</string>
+    <string name="rcpt_sms_why">SMS to %1$s (%2$s)</string>
+    <string name="rcpt_sms_sent">SMS sent to %1$s</string>
+    <string name="rcpt_sms_delivered">SMS delivered to %1$s</string>
+    <string name="rcpt_location">Location (+/-%1$d m)</string>
+    <string name="rcpt_location_plain">Location</string>
+    <string name="rcpt_locating">Finding location</string>
+    <string name="rcpt_location_unavailable">Location unavailable</string>
+    <string name="sos_cancelled_at">SOS cancelled at %1$s</string>
+    <string name="sos_offer_false_alarm">Tell texted contacts it was a false alarm</string>
+    <string name="sos_false_alarm_title">Send a false-alarm text?</string>
+    <string name="sos_false_alarm_body">AshGo will text: %1$s. SMS charges may apply.</string>
+    <string name="action_dont_send">Don\'t send</string>
+    <string name="action_done">Done</string>
+
     <!-- Debug design catalog -->
     <string name="catalog_title">Little Orbit components</string>
     <string name="catalog_dark">Dark</string>
