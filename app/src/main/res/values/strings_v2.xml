@@ -108,9 +108,9 @@
     <string name="awaiting_confirmation">Waiting for %1$s to confirm it\'s you</string>
 
     <!-- ===== Home (Stage 5) ===== -->
-    <string name="greeting_morning_warm">Good morning, love</string>
-    <string name="greeting_afternoon_warm">Good afternoon, love</string>
-    <string name="greeting_evening_warm">Good evening, love</string>
+    <string name="greeting_morning_warm">Good morning</string>
+    <string name="greeting_afternoon_warm">Good afternoon</string>
+    <string name="greeting_evening_warm">Good evening</string>
     <string name="greeting_night_warm">Hello, night owl</string>
     <string name="greeting_morning_neutral">Good morning</string>
     <string name="greeting_afternoon_neutral">Good afternoon</string>
