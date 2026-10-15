@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AshGo architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Nunito,sans-serif; }
+  #box { width:1280px; height:600px; background:#FFF7F5; position:relative; color:#382637; }
+  .phone { position:absolute; left:40px; top:40px; width:664px; height:520px; border-radius:28px; background:#fff; box-shadow:0 0 0 2px #EADFE6; }
+  .phone h3 { margin:0; position:absolute; left:28px; top:20px; font-size:20px; font-weight:800; }
+  .phone h3 span { color:#6E5A6C; font-weight:700; }
+  .layer { position:absolute; border-radius:18px; padding:16px 20px; }
+  .layer b { display:block; font-size:19px; font-weight:800; }
+  .layer small { display:block; font-size:15px; color:#6E5A6C; font-weight:600; margin-top:4px; line-height:1.35; }
+  .feature { left:28px; top:62px; width:604px; height:92px; background:#F6DDE8; }
+  .domain { left:28px; top:172px; width:604px; height:100px; background:#EADFF8; }
+  .data { left:28px; top:288px; width:292px; height:164px; background:#FCEFF3; box-shadow:inset 0 0 0 2px #F0CADA; }
+  .service { left:340px; top:288px; width:292px; height:164px; background:#FCEFF3; box-shadow:inset 0 0 0 2px #F0CADA; }
+  .ext { position:absolute; left:820px; width:420px; height:96px; border-radius:18px; padding:16px 20px; background:#fff; box-shadow:0 0 0 2px #EADFE6; }
+  .ext b { display:block; font-size:19px; font-weight:800; }
+  .ext small { display:block; font-size:15px; color:#6E5A6C; font-weight:600; margin-top:4px; }
+  .ext i { position:absolute; right:18px; top:16px; font-style:normal; font-size:13px; font-weight:800; color:#8B405F; background:#F6DDE8; padding:4px 10px; border-radius:99px; }
+  svg { position:absolute; inset:0; z-index:2; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="box">
+  <svg width="1280" height="600" aria-hidden="true">
+    <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L8 5L1 9" fill="none" stroke="#8B405F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+    <g stroke="#8B405F" stroke-width="2.2" fill="none" stroke-linecap="round">
+      <path d="M370 196 V210" marker-end="url(#a)"/>
+      <path d="M224 314 V326" marker-end="url(#a)"/>
+      <path d="M536 314 V326" marker-end="url(#a)"/>
+      <path d="M704 104 C 760 104, 770 104, 814 104" marker-end="url(#a)" marker-start="url(#a)"/>
+      <path d="M704 360 C 760 360, 770 238, 814 238" marker-end="url(#a)"/>
+      <path d="M704 400 C 760 400, 770 372, 814 372" marker-end="url(#a)"/>
+      <path d="M704 440 C 760 440, 770 506, 814 506" marker-end="url(#a)"/>
+    </g>
+    <g font-family="Nunito" font-size="13" font-weight="700" fill="#6E5A6C">
+      <text x="730" y="96">realtime</text>
+      <text x="746" y="290">sign-in</text>
+      <text x="752" y="378">SMS</text>
+      <text x="738" y="468">updates</text>
+    </g>
+  </svg>
+  <div class="phone">
+    <h3>Android app <span>· Kotlin · Jetpack Compose</span></h3>
+    <div class="layer feature"><b>feature/</b><small>Home · Map · Chat · Safety · Fake call · Our page · Settings, each a screen + ViewModel</small></div>
+    <div class="layer domain"><b>domain/</b><small>Pure, unit-tested rules: presence, overdue trips, SOS state machine, notification planner, background policy</small></div>
+    <div class="layer data"><b>data/</b><small>Repositories over one RtdbClient seam, local stores, place search, updates</small></div>
+    <div class="layer service"><b>service/</b><small>SOS · location sharing · stay connected · notifications · cleanup</small></div>
+  </div>
+  <div class="ext" style="top:56px"><i>Spark · ₹0</i><b>Firebase Realtime Database</b><small>Rules: only the two of you · 64 tests</small></div>
+  <div class="ext" style="top:190px"><b>Firebase Auth</b><small>Google sign-in</small></div>
+  <div class="ext" style="top:324px"><b>Emergency contacts</b><small>SMS with delivery reports</small></div>
+  <div class="ext" style="top:458px"><b>GitHub Releases</b><small>APK + SHA-256, checked before install</small></div>
+</div>
+</body>
+</html>
