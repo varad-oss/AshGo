@@ -260,7 +260,23 @@ document.getElementById('s3').appendChild(painting('c'));
 
 // ?render=light|dark: just the bed, blended onto the app background, for exporting the in-app images.
 const mode = new URLSearchParams(location.search).get('render');
-if (mode) {
+if (mode === 'hero') {
+  // README banner: tulip beds on both sides, the name in the middle.
+  document.body.innerHTML = '';
+  document.body.style.margin = '0';
+  const box = document.createElement('div');
+  box.id = 'box';
+  box.style.cssText = 'width:1280px;height:420px;position:relative;overflow:hidden;background:#FFF7F5;font-family:Nunito,sans-serif;';
+  const left = painting('h1'); left.style.cssText = 'position:absolute;left:-50px;right:auto;bottom:-4px;width:440px;height:auto;mix-blend-mode:multiply;opacity:.85;isolation:isolate;';
+  const right = painting('h2'); right.style.cssText = 'position:absolute;left:auto;right:-50px;bottom:-4px;width:440px;height:auto;mix-blend-mode:multiply;opacity:.85;isolation:isolate;transform:scaleX(-1);';
+  box.append(left, right);
+  const t = document.createElement('div');
+  t.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);width:520px;top:110px;text-align:center;color:#382637;';
+  t.innerHTML = '<div style="font-size:84px;font-weight:800;letter-spacing:-2px;line-height:1">Ash<span style="color:#8B405F">Go</span></div>'
+    + '<div style="margin-top:18px;font-size:23px;font-weight:600;color:#6E5A6C;line-height:1.45">A tiny private space for two.<br>Help is one deliberate hold away.</div>';
+  box.appendChild(t);
+  document.body.appendChild(box);
+} else if (mode) {
   document.body.innerHTML = '';
   document.body.style.margin = '0';
   const box = document.createElement('div');
