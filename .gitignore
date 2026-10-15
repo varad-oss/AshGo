@@ -16,3 +16,18 @@ local.properties
 app/google-services.json
 *.bak
 *.bak[0-9]*
+
+# Owner-maintained list of personal names the LayeringTest keeps out of v2 sources
+app/src/test/resources/forbidden_names.txt
+.superpowers/
+
+# Firebase rules test tooling
+firebase/node_modules/
+firebase/*.log
+firebase/.firebase/
+dist/
+
+# Local design previews and browser-automation output
+.playwright-mcp/
+design/*.png
+design/shots/

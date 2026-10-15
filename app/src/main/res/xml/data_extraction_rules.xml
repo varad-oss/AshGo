@@ -1,19 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AshGo keeps emergency contacts, the partner's number, an SOS in progress, sign-in state, Our page photos and
+  fake-call recordings on this phone only (all of files/, including datastore/, our_page/ and voices/).
+  None of it goes to cloud backup or to a new phone: a restored "active SOS" or stale contacts on another device
+  would be wrong, and the app promises these stay here. A new phone signs in with Google again (J11).
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

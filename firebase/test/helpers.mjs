@@ -1,0 +1,43 @@
+// Shared emulator setup for the rules tests. Uses the demo-ashgo project id, so the
+// emulator never touches the real Firebase project.
+import { readFileSync } from 'node:fs';
+import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
+
+export const DAY = 86_400_000;
+
+export async function makeEnv(rulesFile = 'database.rules.json') {
+  return initializeTestEnvironment({
+    projectId: 'demo-ashgo',
+    database: {
+      host: '127.0.0.1',
+      port: 9000,
+      rules: readFileSync(new URL(`../${rulesFile}`, import.meta.url), 'utf8'),
+    },
+  });
+}
+
+/** A Google-signed-in user: verified email unless told otherwise. */
+export function user(env, uid, email = `${uid}@example.com`, verified = true) {
+  return env.authenticatedContext(uid, { email, email_verified: verified, firebase: { sign_in_provider: 'google.com' } }).database();
+}
+
+/** A signed-in account from another provider (anonymous, password, ...). */
+export function provider(env, uid, sign_in_provider, email = undefined, verified = false) {
+  const token = { firebase: { sign_in_provider } };
+  if (email) { token.email = email; token.email_verified = verified; }
+  return env.authenticatedContext(uid, token).database();
+}
+
+export function anon(env) {
+  return env.unauthenticatedContext().database();
+}
+
+/** Seed data bypassing rules (e.g. old timestamps the rules would reject). */
+export async function seed(env, path, value) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const { ref, set } = await import('firebase/database');
+    await set(ref(ctx.database(), path), value);
+  });
+}
+
+export const emailKey = (email) => email.toLowerCase().replaceAll('.', ',');

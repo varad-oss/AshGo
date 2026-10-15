@@ -1,0 +1,187 @@
+package com.varad.unstoppableash.feature.map
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.varad.unstoppableash.core.time.Clock
+import com.varad.unstoppableash.data.location.LocationRepository
+import com.varad.unstoppableash.data.pair.PairRepository
+import com.varad.unstoppableash.data.presence.PresenceRepository
+import com.varad.unstoppableash.data.trips.TripRepository
+import com.varad.unstoppableash.domain.location.PauseChoice
+import com.varad.unstoppableash.domain.location.SharingPlan
+import com.varad.unstoppableash.domain.model.LocationFix
+import com.varad.unstoppableash.domain.model.PairState
+import com.varad.unstoppableash.domain.model.PresenceSnapshot
+import com.varad.unstoppableash.domain.model.PresenceState
+import com.varad.unstoppableash.domain.model.SharingMode
+import com.varad.unstoppableash.domain.model.Trip
+import com.varad.unstoppableash.domain.model.TripDestination
+import com.varad.unstoppableash.domain.model.TripState
+import com.varad.unstoppableash.domain.presence.PresenceCalculator
+import com.varad.unstoppableash.domain.trips.OverdueEvaluator
+import com.varad.unstoppableash.domain.trips.OverduePhase
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.ZoneId
+import com.varad.unstoppableash.data.places.PlaceSearch
+import com.varad.unstoppableash.data.places.SearchResult
+
+data class MapUiState(
+    val loading: Boolean = true,
+    val myName: String = "",
+    val partnerName: String = "",
+    val partnerPresence: PresenceState = PresenceState.Unknown,
+    /** Null when there is no location at all: the map then shows no partner pin, never a guess. */
+    val partnerFix: LocationFix? = null,
+    /** Shown faded: the pin is real but not current (Stale, Offline, Paused). */
+    val partnerFaded: Boolean = false,
+    val partnerBattery: Int? = null,
+    val myFix: LocationFix? = null,
+    val mySharing: SharingMode = SharingMode.OFF,
+    val mySharingUntil: Long? = null,
+    val myTrip: Trip? = null,
+    val partnerTrip: Trip? = null,
+    val myTripPhase: OverduePhase = OverduePhase.NOT_DUE,
+    val partnerTripPhase: OverduePhase = OverduePhase.NOT_DUE,
+    val nowMs: Long = 0L,
+    val sharingFromThisPhone: Boolean = true,
+    /** I created the orbit: I follow them on the map, with no sharing or trip controls of my own (roles). */
+    val watcher: Boolean = false,
+)
+
+/** Map tab (REDESIGN_SPEC §Map, J6, J9): both pins as they really are, my sharing controls, and trips. */
+@OptIn(ExperimentalCoroutinesApi::class)
+class MapViewModel(
+    pairs: PairRepository,
+    private val presence: PresenceRepository,
+    private val location: LocationRepository,
+    private val trips: TripRepository,
+    private val settings: com.varad.unstoppableash.data.local.SettingsStore,
+    private val clock: Clock,
+    private val zone: ZoneId = ZoneId.systemDefault(),
+    places: PlaceSearch = PlaceSearch { SearchResult.Unavailable },
+    private val saved: com.varad.unstoppableash.data.local.SavedPlacesStore? = null,
+) : ViewModel() {
+
+    val savedPlaces: StateFlow<List<com.varad.unstoppableash.data.local.SavedPlace>> =
+        (saved?.places ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    fun savePlace(name: String, dest: TripDestination) = viewModelScope.launch { saved?.save(name, dest.lat, dest.lng) }
+    fun removePlace(id: String) = viewModelScope.launch { saved?.remove(id) }
+
+    private val placeFinder = PlaceFinder(places, viewModelScope)
+    val placeSearch: StateFlow<PlaceSearchState> = placeFinder.state
+    fun searchPlace(query: String) = placeFinder.search(query)
+    fun clearPlaceSearch() = placeFinder.clear()
+
+    @Volatile private var current: PairState.Paired? = null
+
+    private val paired: Flow<PairState.Paired?> = pairs.pairState().map { it as? PairState.Paired }
+        .distinctUntilChanged { a, b -> a?.meta?.pairId == b?.meta?.pairId && a?.myUid == b?.myUid && a?.partner?.name == b?.partner?.name }
+
+    val state: StateFlow<MapUiState> = paired.flatMapLatest { p ->
+        current = p
+        if (p == null) flowOf(MapUiState(loading = false)) else stateOf(p)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), MapUiState())
+
+    private fun stateOf(p: PairState.Paired): Flow<MapUiState> {
+        val pid = p.meta.pairId
+        return combine(
+            listOf(
+                presence.snapshot(pid, p.partnerUid).map<PresenceSnapshot, PresenceSnapshot?> { it }.onStart { emit(null) },
+                location.observe(pid, p.partnerUid).onStart { emit(null) },
+                presence.snapshot(pid, p.myUid).map<PresenceSnapshot, PresenceSnapshot?> { it }.onStart { emit(null) },
+                location.observe(pid, p.myUid).onStart { emit(null) },
+                trips.observe(pid, p.myUid).onStart { emit(null) },
+                trips.observe(pid, p.partnerUid).onStart { emit(null) },
+                ticker().map { clock.now() },
+                settings.settings.map { it.shareFromThisPhone }.onStart { emit(true) },
+            ),
+        ) { v ->
+            val partner = v[0] as PresenceSnapshot?
+            val me = v[2] as PresenceSnapshot?
+            val now = v[6] as Long
+            val partnerPresence = partner?.let { PresenceCalculator.compute(it, now) } ?: PresenceState.Unknown
+            val myTrip = v[4] as Trip?
+            val partnerTrip = v[5] as Trip?
+            MapUiState(
+                loading = partner == null,
+                myName = p.me?.name.orEmpty(),
+                partnerName = p.partner?.name.orEmpty(),
+                partnerPresence = partnerPresence,
+                partnerFix = v[1] as LocationFix?,
+                partnerFaded = partnerPresence !is PresenceState.Live && partnerPresence !is PresenceState.Recent,
+                partnerBattery = partner?.battery,
+                myFix = v[3] as LocationFix?,
+                mySharing = me?.let { SharingPlan.effective(it.sharing ?: SharingMode.OFF, it.sharingUntil, now) } ?: SharingMode.OFF,
+                mySharingUntil = me?.sharingUntil,
+                myTrip = myTrip?.takeIf { it.state == TripState.ACTIVE || it.state == TripState.OVERDUE },
+                partnerTrip = partnerTrip?.takeIf { it.state == TripState.ACTIVE || it.state == TripState.OVERDUE },
+                myTripPhase = OverdueEvaluator.evaluate(myTrip?.snapshot, now),
+                partnerTripPhase = OverdueEvaluator.evaluate(partnerTrip?.snapshot, now),
+                nowMs = now,
+                sharingFromThisPhone = v[7] as Boolean,
+                watcher = p.isWatcher,
+            )
+        }
+    }
+
+    /** Sharing is chosen per phone: this one runs it from now on (review 8 I6). */
+    fun shareLive() = withPair {
+        settings.update { s -> s.copy(shareFromThisPhone = true) }
+        presence.setSharing(it.meta.pairId, it.myUid, SharingMode.LIVE, null)
+    }
+
+    fun pause(choice: PauseChoice) = withPair {
+        presence.setSharing(it.meta.pairId, it.myUid, SharingMode.PAUSED, SharingPlan.pauseUntil(choice, clock.now(), zone))
+    }
+
+    /** Stop means stopped: off, not chosen here any more, and the last point removed from their map. */
+    fun stopSharing() = withPair {
+        settings.update { s -> s.copy(shareFromThisPhone = false) }
+        presence.setSharing(it.meta.pairId, it.myUid, SharingMode.OFF, null)
+        location.clear(it.meta.pairId, it.myUid)
+    }
+
+    /** A trip without sharing can't detect arrival; the sheet asks, and this honours the answer. */
+    fun startTrip(dest: TripDestination?, expectBy: Long?, note: String?, notifyPartner: Boolean, shareDuringTrip: Boolean) = withPair {
+        if (shareDuringTrip) {
+            settings.update { s -> s.copy(shareFromThisPhone = true) }
+            presence.setSharing(it.meta.pairId, it.myUid, SharingMode.LIVE, null)
+        }
+        trips.start(it.meta.pairId, it.myUid, dest, expectBy, note, notifyPartner)
+    }
+
+    /** "+15 min": from the current deadline, or from now if that has already passed. */
+    fun extendTrip() = withPair { p ->
+        val trip = state.value.myTrip ?: return@withPair
+        // No deadline, nothing to extend: inventing one would later raise an overdue alert nobody asked for.
+        val deadline = trip.extendedTo ?: trip.expectBy ?: return@withPair
+        trips.extend(p.meta.pairId, p.myUid, maxOf(deadline, clock.now()) + EXTEND_MS)
+    }
+
+    fun arrive() = withPair { trips.arrive(it.meta.pairId, it.myUid) }
+    fun endTrip() = withPair { trips.end(it.meta.pairId, it.myUid) }
+
+    private fun withPair(block: suspend (PairState.Paired) -> Unit) {
+        val p = current ?: return
+        viewModelScope.launch { block(p) }
+    }
+
+    private fun ticker(): Flow<Unit> = flow { while (true) { emit(Unit); delay(30_000) } }
+
+    companion object {
+        const val EXTEND_MS = 15 * 60_000L
+    }
+}

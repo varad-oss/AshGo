@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Lets debug builds and instrumented tests reach the local Firebase emulators over plain HTTP at 10.0.2.2. -->
+    <application android:networkSecurityConfig="@xml/network_security_config_debug">
+        <!-- Exported in debug so adb can start it (with the useEmulators extra) on an emulator. -->
+        <activity
+            android:name="com.varad.unstoppableash.V2Activity"
+            android:exported="true"
+            tools:replace="android:exported" />
+        <activity
+            android:name=".catalog.DesignCatalogActivity"
+            android:exported="true"
+            android:label="@string/catalog_title"
+            android:theme="@style/Theme.AshGo" />
+    </application>
+</manifest>

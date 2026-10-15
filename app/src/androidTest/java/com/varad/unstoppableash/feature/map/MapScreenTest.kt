@@ -1,0 +1,200 @@
+package com.varad.unstoppableash.feature.map
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import com.varad.unstoppableash.domain.location.PauseChoice
+import com.varad.unstoppableash.domain.model.LocationFix
+import com.varad.unstoppableash.domain.model.SharingMode
+import com.varad.unstoppableash.domain.model.Trip
+import com.varad.unstoppableash.domain.model.TripDestination
+import com.varad.unstoppableash.domain.model.TripState
+import com.varad.unstoppableash.domain.trips.OverduePhase
+import com.varad.unstoppableash.ui.theme.OrbitTheme
+import com.varad.unstoppableash.ui.theme.ThemeMode
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import org.junit.Rule
+import org.junit.Test
+
+/** The map widget is replaced by an empty box: these tests never load OpenStreetMap tiles. */
+class MapScreenTest {
+    @get:Rule val rule = createComposeRule()
+    private val now = 1_000_000_000L
+    private var pins: MapPins? = null
+    private val pauses = mutableListOf<PauseChoice>()
+    private var shared = 0; private var help = 0
+    private var started: List<Any?>? = null
+    private val base = MapUiState(loading = false, partnerName = "Bob", nowMs = now)
+
+    private fun show(state: MapUiState) = rule.setContent {
+        OrbitTheme(ThemeMode.LIGHT) {
+            MapScreen(
+                state,
+                MapActions(onShareLive = { shared++ }, onPause = { pauses += it }, onGetHelp = { help++ }, onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }),
+                map = { p, _, _, m -> pins = p; Box(m) },
+            )
+        }
+    }
+
+    @Test fun attributionIsAlwaysOnScreen() {
+        show(base)
+        rule.onNodeWithText("© OpenStreetMap contributors").assertExists()
+    }
+
+    @Test fun noLocationNoPinAndNoCentreButton() {
+        show(base)
+        rule.onNodeWithText("Show Bob").assertIsNotEnabled()
+        rule.runOnIdle { assertEquals(null, pins?.partner) }
+    }
+
+    @Test fun aStalePinIsDrawnFaded() {
+        show(base.copy(partnerFix = LocationFix(1.0, 2.0, 5f, now - 3_600_000), partnerFaded = true))
+        rule.runOnIdle { assertEquals(true, pins?.partnerFaded) }
+    }
+
+    @Test fun shareAndPauseControls() {
+        show(base.copy(mySharing = SharingMode.OFF))
+        rule.onNodeWithText("Share live").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, shared) }
+    }
+
+    @Test fun pauseChoicesWhileLive() {
+        show(base.copy(mySharing = SharingMode.LIVE))
+        rule.onNodeWithText("Pause 1 h").performScrollTo().performClick()
+        rule.onNodeWithText("Until morning").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(listOf(PauseChoice.ONE_HOUR, PauseChoice.UNTIL_MORNING), pauses) }
+    }
+
+    @Test fun startingATripTellsThePartnerByDefault() {
+        show(base)
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle { assertEquals("not sharing yet: the trip turns sharing on by default", listOf(null, now + 3_600_000, null, true, true), started) }
+    }
+
+    @Test fun myOverdueTripAsksFirst() {
+        val trip = Trip(TripState.ACTIVE, TripDestination(1.0, 2.0, null), now - 120_000, null, null, true, now - 3_600_000, null)
+        show(base.copy(myTrip = trip, myTripPhase = OverduePhase.ASK_TRAVELLER))
+        rule.onNodeWithText("Are you okay? Your trip is past its time.").assertExists()
+        rule.onNodeWithText("Get help").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, help) }
+    }
+
+    @Test fun partnerOverdueIsShownWithHowLong() {
+        val trip = Trip(TripState.ACTIVE, null, now - 25 * 60_000, null, null, true, now - 3_600_000, null)
+        show(base.copy(partnerTrip = trip, partnerTripPhase = OverduePhase.ALERT_PARTNER))
+        rule.onNodeWithText("Bob's trip is 25 min overdue").assertExists()
+    }
+
+    @Test fun aTripWhileSharingDoesNotAskAgain() {
+        show(base.copy(mySharing = SharingMode.LIVE))
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onAllNodesWithText("Share my location during this trip").assertCountEquals(0)
+    }
+
+    @Test fun noDeadlineNoPlus15() {
+        val trip = Trip(TripState.ACTIVE, null, null, null, null, true, now - 60_000, null)
+        show(base.copy(myTrip = trip))
+        rule.onAllNodesWithText("+15 min").assertCountEquals(0)
+    }
+
+    @Test fun sharingOnElsewhereButNotHereIsSaid() {
+        show(base.copy(mySharing = SharingMode.LIVE, sharingFromThisPhone = false))
+        rule.onNodeWithText("Sharing is on for your account, but not from this phone").assertExists()
+        rule.onNodeWithText("Share from this phone").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, shared) }
+    }
+
+    @Test fun partnerOverdueHelpIsNotMislabelled() {
+        val trip = Trip(TripState.ACTIVE, null, now - 25 * 60_000, null, null, true, now - 3_600_000, null)
+        show(base.copy(partnerTrip = trip, partnerTripPhase = OverduePhase.ALERT_PARTNER))
+        rule.onAllNodesWithText("Raise SOS for them").assertCountEquals(0)
+        rule.onNodeWithText("Get help").assertExists()
+    }
+
+    @Test fun aSearchedPlaceBecomesTheTripDestination() {
+        val searched = mutableListOf<String>()
+        val cafe = com.varad.unstoppableash.data.places.Place("Blue Tokai, Bandra", "Mumbai", 19.06, 72.83)
+        var places by androidx.compose.runtime.mutableStateOf<PlaceSearchState>(PlaceSearchState.Idle)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(
+                    base,
+                    MapActions(onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }, onSearchPlace = { searched += it; places = PlaceSearchState.Results(listOf(cafe)) }),
+                    map = { p, _, _, m -> pins = p; Box(m) },
+                    places = places,
+                )
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Search for a place").performTextInput("blue tokai")
+        rule.onNodeWithText("Search").performClick()
+        rule.runOnIdle { assertEquals(listOf("blue tokai"), searched) }
+        rule.onNodeWithText("Blue Tokai, Bandra").performClick()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle { assertEquals(com.varad.unstoppableash.domain.model.TripDestination(19.06, 72.83, "Blue Tokai, Bandra"), started!![0]) }
+    }
+
+    @Test fun theWatcherHasNoSharingOrTripControls() {
+        show(base.copy(watcher = true))
+        rule.onNodeWithText("Start a trip").assertDoesNotExist()
+        rule.onNodeWithText("Share live").assertDoesNotExist()
+        rule.onNodeWithText("Bob isn't on a trip", substring = true).assertExists()
+    }
+
+    @Test fun aSavedPlaceIsOneTapAway() {
+        val home = com.varad.unstoppableash.data.local.SavedPlace("h1", "Home", 18.52, 73.85)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(base, MapActions(onStartTrip = { d, e, n, t, sh -> started = listOf(d, e, n, t, sh) }), map = { p, _, _, m -> pins = p; Box(m) }, savedPlaces = listOf(home))
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Home").performClick()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle { assertEquals(com.varad.unstoppableash.domain.model.TripDestination(18.52, 73.85, "Home"), started!![0]) }
+    }
+
+    @Test fun aPickedPlaceCanBeSavedWithAName() {
+        var saved: Pair<String, com.varad.unstoppableash.domain.model.TripDestination>? = null
+        val cafe = com.varad.unstoppableash.data.places.Place("Blue Tokai", "Mumbai", 19.06, 72.83)
+        rule.setContent {
+            OrbitTheme(ThemeMode.LIGHT) {
+                MapScreen(
+                    base, MapActions(onSearchPlace = {}, onSavePlace = { n, d -> saved = n to d }), map = { p, _, _, m -> pins = p; Box(m) },
+                    places = PlaceSearchState.Results(listOf(cafe)),
+                )
+            }
+        }
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithText("Blue Tokai").performClick()
+        rule.onNodeWithText("Save this place").performClick()
+        rule.onNodeWithText("Name (e.g. Home, PG)").performTextInput("Office")
+        rule.onNodeWithText("Save").performClick()
+        rule.runOnIdle { assertEquals("Office", saved!!.first); assertEquals(19.06, saved!!.second.lat, 0.0) }
+    }
+
+    @Test fun expectBackCanBeACustomTime() {
+        show(base)
+        rule.onNodeWithText("Start a trip").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Choose a custom time").performClick()
+        rule.onNodeWithText("Expect me back by").assertExists()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("By ", substring = true).assertExists()
+        rule.onNodeWithText("Start").performClick()
+        rule.runOnIdle {
+            val expectBy = started!![1] as Long
+            assertTrue("a real deadline, later than now, within a day", expectBy > now && expectBy <= now + 24 * 3_600_000L)
+        }
+    }
+}
