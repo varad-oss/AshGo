@@ -92,9 +92,19 @@ The server enforces the roles too: only the person who joined can write location
 
 ## Architecture
 
-<p align="center">
-  <img src="docs/readme/architecture.png" alt="Architecture: the Android app's feature, domain, data and service layers, connected to Firebase Realtime Database, Firebase Auth, emergency contacts by SMS, and GitHub Releases for updates" width="100%">
-</p>
+```mermaid
+flowchart LR
+    subgraph Phone["Android app (Kotlin · Compose)"]
+        UI["feature/*<br/>Compose screens + ViewModels"] --> D["domain/*<br/>pure rules: presence, overdue,<br/>SOS state machine, notification planner"]
+        UI --> R["data/*<br/>repositories over RtdbClient"]
+        S["service/*<br/>SOS · location · stay-connected ·<br/>notifications · cleanup · updates"] --> D
+        S --> R
+    end
+    R <-->|"realtime listeners"| DB[("Firebase Realtime Database<br/>Spark plan")]
+    A["Firebase Auth<br/>Google sign-in"] --- R
+    S -->|"SMS with delivery reports"| SMS(("Emergency<br/>contacts"))
+    S -->|"checks app_config,<br/>verifies SHA-256"| GH["GitHub Releases<br/>AshGo-releases"]
+```
 
 - **Pure domain logic** (presence, overdue phases, the SOS state machine, the notification planner, background policy) is unit-tested without Android.
 - **One `RtdbClient` seam** with an in-memory fake, so repositories and view-models are tested against realistic database behaviour: offline writes, denied reads, server time.
