@@ -11,6 +11,25 @@ No secret values are reproduced in this document.
 
 ---
 
+## Status re-check — 2026-10-21 (v2.0.1, `v2` @ `8b867ea`)
+
+Sections 1–8 below are the **original v1 audit**, kept for the record. Below is where each finding stands now.
+
+| # | Status | Evidence (2026-10-21) |
+|---|---|---|
+| S1 authorization | ✅ **Closed** | Google sign-in only, with no anonymous auth (`signInAnonymously` is absent from the code). Data lives under `pairs/{pid}`, with membership enforced by the phase-2 rules (64/64 emulator tests). Live DB: unauthenticated reads of `/`, `/pairs`, `/userPairs` and `/app_config` all return **401**. Only `app_config`, `pairs` and `userPairs` remain at the root; the v1 nodes are deleted. |
+| S2 GitHub token | ✅ **Closed in the app** · ⚠️ owner check | `app_config` holds only `apk_url, apk_size, sha256, latest_version_code, latest_version_name, notes`, with no token. The updater sends no `Authorization` header and downloads from the public `AshGo-releases`. **Owner:** confirm the old v1 token is revoked (GitHub → Settings → Developer settings → Personal access tokens). |
+| S3 personal media in a public repo | 🔴 **Open (history only)** | Nothing personal is in the current tree. Git history still holds 9 photos (`res/drawable/photo_*`) and a voice recording (`res/raw/*fake_call.mp3`), and `varad-oss/AshGo` is **public** (0 forks). Fixing this needs an owner decision; see §9. |
+| S4 SOS forgery | ✅ **Closed** | SOS writes are rules-restricted to the member who joined, and record the sender (`from`) and server time. Only the sender can cancel, and the cancel time is server time. The widget only handles `APPWIDGET_UPDATE`, and a tap opens the non-exported hold screen. The SOS activities and SMS receivers are `exported="false"`. |
+| S5 updater integrity | ✅ **Closed** · ⚠️ signing key | The updater accepts only an allowlisted `https://github.com/varad-oss/AshGo-releases/releases/download/…` URL and checks the SHA-256 and size before the system installer opens. Release builds have `isDebuggable = false` and R8 on. targetSdk 34 blocks cleartext by default. **Remaining:** the APK is still signed with `~/.android/debug.keystore`, kept deliberately so updates install in place. Keep an offline backup of it. |
+| S6 permissions | ✅ **Closed** | No `READ_CONTACTS` (the system phone picker is used instead), and no accessibility service. |
+| S7 backup and logs | ✅ **Closed** | `backup_rules.xml` and `data_extraction_rules.xml` exclude `file`, `sharedpref` and `database` from both cloud backup and device transfer. No log line contains phone numbers or coordinates (location logs give accuracy only). The RTDB cache is app-private on a non-debuggable build. |
+| S8 retention | ✅ **Closed** · accepted limit | Stopping sharing removes the last point. Retention covers messages 7 d, photos 3 d, check-ins 7 d, trips 24 h after ending and cancelled SOS 30 d; leaving the orbit deletes all of it. **Limit:** pruning runs on the members' phones, because Spark has no Cloud Functions. |
+| S9 no E2EE | ✅ **Accepted, not claimed** | No screen or document claims end-to-end encryption. |
+| S10 `notifications` open | ✅ **Closed** 2026-10-14 | The node is deleted, and its rule is gone in phase 2. |
+
+---
+
 ## 0. What we could and could not see
 
 | Item | Status |
@@ -201,3 +220,18 @@ To view the deployed rules: Firebase console → Realtime Database → **Rules**
 4. **Rollback:** paste the old rules back.
 
 **Still exposed after phase 1 (S1):** any signed-in client can still read the legacy v1 paths. That ends only with phase 2, after both phones run v2. **Keep the releases repo private until then** (D-10).
+
+## 9. Closing S3 (owner decision, 2026-10-21)
+
+The current tree is clean. The personal photos and voice recording are only in **git history**, and they can still be downloaded from the public repo, by commit or from old pull-request refs.
+
+**Option A: make `varad-oss/AshGo` private.** *(Recommended: instant, free and reversible.)*
+- Updates keep working, because the app downloads from the separate public `AshGo-releases` repo.
+- The README is no longer public.
+
+**Option B: rewrite history and force-push.**
+- Rewrite with `git filter-repo --invert-paths --path-glob 'app/src/main/res/drawable/photo_*' --path-glob 'app/src/main/res/raw/*.mp3'`, then force-push every branch.
+- This is destructive, and it changes every commit hash.
+- GitHub keeps `refs/pull/*` and cached commits, so fully removing them also needs a GitHub Support request to purge cached views.
+
+**Option C: both.** Rewrite the history, keep the repo private until GitHub confirms the purge, then make it public again.
