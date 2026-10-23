@@ -31,7 +31,7 @@ No secret values are reproduced in this document.
 | SOS authorization | **fixed** | Only the member who joined can create an SOS. Only its sender can cancel it, and only the partner can acknowledge it, both with server time. An active SOS can't be deleted. All of this is asserted in `data.test.mjs` and `roles.test.mjs`. |
 | Backups, logs, permissions | **fixed** | Backup and device transfer exclude all app data. Logs carry no numbers or coordinates. There is no `READ_CONTACTS` and no accessibility service. |
 | Background alerting | **current** (limit) | The watcher's phone is connected only during the traveller's trip, or while following live sharing (`BackgroundPolicy`). Outside those windows an SOS reaches the watcher by SMS only. The README says so. |
-| CI | **fixed** today | `.github/workflows/ci.yml` runs unit tests, lint and the rules suite with `contents: read`, no secrets and a placeholder Firebase config. It was verified locally in a clean worktree. **It has not run on GitHub yet** (nothing pushed). |
+| CI | **fixed** today | `.github/workflows/ci.yml` runs unit tests, lint and the rules suite with `contents: read`, no secrets and a placeholder Firebase config. It was verified locally in a clean worktree, and both jobs pass on GitHub for `v2` @ `f763bf1` (after switching the rules script to a file glob so it works on Node 22). |
 
 ## Status re-check — 2026-10-21 (v2.0.1, `v2` @ `8b867ea`)
 
