@@ -45,12 +45,21 @@ object UpdatePolicy {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
         if (uri.scheme != "https" || uri.userInfo != null || (uri.port != -1 && uri.port != 443)) return false
         val host = uri.host?.lowercase() ?: return false
+        // `uri.path` is decoded, so "%2e%2e" shows up here as "..": no segment may step out of the repo path.
+        if (uri.path.orEmpty().split('/').any { it == "." || it == ".." }) return false
         return when (host) {
             "github.com" -> uri.path?.startsWith(REPO_PATH) == true
             in ASSET_HOSTS -> true
             else -> false
         }
     }
+
+    /** No AshGo APK comes near this; anything larger is stopped mid-download rather than filling the cache. */
+    const val MAX_APK_BYTES = 100L * 1024 * 1024
+
+    /** More bytes than `app_config` announced (or than the hard cap) means it is not the published file. */
+    fun tooLarge(downloaded: Long, announced: Long?): Boolean =
+        downloaded > minOf(announced ?: MAX_APK_BYTES, MAX_APK_BYTES)
 
     fun matches(input: InputStream, expectedSha256: String): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")

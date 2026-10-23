@@ -1,5 +1,7 @@
 # AshGo — Current State Audit
 
+> **Historical snapshot (2026-10-13).** This describes v1, before the v2 redesign, and is kept for the record. For the current status, see the dated re-checks at the top of [SECURITY_PRIVACY_AUDIT.md](SECURITY_PRIVACY_AUDIT.md).
+
 Audit date: 2026-10-13 · Branch audited: `main` @ `fc1070e` (versionCode 45, versionName 1.3.32)
 Method: every Kotlin file, manifest, Gradle file and XML resource was read in full; git history was searched; a baseline build, unit-test run and lint run were executed locally. No production code was modified.
 

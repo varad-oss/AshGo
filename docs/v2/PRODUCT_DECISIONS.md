@@ -124,6 +124,8 @@ Existing installs are signed with this Mac's debug key.
 
 **Interim:** keep the private repo, using a fine-grained, single-repo, Contents-read-only token in `app_config/github_token`.
 
+**Status (2026-10-21):** done. The releases repo is public, `app_config/github_token` is deleted, and the owner revoked the old token.
+
 **v2 flow:** the owner bumps `app_config/latest_version_code` and sets `apk_url` + `sha256` in the console. The app shows the size, downloads, verifies the SHA-256, and hands the file to the system installer. Rules make `app_config` read-only for clients.
 
 Earlier recommendation, kept for the record:

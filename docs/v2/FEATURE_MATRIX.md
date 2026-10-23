@@ -1,5 +1,7 @@
 # AshGo — Existing Feature Matrix
 
+> **Historical snapshot (2026-10-13).** This describes v1, before the v2 redesign, and is kept for the record. For the current status, see the dated re-checks at the top of [SECURITY_PRIVACY_AUDIT.md](SECURITY_PRIVACY_AUDIT.md).
+
 **Classification**
 - ✅ Verified in code and coherent
 - 🧪 Implemented, not adequately tested

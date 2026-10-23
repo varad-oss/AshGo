@@ -48,6 +48,20 @@ class UpdatePolicyTest {
         assertFalse(UpdatePolicy.matches(bytes.inputStream(), hex.replaceFirst(hex[0], if (hex[0] == 'a') 'b' else 'a')))
     }
 
+    @Test fun dotSegmentsCannotWalkOutOfTheReleasesRepo() {
+        assertFalse(UpdatePolicy.allowedUrl("https://github.com/varad-oss/AshGo-releases/../other-repo/releases/download/v1/a.apk"))
+        assertFalse("percent-encoded dots too", UpdatePolicy.allowedUrl("https://github.com/varad-oss/AshGo-releases/%2e%2e/other-repo/a.apk"))
+        assertFalse(UpdatePolicy.allowedUrl("https://github.com/varad-oss/AshGo-releases/./releases/download/v1/a.apk"))
+    }
+
+    @Test fun downloadsStopAtTheAnnouncedSizeOrTheHardCap() {
+        assertFalse(UpdatePolicy.tooLarge(downloaded = 8_123_456L, announced = 8_123_456L))
+        assertTrue("one byte more than announced", UpdatePolicy.tooLarge(downloaded = 8_123_457L, announced = 8_123_456L))
+        assertFalse(UpdatePolicy.tooLarge(downloaded = UpdatePolicy.MAX_APK_BYTES, announced = null))
+        assertTrue("no size announced: hard cap", UpdatePolicy.tooLarge(downloaded = UpdatePolicy.MAX_APK_BYTES + 1, announced = null))
+        assertTrue("an announced size above the cap is not trusted", UpdatePolicy.tooLarge(downloaded = UpdatePolicy.MAX_APK_BYTES + 1, announced = Long.MAX_VALUE))
+    }
+
     @Test fun parseNeverThrows() {
         assertEquals(UpdateCheck.Unavailable, UpdatePolicy.parse(mapOf("latest_version_code" to "twelve"), 1))
         assertNull((UpdatePolicy.parse(good - "notes", 1) as UpdateCheck.Available).info.notes)

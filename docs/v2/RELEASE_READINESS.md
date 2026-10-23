@@ -1,5 +1,7 @@
 # AshGo 2.0 — release readiness (2026-10-14)
 
+> **Dated 2026-10-14, for 2.0.0.** The owner steps below were completed during the rollout. For the current test commands, see the README; for the security status, see [SECURITY_PRIVACY_AUDIT.md](SECURITY_PRIVACY_AUDIT.md).
+
 **Build:** 2.0.0 (versionCode 46), signed with the same key as v1, R8 on. **Budget:** ₹0, on the Firebase Spark plan only (RTDB + Auth). No Functions, Storage, FCM server, Blaze or paid APIs.
 
 ## Status

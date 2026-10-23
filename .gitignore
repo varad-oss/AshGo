@@ -31,3 +31,16 @@ dist/
 .playwright-mcp/
 design/*.png
 design/shots/
+
+# Signing material, local secrets and build artifacts: never committed
+*.jks
+*.keystore
+*.p12
+*.pem
+.env
+.env.*
+*.apk
+*.aab
+*.log
+# A copy of the live rules pulled for comparison (SECURITY_PRIVACY_AUDIT §7)
+firebase/database.rules.current.json

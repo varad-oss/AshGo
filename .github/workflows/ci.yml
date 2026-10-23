@@ -1,0 +1,63 @@
+# Local-only checks: JVM unit tests, lint, and the Realtime Database rules against the emulator (demo project).
+# No secrets, no production Firebase, no device or emulator tests. Two-phone checks are manual (DEVICE_VERIFICATION.md).
+name: CI
+
+on:
+  push:
+    branches: [main, v2]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android unit tests + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      # The real google-services.json is git-ignored. This placeholder (demo project, fake ids) only lets the build run.
+      - name: Placeholder Firebase config
+        run: cp .github/ci/google-services.placeholder.json app/google-services.json
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+      - name: Lint
+        run: ./gradlew :app:lintDebug --console=plain
+      - name: Test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: app/build/reports/
+
+  rules:
+    name: Database rules (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: firebase
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4 # the database emulator runs on Java
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: firebase/package-lock.json
+      - run: npm ci
+      - name: Rules tests (both stages, project demo-ashgo)
+        run: npm test

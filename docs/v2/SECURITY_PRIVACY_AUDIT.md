@@ -11,6 +11,28 @@ No secret values are reproduced in this document.
 
 ---
 
+## Status re-check — 2026-10-24 (local repository only)
+
+**Method:** source, rules, tests, build config and git history read on `v2` @ `46329bf`. Rules suite run on the local emulator (project `demo-ashgo`); JVM unit tests and lint run locally. **No production system was accessed:** no live probe, rule read or deploy. The live-database observations in the 2026-10-21 table below are dated evidence from that day, not re-verified today.
+
+**Labels:** **current** = confirmed in today's code · **fixed** = fixed, with evidence · **historical** = past issue that is still relevant · **owner** = needs owner or production verification.
+
+| Item | Label | Finding |
+|---|---|---|
+| Legacy v1 paths in `database.rules.json` (phase 1) | **current** (file) · **owner** (live) | Phase 1 still grants `auth != null` read and write on `chat`, `tracking`, `alerts`, `buzz` and `users`, so **any signed-in account** could use those paths. Phase 2 removes them and leaves no root grant. The v2 subtrees (`pairs`, `invites`, `userPairs`, `app_config`) are byte-identical in both files, so the pair, role and outsider tests cover both stages. Moving to phase 2 requires both phones on v2, the legacy data deleted, then an owner deploy and check. The owner record says this happened in October 2026; the repo can't prove the live state. |
+| `firebase.json` deployed phase 1 | **fixed** today | The default deploy target was `database.rules.json`, so a routine `firebase deploy` would have **reopened** the legacy paths. It now points at `database.rules.phase2.json`, and `firebase/test/stages.test.mjs` fails if the target changes, or if phase 2 regains a legacy path, a root grant or a differing v2 subtree. **Not deployed.** |
+| Updater URL allowlist | **fixed** today | `allowedUrl` checked only the path prefix, so `/varad-oss/AshGo-releases/../other/…`, including the `%2e%2e` form, passed. Dot segments are now rejected (`UpdatePolicyTest.dotSegmentsCannotWalkOutOfTheReleasesRepo`). The SHA-256 check already blocked any wrong file, so this is defence in depth. |
+| Updater download size | **fixed** today | There was no limit while downloading. The download now stops as soon as it passes the announced `apk_size`, or 100 MB when no size is announced (`downloadsStopAtTheAnnouncedSizeOrTheHardCap`). |
+| Updater token, hash, https, redirects | **fixed** | No token anywhere in the source. Every redirect hop is re-checked against the allowlist, and the file goes to the system installer only after its SHA-256 matches. |
+| Release signing | **current** (by design) · **owner** | `release` uses `signingConfigs.debug`, the owner's machine key, kept so v1 and v2 installs update in place (D-9). The build is non-debuggable with R8. A dedicated release key would need APK Signature Scheme v3 rotation, and it is an owner decision. Losing that keystore ends in-place updates. |
+| Debug emulator switch | **fixed** | `DevBackend` ignores `useEmulators` unless the app is debuggable, so another app can't send a release build to a fake backend. |
+| Personal assets | **historical** · **owner** | None in the current tree. Git history still contains 9 photos and a voice recording (paths: `app/src/main/res/drawable/photo_*`, `app/src/main/res/raw/*.mp3`). The owner accepted this on 2026-10-21 (§9). |
+| Credentials in the tree | **fixed** | No keystore, `.env`, APK or `google-services.json` is tracked. `.gitignore` now also covers `*.jks`, `*.keystore`, `*.p12`, `*.pem`, `.env*`, `*.apk`, `*.aab`, `*.log` and `firebase/database.rules.current.json`. |
+| SOS authorization | **fixed** | Only the member who joined can create an SOS. Only its sender can cancel it, and only the partner can acknowledge it, both with server time. An active SOS can't be deleted. All of this is asserted in `data.test.mjs` and `roles.test.mjs`. |
+| Backups, logs, permissions | **fixed** | Backup and device transfer exclude all app data. Logs carry no numbers or coordinates. There is no `READ_CONTACTS` and no accessibility service. |
+| Background alerting | **current** (limit) | The watcher's phone is connected only during the traveller's trip, or while following live sharing (`BackgroundPolicy`). Outside those windows an SOS reaches the watcher by SMS only. The README says so. |
+| CI | **fixed** today | `.github/workflows/ci.yml` runs unit tests, lint and the rules suite with `contents: read`, no secrets and a placeholder Firebase config. It was verified locally in a clean worktree. **It has not run on GitHub yet** (nothing pushed). |
+
 ## Status re-check — 2026-10-21 (v2.0.1, `v2` @ `8b867ea`)
 
 Sections 1–8 below are the **original v1 audit**, kept for the record. Below is where each finding stands now.
@@ -189,6 +211,8 @@ To view the deployed rules: Firebase console → Realtime Database → **Rules**
 
 
 ## 8. Deploying the phase-1 rules (owner, 2026-10-14)
+
+> **Historical (done).** Since 2026-10-24 `firebase.json` points at the phase-2 file, so the CLI command below now deploys **phase 2**. Phase 1 should never be redeployed: it would reopen the legacy paths.
 
 `firebase/database.rules.json` is safe to deploy **now**, while v1 is still installed.
 

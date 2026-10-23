@@ -66,8 +66,13 @@ class Updater(private val context: Context, private val db: RtdbClient, private 
                     while (true) {
                         val n = input.read(buffer)
                         if (n < 0) break
-                        output.write(buffer, 0, n)
                         done += n
+                        if (UpdatePolicy.tooLarge(done, info.sizeBytes)) {
+                            connection.disconnect()
+                            out.delete()
+                            return@withContext Outcome.Failure(FailureReason.INVALID, UpdateFailure.CHECKSUM.name)
+                        }
+                        output.write(buffer, 0, n)
                         onProgress(total?.let { (done.toFloat() / it).coerceAtMost(1f) })
                     }
                 }
